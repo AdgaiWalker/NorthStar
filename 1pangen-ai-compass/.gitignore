@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+.env
+.env.*
+!.env.example
+
+.zhipu.local.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

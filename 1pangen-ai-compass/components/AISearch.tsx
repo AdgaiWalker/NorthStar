@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, Loader2, ArrowRight, BookOpen, AlertTriangle } from 'lucide-react';
-import { searchToolsWithAI } from '../services/geminiService';
+import { searchToolsWithAI } from '../services/AIService';
 import { AISearchResultV2 } from '../services/aiContract';
 import { Tool, Article } from '../types';
 import { ToolCard, ArticleCard } from './CardComponents';
