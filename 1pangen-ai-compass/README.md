@@ -1,20 +1,22 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 盘根 · AI 指南针（PanGen AI Compass）前端
 
-# Run and deploy your AI Studio app
+- 最终 PRD（单一事实来源）：`../openspec/Specs/PRD-盘根AI指南针-最终版.md`
 
-This contains everything you need to run your app locally.
+## 本地运行
 
-View your app in AI Studio: https://ai.studio/apps/drive/1FYyHI0aQVk8KtzdqewR7VXB6sjUioF63
+前置条件：Node.js（建议使用 `pnpm`）。
 
-## Run Locally
+1. 安装依赖：
+   - `pnpm install`
+   - 或：`npm install`
+2. 配置 AI（可选）
+   - 方式 A：在项目根目录创建 `.zhipu.local.json`（建议保持 untracked），写入 `api_key`（可选 `base_url`、`model`）。
+   - 方式 B：在 `.env.development.local` 设置 `ZHIPU_API_KEY` / `ZHIPU_BASE_URL`。
+3. 启动开发：
+   - `pnpm dev`
+   - 或：`npm run dev`
 
-**Prerequisites:**  Node.js
+## 说明
 
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- AI 请求通过 Vite proxy 访问：`POST /__zhipu/chat/completions`。
+- 当 AI 不可用或返回不可解析内容时，前端会进入“演示模式（demo）”回退。
