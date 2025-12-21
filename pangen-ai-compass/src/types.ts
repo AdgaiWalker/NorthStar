@@ -30,6 +30,8 @@ export interface Tool {
   imageUrl: string;
   url: string;
   isFavorite: boolean;
+  visibility?: 'public' | 'campus'; // 可见性：公开/校内专区
+  schoolId?: string; // 校内专区时的学校标识
 }
 
 export interface Article {
@@ -52,6 +54,8 @@ export interface Article {
     likes: number;
     comments: number;
   };
+  visibility?: 'public' | 'campus'; // 可见性：公开/校内专区
+  schoolId?: string; // 校内专区时的学校标识
 }
 
 export interface User {

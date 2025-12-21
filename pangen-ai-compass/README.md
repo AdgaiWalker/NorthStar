@@ -20,3 +20,11 @@
 
 - AI 请求通过 Vite proxy 访问：`POST /__zhipu/chat/completions`。
 - 当 AI 不可用或返回不可解析内容时，前端会进入“演示模式（demo）”回退。
+
+## ⚠️ 安全说明
+
+**重要：当前配置仅用于本地开发环境！**
+
+- Vite dev server 的 proxy 功能仅在开发模式下有效
+- 生产环境必须配置后端 API 网关，由后端服务持有并转发 API Key
+- 不要将包含 API Key 的配置文件提交到版本控制系统
