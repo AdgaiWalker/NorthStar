@@ -81,6 +81,34 @@ export type ViewState =
   | { type: 'tool-detail'; toolId: string }
   | { type: 'article-read'; articleId: string; topicId?: string }
   | { type: 'login' }
-  | { type: 'user-center'; tab?: 'profile' | 'history' | 'favorites' | 'creator' | 'solutions' }
+  | { type: 'user-center'; tab?: 'profile' | 'history' | 'favorites' | 'creator' | 'solutions' | 'stats' }
   | { type: 'solution-generate'; toolIds: string[] }
-  | { type: 'admin'; section?: 'dashboard' | 'content' | 'users' };
+  | { type: 'admin'; section?: 'dashboard' | 'content' | 'users' | 'analytics' };
+
+export interface AnalyticsEvent {
+  id: string;
+  type: 'ai_search' | 'solution_generate' | 'solution_export' | 'tool_select' | 'domain_switch' | 'page_view';
+  timestamp: string;
+  domain?: Domain;
+  toolIds?: string[];
+  metadata?: Record<string, any>;
+}
+
+export interface UserStats {
+  aiSearchCount: { total: number; trend: number[] };
+  solutionCount: { total: number; trend: number[] };
+  exportCount: number;
+  topTools: { id: string; name: string; count: number; icon: string }[];
+  domainDistribution: { domain: Domain; count: number; label: string; color: string }[];
+  trend: { date: string; searches: number; solutions: number }[];
+}
+
+export interface PlatformStats {
+  totalUsers: number;
+  activeUsers: { dau: number; wau: number; mau: number };
+  aiCalls: { today: number; week: number; successRate: number };
+  solutionGenerated: { today: number; week: number };
+  topTools: { name: string; usage: number }[];
+  topSearchTerms: { term: string; count: number }[];
+  trend: { date: string; users: number; aiCalls: number }[];
+}

@@ -4,6 +4,7 @@ import { searchToolsWithAI } from '../services/AIService';
 import { AISearchResultV2 } from '../services/aiContract';
 import { Tool, Article } from '../types';
 import { ToolCard, ArticleCard } from './CardComponents';
+import { UI_DELAY } from '@/constants/ui';
 
 interface AISearchProps {
   tools: Tool[];
@@ -27,7 +28,7 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
     setIsExpanded(true);
     
     // Simulate slight network delay
-    await new Promise(resolve => setTimeout(resolve, 800));
+    await new Promise(resolve => setTimeout(resolve, UI_DELAY.AI_SEARCH_SIMULATE));
     
     const aiResponse = await searchToolsWithAI(query, tools, articles);
     setResult(aiResponse);

@@ -1,6 +1,7 @@
 import { Tool, Article } from '../types';
 import { AISearchResultV2 } from './aiContract';
 import { buildFallbackResult } from './aiFallback';
+import { API_ENDPOINTS } from '@/constants/api';
 
 const ZHIPU_MODEL = 'glm-4.6';
 const EMIT_SEARCH_RESULT_TOOL_NAME = 'emit_search_result_v2';
@@ -105,7 +106,7 @@ ${articleContext}
       },
     ];
  
-    const response = await fetch('/__zhipu/chat/completions', {
+    const response = await fetch(API_ENDPOINTS.ZHIPU_CHAT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

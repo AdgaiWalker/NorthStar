@@ -3,6 +3,7 @@ export const STORAGE_KEYS = {
   language: 'pangen.language',
   selectedToolIds: 'pangen.selectedToolIds',
   userSolutions: 'pangen.userSolutions',
+  analyticsEvents: 'pangen.analyticsEvents',
 } as const;
 
 export interface StorageReadResult<T> {

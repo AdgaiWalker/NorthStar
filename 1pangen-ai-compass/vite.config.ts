@@ -98,8 +98,11 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(__dirname, 'src'),
       },
+    },
+    build: {
+      minify: false, // 避免 Windows/Node 25 下 esbuild 压缩异常
     },
   };
 });
