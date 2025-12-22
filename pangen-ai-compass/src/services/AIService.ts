@@ -1,5 +1,5 @@
 import { Tool, Article } from '../types';
-import { AISearchResultV2 } from './aiContract';
+import { AISearchResultV2, AISolutionResult, FallbackReason } from './aiContract';
 import { buildFallbackResult } from './aiFallback';
 import { API_ENDPOINTS } from '@/constants/api';
 
@@ -166,5 +166,134 @@ ${articleContext}
   } catch (error) {
     const reason = error instanceof SyntaxError ? 'parse_error' : 'network_error';
     return buildFallbackResult(reason, query, availableTools, availableArticles);
+  }
+};
+
+// ===== AI 方案生成 =====
+
+const EMIT_SOLUTION_TOOL_NAME = 'emit_solution_v1';
+
+const buildFallbackSolution = (
+  reason: FallbackReason,
+  goal: string,
+  tools: Tool[]
+): AISolutionResult => {
+  const toolNames = tools.map(t => t.name).join('、');
+  return {
+    mode: 'demo',
+    fallbackReason: reason,
+    title: `方案: ${toolNames}`,
+    aiAdvice: `### 演示模式
+
+AI 服务不可用，以下为默认建议。
+
+#### 已选工具
+${tools.map(t => `- **${t.name}**: ${t.description}`).join('\n')}
+
+#### 建议步骤
+1. 熟悉每个工具的基本操作
+2. 根据目标“${goal || '探索工具组合'}”设计工作流
+3. 尝试将工具组合使用
+
+> 请稍后重试以获取更专业的 AI 分析。`,
+  };
+};
+
+export const generateSolutionWithAI = async (
+  goal: string,
+  selectedTools: Tool[]
+): Promise<AISolutionResult> => {
+  try {
+    const toolContext = selectedTools.map(t => `- ${t.name}: ${t.description}`).join('\n');
+    const effectiveGoal = goal.trim() || '探索这些工具的组合潜力';
+
+    const userPrompt = `用户目标: "${effectiveGoal}"
+
+已选工具:
+${toolContext}
+
+请生成一份完整的解决方案，包含:
+1. 方案标题（简短有力）
+2. 详细的 AI 建议（Markdown 格式，包含步骤、优势分析、实施建议等）
+
+要求:
+- 必须使用中文
+- 建议内容要具体、可执行
+- 步骤数量 3-5 个
+- 输出纯 JSON，禁止 markdown 代码块`;
+
+    const functionTools = [
+      {
+        type: 'function',
+        function: {
+          name: EMIT_SOLUTION_TOOL_NAME,
+          description: '输出盘根指南针 AI 方案生成结果',
+          parameters: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: '方案标题' },
+              aiAdvice: { type: 'string', description: 'AI 建议，Markdown 格式' },
+            },
+            required: ['title', 'aiAdvice'],
+          },
+        },
+      },
+    ];
+
+    const response = await fetch(API_ENDPOINTS.ZHIPU_CHAT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: ZHIPU_MODEL,
+        messages: [
+          { role: 'system', content: '你是一位名为“盘根指南针”的专业 AI 软件顾问，擅长制定工具组合使用方案。' },
+          { role: 'user', content: userPrompt },
+        ],
+        tools: functionTools,
+        tool_choice: {
+          type: 'function',
+          function: {
+            name: EMIT_SOLUTION_TOOL_NAME,
+          },
+        },
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      const reason = response.status === 401 || response.status === 403 || response.status === 404 ? 'missing_key' : 'network_error';
+      return buildFallbackSolution(reason, effectiveGoal, selectedTools);
+    }
+
+    const payload: unknown = await response.json();
+    const toolArguments =
+      typeof (payload as any)?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments === 'string'
+        ? (payload as any).choices[0].message.tool_calls[0].function.arguments
+        : '';
+
+    const content =
+      typeof (payload as any)?.choices?.[0]?.message?.content === 'string'
+        ? (payload as any).choices[0].message.content
+        : '';
+
+    const jsonText = toolArguments || content || '{}';
+    const data = safeParseJsonObject(jsonText);
+
+    if (!data.title || !data.aiAdvice) {
+      return buildFallbackSolution('empty_result', effectiveGoal, selectedTools);
+    }
+
+    return {
+      mode: 'ai',
+      fallbackReason: '',
+      title: data.title,
+      aiAdvice: data.aiAdvice,
+    };
+
+  } catch (error) {
+    const reason = error instanceof SyntaxError ? 'parse_error' : 'network_error';
+    return buildFallbackSolution(reason, goal, selectedTools);
   }
 };

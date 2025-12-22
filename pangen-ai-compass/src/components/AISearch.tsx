@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Sparkles, Loader2, ArrowRight, BookOpen, AlertTriangle, Search, ChevronDown, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { Sparkles, Loader2, ArrowRight, AlertTriangle, Search, Library, Layers, BookOpen } from 'lucide-react';
 import { searchToolsWithAI } from '../services/AIService';
 import { AISearchResultV2 } from '../services/aiContract';
-import { Tool, Article } from '../types';
+import { Tool, Article, LibraryMode } from '../types';
 import { ToolCard, ArticleCard } from './CardComponents';
 import { UI_DELAY } from '@/constants/ui';
 
@@ -19,6 +19,7 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
   const [loading, setLoading] = useState(false);
 
   const [searchMode, setSearchMode] = useState<'ai' | 'normal'>('ai');
+  const [libraryMode, setLibraryMode] = useState<LibraryMode>('professional');
   const [lastSearchedQuery, setLastSearchedQuery] = useState('');
 
   // AI Search Result
@@ -28,29 +29,41 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
   const [normalResult, setNormalResult] = useState<{ tools: Tool[]; articles: Article[] } | null>(null);
 
   const [isExpanded, setIsExpanded] = useState(false);
-  // Removed scopeMenuOpen state as we switched to single toggle
-  
-  // Cleanup listener no longer needed for toggle button (but keeping clean component structure)
 
-  const performSearch = async (mode: 'ai' | 'normal', q: string) => {
+  // 根据库模式过滤数据
+  const getFilteredData = (libMode: LibraryMode) => {
+    if (libMode === 'professional') {
+      // 专业库：仅精选内容
+      return {
+        filteredTools: tools, // 工具暂无 isFeatured 字段，全部使用
+        filteredArticles: articles.filter(a => a.isFeatured),
+      };
+    }
+    // 综合库：全量内容
+    return { filteredTools: tools, filteredArticles: articles };
+  };
+
+  const performSearch = async (mode: 'ai' | 'normal', q: string, libMode: LibraryMode = libraryMode) => {
     if (!q.trim()) return;
 
     setLoading(true);
     setIsExpanded(true);
 
-    // Simulate slight network delay
+    // 模拟网络延迟
     await new Promise(resolve => setTimeout(resolve, UI_DELAY.AI_SEARCH_SIMULATE));
 
+    const { filteredTools, filteredArticles } = getFilteredData(libMode);
+
     if (mode === 'ai') {
-      const aiResponse = await searchToolsWithAI(q, tools, articles);
+      const aiResponse = await searchToolsWithAI(q, filteredTools, filteredArticles);
       setAiResult(aiResponse);
       setNormalResult(null);
     } else {
       const needle = q.toLowerCase();
-      const matchedTools = tools.filter(t =>
+      const matchedTools = filteredTools.filter(t =>
         `${t.name} ${t.description}`.toLowerCase().includes(needle)
       );
-      const matchedArticles = articles.filter(a =>
+      const matchedArticles = filteredArticles.filter(a =>
         `${a.title} ${a.summary}`.toLowerCase().includes(needle)
       );
       setNormalResult({ tools: matchedTools, articles: matchedArticles });
@@ -72,11 +85,21 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
   const handleModeChange = async (newMode: 'ai' | 'normal') => {
     setSearchMode(newMode);
     
-    // Switching mode re-runs the last submitted query (if any)
+    // 切换模式后重新搜索
     const q = query.trim();
     if (!q || !lastSearchedQuery || q !== lastSearchedQuery) return;
 
     await performSearch(newMode, q);
+  };
+
+  const handleLibraryModeChange = async (newLibMode: LibraryMode) => {
+    setLibraryMode(newLibMode);
+    
+    // 切换库模式后重新搜索
+    const q = query.trim();
+    if (!q || !lastSearchedQuery || q !== lastSearchedQuery || searchMode !== 'ai') return;
+
+    await performSearch('ai', q, newLibMode);
   };
 
   const handleClose = () => {
@@ -99,7 +122,7 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
 
   return (
     <div className="w-full max-w-4xl mx-auto mb-12">
-      <div className={`relative z-10 rounded-2xl transition-all duration-500 ${scopeMenuOpen ? 'overflow-visible' : 'overflow-hidden'}
+      <div className={`relative z-10 rounded-2xl transition-all duration-500 overflow-hidden
         ${isExpanded 
           ? (isEyeCare ? 'bg-[#FDFCF8] shadow-lg ring-1 ring-stone-200' : 'bg-white shadow-xl ring-1 ring-slate-200')
           : 'bg-transparent'
@@ -111,43 +134,48 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
           <div className={`relative flex items-center p-2 rounded-2xl transition-all duration-300
              ${!isExpanded ? (isEyeCare ? 'bg-[#FDFCF8] shadow-md border border-stone-200' : 'bg-white shadow-lg border border-slate-100') : ''}
           `}>
-            {/* Apple-style Single Scope Chip (Toggle) */}
-            <div className="relative flex items-center pl-2 pr-2">
+            {/* 搜索模式切换按钮 */}
+            <div className="relative flex items-center pl-2 pr-1">
               <button
                 type="button"
                 onClick={() => handleModeChange(searchMode === 'ai' ? 'normal' : 'ai')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-300 group ${
+                className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-300 ${
                   searchMode === 'ai' 
-                    ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-100 shadow-sm hover:bg-blue-100' 
-                    : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200 hover:bg-slate-200 hover:text-slate-800'
+                    ? 'bg-blue-50 ring-1 ring-blue-100 shadow-sm hover:bg-blue-100' 
+                    : 'bg-slate-100 ring-1 ring-slate-200 hover:bg-slate-200'
                 }`}
-                title="点击切换搜索模式"
+                title={searchMode === 'ai' ? '当前: AI 搜索，点击切换为普通搜索' : '当前: 普通搜索，点击切换为 AI 搜索'}
               >
                 {loading ? (
-                  <Loader2 className="animate-spin" size={14} />
+                  <Loader2 className="animate-spin" size={16} />
                 ) : (
                   searchMode === 'ai' 
-                    ? <Sparkles size={14} className="text-blue-600" />
-                    : <Search size={14} className="text-slate-500 group-hover:text-slate-700" />
+                    ? <Sparkles size={16} className="text-blue-600" />
+                    : <Search size={16} className="text-slate-500" />
                 )}
-                <span className="min-w-[4.5em] text-center">
-                  {searchMode === 'ai' ? 'AI 搜索' : '普通搜索'}
-                </span>
               </button>
-              
-              {/* Vertical Divider */}
-              <div className="w-px h-6 bg-slate-100 mx-2"></div>
-            </div>
 
-            <input
-                    }`}
-                  >
-                    <Search size={16} className={searchMode === 'normal' ? 'text-blue-600' : 'text-slate-400'} />
-                    普通搜索
-                    {searchMode === 'normal' && <Check size={14} className="ml-auto text-blue-600" />}
-                  </button>
-                </div>
+              {/* AI 模式下显示库模式切换 */}
+              {searchMode === 'ai' && (
+                <button
+                  type="button"
+                  onClick={() => handleLibraryModeChange(libraryMode === 'professional' ? 'comprehensive' : 'professional')}
+                  className={`ml-1 flex items-center justify-center w-8 h-8 rounded-full transition-all duration-300 ${
+                    libraryMode === 'professional'
+                      ? 'bg-indigo-50 ring-1 ring-indigo-100 hover:bg-indigo-100'
+                      : 'bg-emerald-50 ring-1 ring-emerald-100 hover:bg-emerald-100'
+                  }`}
+                  title={libraryMode === 'professional' ? '当前: 专业库（精选内容），点击切换为综合库' : '当前: 综合库（全量内容），点击切换为专业库'}
+                >
+                  {libraryMode === 'professional' 
+                    ? <Library size={16} className="text-indigo-600" />
+                    : <Layers size={16} className="text-emerald-600" />
+                  }
+                </button>
               )}
+              
+              {/* 分隔线 */}
+              <div className="w-px h-6 bg-slate-100 mx-2"></div>
             </div>
 
             <input

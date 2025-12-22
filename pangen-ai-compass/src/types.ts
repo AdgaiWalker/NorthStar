@@ -80,6 +80,9 @@ export type ThemeMode = 'light' | 'eye-care';
 
 export type Language = 'zh' | 'en' | 'jp' | 'ru';
 
+// AI 搜索库模式: professional=专业库(精选), comprehensive=综合库(全量)
+export type LibraryMode = 'professional' | 'comprehensive';
+
 export type ViewState = 
   | { type: 'home' }
   | { type: 'tool-detail'; toolId: string }

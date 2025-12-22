@@ -209,7 +209,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     <FloatingDock
       selectedToolIds={selectedToolIds}
       onClearSelection={clearSelection}
-      onGenerate={toolIds => navigate({ type: 'solution-generate', toolIds })}
+      onGenerate={() => navigate({ type: 'solution-generate', toolIds: Array.from(selectedToolIds) })}
     />
   </div>
 );

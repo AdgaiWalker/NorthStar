@@ -1,0 +1,517 @@
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  AlertTriangle,
+  BookOpen,
+  Calendar,
+  CheckSquare,
+  Copy,
+  Download,
+  Layout,
+  MessageCircle,
+  MessageSquare,
+  Share2,
+  Sparkles,
+  Trash2,
+  X,
+  Zap,
+  Settings,
+} from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { UserSolution } from '../types';
+import { MOCK_TOOLS } from '../constants';
+import { useAppStore } from '../store/useAppStore';
+import { exportSolutionToFile } from '../utils/export';
+
+type UserCenterTab = 'profile' | 'solutions' | 'favorites' | 'settings';
+
+export const UserCenterPage: React.FC = () => {
+  const { tab: tabParam } = useParams<{ tab?: string }>();
+  const navigate = useNavigate();
+  const { themeMode, userSolutions, deleteSolution } = useAppStore();
+
+  const tab = (tabParam as UserCenterTab) || 'profile';
+  const isEyeCare = themeMode === 'eye-care';
+
+  // 方案详情抽屉
+  const [viewSolution, setViewSolution] = useState<UserSolution | null>(null);
+  const [solutionToDelete, setSolutionToDelete] = useState<string | null>(null);
+
+  // 分享/导出状态
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // 设置状态
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    setShowShareMenu(false);
+    setLinkCopied(false);
+    setShowExportMenu(false);
+  }, [viewSolution]);
+
+  const handleDeleteConfirm = () => {
+    if (!solutionToDelete) return;
+    deleteSolution(solutionToDelete);
+    if (viewSolution?.id === solutionToDelete) {
+      setViewSolution(null);
+    }
+    setSolutionToDelete(null);
+  };
+
+  const handleExportSolution = (sol: UserSolution, format: 'md' | 'txt' | 'csv') => {
+    exportSolutionToFile(sol, format, MOCK_TOOLS);
+  };
+
+  const navigateTab = (t: UserCenterTab) => {
+    navigate(t === 'profile' ? '/me' : `/me/${t}`);
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 animate-in fade-in">
+      <div className="flex flex-col md:flex-row gap-8">
+        {/* Sidebar Nav */}
+        <div className="w-full md:w-64 flex-shrink-0">
+          <div
+            className={`p-4 rounded-2xl ${
+              isEyeCare
+                ? 'bg-[#FDFCF8] border border-stone-100'
+                : 'bg-white shadow-sm border border-slate-100'
+            }`}
+          >
+            <div className="flex items-center gap-3 px-2 mb-6">
+              <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden">
+                <img src="https://picsum.photos/100/100?random=user" alt="User" />
+              </div>
+              <div>
+                <div className="font-bold text-sm">My User</div>
+                <div className="text-xs text-slate-400">Pro Member</div>
+              </div>
+            </div>
+
+            <nav className="space-y-1">
+              <button
+                onClick={() => navigateTab('profile')}
+                className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium ${
+                  tab === 'profile'
+                    ? 'bg-slate-100 text-slate-900'
+                    : 'text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                个人资料
+              </button>
+              <button
+                onClick={() => navigateTab('solutions')}
+                className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium ${
+                  tab === 'solutions'
+                    ? 'bg-slate-100 text-slate-900'
+                    : 'text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                我的方案
+              </button>
+              <button
+                onClick={() => navigateTab('favorites')}
+                className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium ${
+                  tab === 'favorites'
+                    ? 'bg-slate-100 text-slate-900'
+                    : 'text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                收藏夹
+              </button>
+              <button
+                onClick={() => navigateTab('settings')}
+                className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium ${
+                  tab === 'settings'
+                    ? 'bg-slate-100 text-slate-900'
+                    : 'text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                设置
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1">
+          {tab === 'solutions' && (
+            <div>
+              <h2 className="text-2xl font-bold mb-6">我的 AI 方案</h2>
+              {userSolutions.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-2xl">
+                  <Sparkles className="mx-auto mb-2 opacity-50" size={32} />
+                  <p>还没有生成过方案</p>
+                  <button
+                    onClick={() => navigate('/')}
+                    className="mt-4 text-blue-600 font-bold text-sm hover:underline"
+                  >
+                    去创建
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {userSolutions.map((sol) => (
+                    <div
+                      key={sol.id}
+                      onClick={() => setViewSolution(sol)}
+                      className={`p-6 rounded-2xl cursor-pointer hover:border-blue-400 transition-all ${
+                        isEyeCare
+                          ? 'bg-white border border-stone-200'
+                          : 'bg-white border border-slate-100 shadow-sm'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-bold text-lg">{sol.title}</h3>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExportSolution(sol, 'md');
+                            }}
+                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="快捷导出 Markdown"
+                          >
+                            <Download size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSolutionToDelete(sol.id);
+                            }}
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            title="删除"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-sm text-slate-500 mb-4 line-clamp-2">
+                        {sol.targetGoal}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        {sol.toolIds.map((tid) => {
+                          const t = MOCK_TOOLS.find((mt) => mt.id === tid);
+                          if (!t) return null;
+                          return (
+                            <img
+                              key={tid}
+                              src={t.imageUrl}
+                              className="w-6 h-6 rounded-full border border-white shadow-sm"
+                              title={t.name}
+                              alt={t.name}
+                            />
+                          );
+                        })}
+                        <span className="text-xs text-slate-400 ml-2">
+                          {sol.createdAt}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === 'profile' && (
+            <div
+              className={`p-8 rounded-2xl ${
+                isEyeCare ? 'bg-white' : 'bg-white shadow-sm'
+              }`}
+            >
+              <h2 className="text-xl font-bold mb-4">个人资料</h2>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-20 h-20 bg-slate-200 rounded-full overflow-hidden">
+                  <img
+                    src="https://picsum.photos/100/100?random=user"
+                    className="w-full h-full object-cover"
+                    alt="User"
+                  />
+                </div>
+                <div>
+                  <div className="font-bold text-lg">My User</div>
+                  <div className="text-slate-500">user@pangen.ai</div>
+                </div>
+              </div>
+              <div className="space-y-4 max-w-md">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                    昵称
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue="My User"
+                    className="w-full p-2 bg-slate-50 rounded-lg border-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                    邮箱
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue="user@pangen.ai"
+                    disabled
+                    className="w-full p-2 bg-slate-50 rounded-lg border-none opacity-50 cursor-not-allowed"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'settings' && (
+            <div
+              className={`p-8 rounded-2xl ${
+                isEyeCare ? 'bg-white' : 'bg-white shadow-sm'
+              }`}
+            >
+              <h2 className="text-xl font-bold mb-8 flex items-center gap-2">
+                <Settings size={24} /> 设置
+              </h2>
+              <div className="text-center py-12 text-slate-400">
+                设置功能开发中...
+              </div>
+            </div>
+          )}
+
+          {tab === 'favorites' && (
+            <div className="text-center py-12 text-slate-400">
+              收藏功能开发中...
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Side Drawer for Solution Details */}
+      {viewSolution && (
+        <div className="fixed inset-0 z-[60] flex justify-end">
+          <div
+            className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity"
+            onClick={() => setViewSolution(null)}
+          ></div>
+          <div
+            className={`relative w-full max-w-2xl h-full shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col ${
+              isEyeCare ? 'bg-[#FDFCF8]' : 'bg-white'
+            }`}
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 flex justify-between items-start z-10">
+              <div>
+                <h2 className="text-2xl font-bold mb-1">{viewSolution.title}</h2>
+                <div className="flex items-center gap-4 text-sm text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <Calendar size={14} /> {viewSolution.createdAt}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Sparkles size={14} className="text-blue-500" /> AI 生成方案
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <button
+                    onClick={() => setShowShareMenu(!showShareMenu)}
+                    className={`p-2 rounded-full transition-colors ${
+                      showShareMenu
+                        ? 'bg-blue-50 text-blue-600'
+                        : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'
+                    }`}
+                    title="分享方案"
+                  >
+                    <Share2 size={24} />
+                  </button>
+                  {showShareMenu && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-50 animate-in fade-in zoom-in-95 origin-top-right">
+                      <div className="text-xs font-bold text-slate-400 px-3 py-2 uppercase tracking-wider">
+                        分享方案
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            `https://pangen-ai.com/s/${viewSolution.id}`
+                          );
+                          setLinkCopied(true);
+                          setTimeout(() => {
+                            setLinkCopied(false);
+                            setShowShareMenu(false);
+                          }, 1000);
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all duration-200 ${
+                          linkCopied
+                            ? 'bg-green-50 text-green-700 font-bold'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {linkCopied ? (
+                          <CheckSquare size={16} className="text-green-500" />
+                        ) : (
+                          <Copy size={16} />
+                        )}
+                        {linkCopied ? '已复制链接' : '复制链接'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setViewSolution(null)}
+                  className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                  title="关闭"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-8">
+              <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 mb-8">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 mb-2 flex items-center gap-1">
+                  <Layout size={12} /> 核心目标
+                </h3>
+                <p className="text-slate-700 font-medium">
+                  {viewSolution.targetGoal}
+                </p>
+              </div>
+
+              <div className="mb-8">
+                <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <Zap size={16} /> 涉及工具
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {viewSolution.toolIds.map((tid) => {
+                    const tool = MOCK_TOOLS.find((t) => t.id === tid);
+                    return tool ? (
+                      <div
+                        key={tid}
+                        className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all bg-white cursor-pointer"
+                        onClick={() => navigate(`/tool/${tid}`)}
+                      >
+                        <img
+                          src={tool.imageUrl}
+                          className="w-10 h-10 rounded-lg object-cover bg-slate-100"
+                          alt=""
+                        />
+                        <div>
+                          <div className="font-bold text-sm">{tool.name}</div>
+                          <div className="text-xs text-slate-500">
+                            {tool.domain}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <BookOpen size={16} /> 方案建议
+                </h3>
+                <div
+                  className={`prose max-w-none ${
+                    isEyeCare ? 'prose-stone' : 'prose-slate'
+                  }`}
+                >
+                  <ReactMarkdown>{viewSolution.aiAdvice}</ReactMarkdown>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center relative">
+              <div className="flex items-center gap-2 relative">
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="px-4 py-2 text-sm font-bold bg-white border border-slate-200 hover:border-blue-400 hover:text-blue-600 rounded-lg transition-all shadow-sm flex items-center gap-2"
+                >
+                  <Download size={16} /> 导出方案
+                </button>
+                {showExportMenu && (
+                  <div className="absolute bottom-full left-0 mb-2 w-32 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 origin-bottom-left z-50">
+                    <button
+                      onClick={() => {
+                        handleExportSolution(viewSolution, 'md');
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700"
+                    >
+                      Markdown
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleExportSolution(viewSolution, 'txt');
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700"
+                    >
+                      TXT 文本
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleExportSolution(viewSolution, 'csv');
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700"
+                    >
+                      CSV 表格
+                    </button>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setSolutionToDelete(viewSolution.id)}
+                className="px-4 py-2 text-sm font-bold text-red-500 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Trash2 size={16} /> 删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {solutionToDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => setSolutionToDelete(null)}
+          ></div>
+          <div
+            className={`relative w-full max-w-sm p-6 rounded-2xl shadow-2xl ${
+              isEyeCare ? 'bg-[#FDFCF8]' : 'bg-white'
+            }`}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-bold mb-2 text-slate-900">
+                确认删除方案？
+              </h3>
+              <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+                此操作无法撤销。该方案及其所有 AI 分析建议将被永久移除。
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setSolutionToDelete(null)}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-colors shadow-lg shadow-red-500/30"
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

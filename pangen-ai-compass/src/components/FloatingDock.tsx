@@ -7,7 +7,7 @@ import { useShare } from '@/hooks/useShare';
 interface FloatingDockProps {
   selectedToolIds: Set<string>;
   onClearSelection: () => void;
-  onGenerate: (toolIds: string[]) => void;
+  onGenerate: () => void;
 }
 
 export const FloatingDock: React.FC<FloatingDockProps> = ({
@@ -138,7 +138,7 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
 
           {/* Generate Button (Primary) */}
           <button
-            onClick={() => onGenerate(toolIds)}
+            onClick={onGenerate}
             className="ml-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-5 py-2.5 rounded-full font-bold text-sm shadow-lg shadow-blue-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-2 whitespace-nowrap"
           >
             <Sparkles size={16} fill="currentColor" className="text-blue-200" />
