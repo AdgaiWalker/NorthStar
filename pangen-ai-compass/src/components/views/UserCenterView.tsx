@@ -14,12 +14,13 @@ import {
   Trash2,
   X,
   Zap,
+  Settings,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ContentType, ThemeMode, UserSolution, ViewState } from '../../types';
 import { MOCK_TOOLS } from '../../constants';
 
-export type UserCenterTab = 'profile' | 'history' | 'favorites' | 'creator' | 'solutions' | 'stats';
+export type UserCenterTab = 'profile' | 'history' | 'favorites' | 'creator' | 'solutions' | 'stats' | 'settings';
 
 interface UserCenterViewProps {
   tab?: UserCenterTab;
@@ -50,6 +51,17 @@ export const UserCenterView: React.FC<UserCenterViewProps> = ({
 
   // Export state
   const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // Settings state (Local prototype state)
+  const [settingsTheme, setSettingsTheme] = useState<ThemeMode>(themeMode);
+  const [settingsLang, setSettingsLang] = useState<'zh' | 'en' | 'jp' | 'ru'>('zh');
+  const [settingsExport, setSettingsExport] = useState<'md' | 'txt' | 'csv'>('md');
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    // Sync local theme state if prop changes
+    setSettingsTheme(themeMode);
+  }, [themeMode]);
 
   useEffect(() => {
     // Reset state when viewSolution changes or closes
@@ -117,6 +129,14 @@ export const UserCenterView: React.FC<UserCenterViewProps> = ({
                 }`}
               >
                 收藏夹
+              </button>
+              <button
+                onClick={() => navigate({ type: 'user-center', tab: 'settings' })}
+                className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium ${
+                  tab === 'settings' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                设置
               </button>
             </nav>
           </div>
@@ -227,6 +247,119 @@ export const UserCenterView: React.FC<UserCenterViewProps> = ({
                     disabled
                     className="w-full p-2 bg-slate-50 rounded-lg border-none opacity-50 cursor-not-allowed"
                   />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'settings' && (
+            <div className={`p-8 rounded-2xl ${themeMode === 'eye-care' ? 'bg-white' : 'bg-white shadow-sm'}`}>
+              <h2 className="text-xl font-bold mb-8 flex items-center gap-2">
+                <Settings size={24} /> 设置
+              </h2>
+
+              <div className="space-y-8 max-w-2xl">
+                {/* Appearance */}
+                <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
+                  <div className="mb-4">
+                    <h3 className="font-bold text-slate-900">外观设置</h3>
+                    <p className="text-xs text-slate-500 mt-1">选择最适合您的界面风格</p>
+                  </div>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setSettingsTheme('light')}
+                      className={`flex-1 py-3 px-4 rounded-xl border-2 text-sm font-bold transition-all ${
+                        settingsTheme === 'light'
+                          ? 'border-blue-600 bg-white text-blue-600 shadow-sm'
+                          : 'border-transparent bg-white text-slate-500 hover:bg-slate-100'
+                      }`}
+                    >
+                      🌞 明亮模式
+                    </button>
+                    <button
+                      onClick={() => setSettingsTheme('eye-care')}
+                      className={`flex-1 py-3 px-4 rounded-xl border-2 text-sm font-bold transition-all ${
+                        settingsTheme === 'eye-care'
+                          ? 'border-stone-400 bg-[#FDFCF8] text-stone-600 shadow-sm'
+                          : 'border-transparent bg-white text-slate-500 hover:bg-slate-100'
+                      }`}
+                    >
+                      🌿 护眼模式
+                    </button>
+                  </div>
+                </div>
+
+                {/* Language */}
+                <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
+                  <div className="mb-4">
+                    <h3 className="font-bold text-slate-900">语言偏好</h3>
+                    <p className="text-xs text-slate-500 mt-1">界面显示语言</p>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { id: 'zh', label: '简体中文' },
+                      { id: 'en', label: 'English' },
+                      { id: 'jp', label: '日本語' },
+                      { id: 'ru', label: 'Русский' },
+                    ].map(lang => (
+                      <button
+                        key={lang.id}
+                        onClick={() => setSettingsLang(lang.id as any)}
+                        className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                          settingsLang === lang.id
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-white text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Export Preferences */}
+                <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
+                  <div className="mb-4">
+                    <h3 className="font-bold text-slate-900">默认导出格式</h3>
+                    <p className="text-xs text-slate-500 mt-1">方案导出时的默认文件类型</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {[
+                      { id: 'md', label: 'Markdown (.md)' },
+                      { id: 'txt', label: '纯文本 (.txt)' },
+                      { id: 'csv', label: '表格数据 (.csv)' },
+                    ].map(fmt => (
+                      <button
+                        key={fmt.id}
+                        onClick={() => setSettingsExport(fmt.id as any)}
+                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                          settingsExport === fmt.id
+                            ? 'bg-slate-800 text-white shadow-md'
+                            : 'bg-white text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {fmt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="flex items-center gap-4 pt-4">
+                  <button 
+                    onClick={() => {
+                      setShowSaveSuccess(true);
+                      setTimeout(() => setShowSaveSuccess(false), 2000);
+                    }}
+                    className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20"
+                  >
+                    保存更改
+                  </button>
+                  {showSaveSuccess && (
+                    <span className="text-green-600 text-sm font-bold animate-in fade-in slide-in-from-left-2 flex items-center gap-1">
+                      <CheckSquare size={16} /> 设置已更新
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

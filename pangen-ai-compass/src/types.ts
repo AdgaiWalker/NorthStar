@@ -85,9 +85,25 @@ export type ViewState =
   | { type: 'tool-detail'; toolId: string }
   | { type: 'article-read'; articleId: string; topicId?: string }
   | { type: 'login' }
-  | { type: 'user-center'; tab?: 'profile' | 'history' | 'favorites' | 'creator' | 'solutions' | 'stats' }
+  | {
+      type: 'user-center';
+      tab?: 'profile' | 'history' | 'favorites' | 'creator' | 'solutions' | 'stats' | 'settings';
+    }
   | { type: 'solution-generate'; toolIds: string[] }
-  | { type: 'admin'; section?: 'dashboard' | 'content' | 'users' | 'analytics' };
+  | {
+      type: 'admin';
+      section?:
+        | 'dashboard'
+        | 'content'
+        | 'users'
+        | 'approvals'
+        | 'tools'
+        | 'stats'
+        | 'payments'
+        | 'ai'
+        | 'settings'
+        | 'analytics';
+    };
 
 export interface AnalyticsEvent {
   id: string;

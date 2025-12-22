@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sparkles, Loader2, ArrowRight, BookOpen, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Sparkles, Loader2, ArrowRight, BookOpen, AlertTriangle, Search, ChevronDown, Check } from 'lucide-react';
 import { searchToolsWithAI } from '../services/AIService';
 import { AISearchResultV2 } from '../services/aiContract';
 import { Tool, Article } from '../types';
@@ -17,38 +17,89 @@ interface AISearchProps {
 export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick, onArticleClick, themeMode }) => {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<AISearchResultV2 | null>(null);
-  const [isExpanded, setIsExpanded] = useState(false);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  const [searchMode, setSearchMode] = useState<'ai' | 'normal'>('ai');
+  const [lastSearchedQuery, setLastSearchedQuery] = useState('');
+
+  // AI Search Result
+  const [aiResult, setAiResult] = useState<AISearchResultV2 | null>(null);
+
+  // Normal Search Result
+  const [normalResult, setNormalResult] = useState<{ tools: Tool[]; articles: Article[] } | null>(null);
+
+  const [isExpanded, setIsExpanded] = useState(false);
+  // Removed scopeMenuOpen state as we switched to single toggle
+  
+  // Cleanup listener no longer needed for toggle button (but keeping clean component structure)
+
+  const performSearch = async (mode: 'ai' | 'normal', q: string) => {
+    if (!q.trim()) return;
 
     setLoading(true);
     setIsExpanded(true);
-    
+
     // Simulate slight network delay
     await new Promise(resolve => setTimeout(resolve, UI_DELAY.AI_SEARCH_SIMULATE));
-    
-    const aiResponse = await searchToolsWithAI(query, tools, articles);
-    setResult(aiResponse);
+
+    if (mode === 'ai') {
+      const aiResponse = await searchToolsWithAI(q, tools, articles);
+      setAiResult(aiResponse);
+      setNormalResult(null);
+    } else {
+      const needle = q.toLowerCase();
+      const matchedTools = tools.filter(t =>
+        `${t.name} ${t.description}`.toLowerCase().includes(needle)
+      );
+      const matchedArticles = articles.filter(a =>
+        `${a.title} ${a.summary}`.toLowerCase().includes(needle)
+      );
+      setNormalResult({ tools: matchedTools, articles: matchedArticles });
+      setAiResult(null);
+    }
+
     setLoading(false);
   };
 
-  const recommendedTools = result?.suggestedTools
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+
+    setLastSearchedQuery(q);
+    await performSearch(searchMode, q);
+  };
+
+  const handleModeChange = async (newMode: 'ai' | 'normal') => {
+    setSearchMode(newMode);
+    
+    // Switching mode re-runs the last submitted query (if any)
+    const q = query.trim();
+    if (!q || !lastSearchedQuery || q !== lastSearchedQuery) return;
+
+    await performSearch(newMode, q);
+  };
+
+  const handleClose = () => {
+    setIsExpanded(false);
+    setQuery('');
+    setAiResult(null);
+    setNormalResult(null);
+  };
+
+  const recommendedTools = aiResult?.suggestedTools
     .map(name => tools.find(t => t.name.includes(name) || name.includes(t.name)))
     .filter((t): t is Tool => !!t) || [];
 
-  const recommendedArticles = result?.suggestedArticles
+  const recommendedArticles = aiResult?.suggestedArticles
     .map(title => articles.find(a => a.title.includes(title) || title.includes(a.title)))
     .filter((a): a is Article => !!a) || [];
 
   const isEyeCare = themeMode === 'eye-care';
-  const isDemoMode = result?.mode === 'demo';
+  const isDemoMode = aiResult?.mode === 'demo';
 
   return (
     <div className="w-full max-w-4xl mx-auto mb-12">
-      <div className={`relative z-10 rounded-2xl transition-all duration-500 overflow-hidden
+      <div className={`relative z-10 rounded-2xl transition-all duration-500 ${scopeMenuOpen ? 'overflow-visible' : 'overflow-hidden'}
         ${isExpanded 
           ? (isEyeCare ? 'bg-[#FDFCF8] shadow-lg ring-1 ring-stone-200' : 'bg-white shadow-xl ring-1 ring-slate-200')
           : 'bg-transparent'
@@ -60,14 +111,50 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
           <div className={`relative flex items-center p-2 rounded-2xl transition-all duration-300
              ${!isExpanded ? (isEyeCare ? 'bg-[#FDFCF8] shadow-md border border-stone-200' : 'bg-white shadow-lg border border-slate-100') : ''}
           `}>
-            <div className="pl-4 text-blue-600">
-              {loading ? <Loader2 className="animate-spin" size={24} /> : <Sparkles size={24} />}
+            {/* Apple-style Single Scope Chip (Toggle) */}
+            <div className="relative flex items-center pl-2 pr-2">
+              <button
+                type="button"
+                onClick={() => handleModeChange(searchMode === 'ai' ? 'normal' : 'ai')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-300 group ${
+                  searchMode === 'ai' 
+                    ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-100 shadow-sm hover:bg-blue-100' 
+                    : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200 hover:bg-slate-200 hover:text-slate-800'
+                }`}
+                title="点击切换搜索模式"
+              >
+                {loading ? (
+                  <Loader2 className="animate-spin" size={14} />
+                ) : (
+                  searchMode === 'ai' 
+                    ? <Sparkles size={14} className="text-blue-600" />
+                    : <Search size={14} className="text-slate-500 group-hover:text-slate-700" />
+                )}
+                <span className="min-w-[4.5em] text-center">
+                  {searchMode === 'ai' ? 'AI 搜索' : '普通搜索'}
+                </span>
+              </button>
+              
+              {/* Vertical Divider */}
+              <div className="w-px h-6 bg-slate-100 mx-2"></div>
             </div>
+
+            <input
+                    }`}
+                  >
+                    <Search size={16} className={searchMode === 'normal' ? 'text-blue-600' : 'text-slate-400'} />
+                    普通搜索
+                    {searchMode === 'normal' && <Check size={14} className="ml-auto text-blue-600" />}
+                  </button>
+                </div>
+              )}
+            </div>
+
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="我想学剪辑短视频..."
+              placeholder={searchMode === 'ai' ? "我想学剪辑短视频..." : "输入关键词搜索工具或文章..."}
               className={`w-full p-4 bg-transparent border-none outline-none text-lg placeholder:text-slate-400 ${isEyeCare ? 'text-stone-800' : 'text-slate-800'}`}
             />
             <button 
@@ -81,61 +168,121 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
         </form>
 
         {/* Results Area */}
-        {isExpanded && !loading && result && (
+        {isExpanded && !loading && (
           <div className="p-6 md:p-8 animate-in fade-in slide-in-from-top-4 duration-500">
-            {isDemoMode && (
-              <div className="mb-4 flex items-center gap-2 rounded-xl bg-amber-50 text-amber-800 px-4 py-3 border border-amber-100">
-                <AlertTriangle size={18} className="shrink-0" />
-                <div className="text-sm font-medium">演示模式：AI 服务不可用，以下为基于评分与关键词的推荐结果。</div>
-              </div>
-            )}
-            <div className="mb-8">
-              <h4 className="text-sm font-bold uppercase tracking-wider text-blue-600 mb-2">AI 推荐方案</h4>
-              <p className={`text-lg leading-relaxed font-medium mb-4 ${isEyeCare ? 'text-stone-800' : 'text-slate-800'}`}>
-                {result.summary}
-              </p>
-              <div className={`p-4 rounded-xl text-sm leading-relaxed ${isEyeCare ? 'bg-amber-50 text-stone-700' : 'bg-slate-50 text-slate-600'}`}>
-                <span className="font-bold block mb-1">建议路径:</span>
-                {result.recommendation}
-              </div>
-            </div>
+            {/* AI Search Results */}
+            {searchMode === 'ai' && aiResult && (
+              <>
+                {isDemoMode && (
+                  <div className="mb-4 flex items-center gap-2 rounded-xl bg-amber-50 text-amber-800 px-4 py-3 border border-amber-100">
+                    <AlertTriangle size={18} className="shrink-0" />
+                    <div className="text-sm font-medium">演示模式：AI 服务不可用，以下为基于评分与关键词的推荐结果。</div>
+                  </div>
+                )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-               {recommendedTools.length > 0 && (
+                <div className="mb-8">
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-blue-600 mb-2">AI 推荐方案</h4>
+                  <p className={`text-lg leading-relaxed font-medium mb-4 ${isEyeCare ? 'text-stone-800' : 'text-slate-800'}`}>
+                    {aiResult.summary}
+                  </p>
+                  <div className={`p-4 rounded-xl text-sm leading-relaxed ${isEyeCare ? 'bg-amber-50 text-stone-700' : 'bg-slate-50 text-slate-600'}`}>
+                    <span className="font-bold block mb-1">建议路径:</span>
+                    {aiResult.recommendation}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {recommendedTools.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">推荐工具</h4>
+                      <div className="space-y-4">
+                        {recommendedTools.map(tool => (
+                          <ToolCard
+                            key={tool.id}
+                            tool={tool}
+                            themeMode={themeMode}
+                            onClick={() => onToolClick(tool.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {recommendedArticles.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">相关文章</h4>
+                      <div className="space-y-4">
+                        {recommendedArticles.map(article => (
+                          <ArticleCard
+                            key={article.id}
+                            article={article}
+                            themeMode={themeMode}
+                            onClick={() => onArticleClick(article.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Normal Search Results */}
+            {searchMode === 'normal' && normalResult && (
+              <div className="space-y-8">
+                <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-50 px-3 py-2 rounded-lg w-fit">
+                  <span>找到 {normalResult.tools.length} 个工具</span>
+                  <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                  <span>{normalResult.articles.length} 篇内容</span>
+                </div>
+
+                {normalResult.tools.length === 0 && normalResult.articles.length === 0 && (
+                  <div className="text-center py-12 text-slate-400">
+                    <Search size={48} className="mx-auto mb-4 opacity-20" />
+                    <p>未找到相关结果，换个关键词试试？</p>
+                  </div>
+                )}
+
+                {normalResult.tools.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">推荐工具</h4>
-                    <div className="space-y-4">
-                      {recommendedTools.map(tool => (
-                        <ToolCard 
-                          key={tool.id} 
-                          tool={tool} 
+                    <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+                      <Sparkles size={16} /> 工具结果
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {normalResult.tools.map(tool => (
+                        <ToolCard
+                          key={tool.id}
+                          tool={tool}
                           themeMode={themeMode}
-                          onClick={() => onToolClick(tool.id)} 
+                          onClick={() => onToolClick(tool.id)}
                         />
                       ))}
                     </div>
                   </div>
                 )}
-                
-                {recommendedArticles.length > 0 && (
-                   <div>
-                     <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">相关文章</h4>
-                     <div className="space-y-4">
-                       {recommendedArticles.map(article => (
-                         <ArticleCard
-                           key={article.id}
-                           article={article}
-                           themeMode={themeMode}
-                           onClick={() => onArticleClick(article.id)}
-                         />
-                       ))}
-                     </div>
-                   </div>
+
+                {normalResult.articles.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+                      <BookOpen size={16} /> 内容结果
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {normalResult.articles.map(article => (
+                        <ArticleCard
+                          key={article.id}
+                          article={article}
+                          themeMode={themeMode}
+                          onClick={() => onArticleClick(article.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 )}
-            </div>
-            
-            <button 
-              onClick={() => { setIsExpanded(false); setQuery(''); setResult(null); }}
+              </div>
+            )}
+
+            <button
+              onClick={handleClose}
               className="mt-8 w-full py-3 text-sm text-slate-400 hover:bg-slate-50 rounded-lg transition-colors"
             >
               关闭搜索结果
