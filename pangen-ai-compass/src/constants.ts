@@ -114,10 +114,18 @@ export const MOCK_ARTICLES: Article[] = [
     content: `
 # 视频重点摘要
 
-1. **导入项目**：让 Cursor 索引整个文件夹。
+:::video{src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" caption="演示视频（占位）"}:::
+
+:::callout{type="tip" title="阅读提示"}
+这里先演示“文档页混排”：同一篇内容里可以插入视频块、提示块（callout）和标准 Markdown。
+:::
+
+1. **导入项目**：让 [[tool:t1|Cursor]] 索引整个文件夹。
 2. **选中烂代码**：使用 \`Cmd+K\` 呼出指令框。
 3. **输入指令**：输入“重构此函数，使其符合单一职责原则”。
 4. **审查差异**：查看 AI 修改前后的对比，并接受更改。
+
+另外可参考 [[Git 分支管理最佳实践]]。
 
 ## 详细步骤
 
@@ -168,6 +176,10 @@ export const MOCK_ARTICLES: Article[] = [
     summary: '不想写 PPT？把 Word 大纲丢给 Gamma，自动生成配图、排版精美的演示文稿。',
     content: `
 # 快速上手
+
+:::callout{type="info" title="建议"}
+把大纲当作“章节目录”，后续我们会用真实 TOC 自动生成右侧目录，并支持移动端目录抽屉。
+:::
 
 1. 准备你的 Markdown 或 Word 大纲。
 2. 选择 "Paste in text" 模式。

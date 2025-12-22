@@ -6,7 +6,8 @@ import { MOCK_TOOLS } from '../constants';
 import { useAppStore } from '../store/useAppStore';
 import { useShare } from '../hooks/useShare';
 import { SITE_URL } from '../constants/ui';
-import { generateSolutionWithAI } from '../services/AIService';
+import { buildFallbackSolution, generateSolutionWithAI } from '../services/AIService';
+import { DAILY_GUEST_QUOTA_LIMITS, consumeGuestQuota, getGuestQuotaState } from '../utils/quota';
 
 export const SolutionNewPage: React.FC = () => {
   const navigate = useNavigate();
@@ -23,6 +24,9 @@ export const SolutionNewPage: React.FC = () => {
   const [goal, setGoal] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const { copied, copyText } = useShare();
+
+  // 游客额度：用于展示与拦截
+  const [quotaState, setQuotaState] = useState(() => getGuestQuotaState());
 
   const isEyeCare = themeMode === 'eye-care';
 
@@ -46,19 +50,49 @@ export const SolutionNewPage: React.FC = () => {
   }
 
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoReason, setDemoReason] = useState<'quota_exhausted' | 'other' | null>(null);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
     setIsDemoMode(false);
+    setDemoReason(null);
 
     try {
       const effectiveGoal = goal.trim() || '探索这些工具的组合潜力';
-      
-      // 调用真实 AI 方案生成
+
+      // 额度不足：不调用真实 AI，直接进入 demo（不扣次）
+      const quota = getGuestQuotaState();
+      if (quota.aiSolutionRemaining <= 0) {
+        setQuotaState(quota);
+        setIsDemoMode(true);
+        setDemoReason('quota_exhausted');
+
+        const result = buildFallbackSolution('quota_exhausted', effectiveGoal, selectedTools);
+        const newSolution: UserSolution = {
+          id: Date.now().toString(),
+          title: result.title,
+          targetGoal: effectiveGoal,
+          toolIds: toolIds,
+          aiAdvice: result.aiAdvice,
+          createdAt: new Date().toLocaleDateString(),
+        };
+
+        saveSolution(newSolution);
+        clearSelection();
+        navigate('/me/solutions');
+        return;
+      }
+
+      // 调用真实 AI 方案生成（demo 回退不扣次）
       const result = await generateSolutionWithAI(effectiveGoal, selectedTools);
-      
+      if (result.mode === 'ai') {
+        consumeGuestQuota('aiSolution', 1);
+      }
+      setQuotaState(getGuestQuotaState());
+
       if (result.mode === 'demo') {
         setIsDemoMode(true);
+        setDemoReason('other');
       }
 
       const newSolution: UserSolution = {
@@ -69,20 +103,23 @@ export const SolutionNewPage: React.FC = () => {
         aiAdvice: result.aiAdvice,
         createdAt: new Date().toLocaleDateString(),
       };
-      
+
       saveSolution(newSolution);
       clearSelection();
       navigate('/me/solutions');
     } catch (error) {
       console.error('AI 方案生成失败:', error);
-      // 即使失败也生成默认方案
+      setIsDemoMode(true);
+      setDemoReason('other');
+
       const effectiveGoal = goal.trim() || '探索这些工具的组合潜力';
+      const result = buildFallbackSolution('network_error', effectiveGoal, selectedTools);
       const fallbackSolution: UserSolution = {
         id: Date.now().toString(),
-        title: `方案: ${selectedTools.map((t) => t.name).join(' + ')}`,
+        title: result.title,
         targetGoal: effectiveGoal,
         toolIds: toolIds,
-        aiAdvice: `### 生成失败\n\n抱歉，AI 服务暂时不可用。请稍后重试。\n\n#### 已选工具\n${selectedTools.map(t => `- **${t.name}**`).join('\n')}`,
+        aiAdvice: result.aiAdvice,
         createdAt: new Date().toLocaleDateString(),
       };
       saveSolution(fallbackSolution);
@@ -141,6 +178,21 @@ export const SolutionNewPage: React.FC = () => {
             )}
           </button>
         </div>
+
+        <div className="mb-4 flex justify-end">
+          <div className={`text-xs ${isEyeCare ? 'text-stone-600' : 'text-slate-500'}`}>
+            今日额度：AI 搜索 {quotaState.aiSearchRemaining}/{DAILY_GUEST_QUOTA_LIMITS.aiSearch} · 方案 {quotaState.aiSolutionRemaining}/{DAILY_GUEST_QUOTA_LIMITS.aiSolution}
+          </div>
+        </div>
+
+        {quotaState.aiSolutionRemaining <= 0 && (
+          <div className="mb-6 flex items-start gap-2 rounded-xl bg-amber-50 text-amber-800 px-4 py-3 border border-amber-100">
+            <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+            <div className="text-sm font-medium">
+              今日 AI 方案额度已用完。你仍可点击“生成方案”，系统将以演示模式生成基础草稿（不扣次数）。
+            </div>
+          </div>
+        )}
 
         <div className="mb-6">
           <label className="block text-sm font-bold text-slate-500 mb-2 uppercase tracking-wider">

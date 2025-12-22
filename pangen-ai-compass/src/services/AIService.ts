@@ -173,19 +173,30 @@ ${articleContext}
 
 const EMIT_SOLUTION_TOOL_NAME = 'emit_solution_v1';
 
-const buildFallbackSolution = (
+export const buildFallbackSolution = (
   reason: FallbackReason,
   goal: string,
   tools: Tool[]
 ): AISolutionResult => {
   const toolNames = tools.map(t => t.name).join('、');
+
+  const intro =
+    reason === 'quota_exhausted'
+      ? '今日 AI 额度已用完，已为你提供不消耗次数的基础方案草稿。'
+      : 'AI 服务不可用，以下为默认建议。';
+
+  const outro =
+    reason === 'quota_exhausted'
+      ? '> 明日 00:00 自动恢复额度。'
+      : '> 请稍后重试以获取更专业的 AI 分析。';
+
   return {
     mode: 'demo',
     fallbackReason: reason,
     title: `方案: ${toolNames}`,
     aiAdvice: `### 演示模式
 
-AI 服务不可用，以下为默认建议。
+${intro}
 
 #### 已选工具
 ${tools.map(t => `- **${t.name}**: ${t.description}`).join('\n')}
@@ -195,7 +206,7 @@ ${tools.map(t => `- **${t.name}**: ${t.description}`).join('\n')}
 2. 根据目标“${goal || '探索工具组合'}”设计工作流
 3. 尝试将工具组合使用
 
-> 请稍后重试以获取更专业的 AI 分析。`,
+${outro}`,
   };
 };
 

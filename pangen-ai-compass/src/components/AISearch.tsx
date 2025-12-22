@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Sparkles, Loader2, ArrowRight, AlertTriangle, Search, Library, Layers, BookOpen } from 'lucide-react';
 import { searchToolsWithAI } from '../services/AIService';
+import { buildFallbackResult } from '../services/aiFallback';
 import { AISearchResultV2 } from '../services/aiContract';
 import { Tool, Article, LibraryMode } from '../types';
 import { ToolCard, ArticleCard } from './CardComponents';
 import { UI_DELAY } from '@/constants/ui';
+import { DAILY_GUEST_QUOTA_LIMITS, consumeGuestQuota, getGuestQuotaState } from '../utils/quota';
 
 interface AISearchProps {
   tools: Tool[];
@@ -29,6 +31,13 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
   const [normalResult, setNormalResult] = useState<{ tools: Tool[]; articles: Article[] } | null>(null);
 
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // 游客额度（本地存储）：用于展示与拦截
+  const [quotaState, setQuotaState] = useState(() => getGuestQuotaState());
+
+  useEffect(() => {
+    setQuotaState(getGuestQuotaState());
+  }, []);
 
   // 根据库模式过滤数据
   const getFilteredData = (libMode: LibraryMode) => {
@@ -55,7 +64,20 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
     const { filteredTools, filteredArticles } = getFilteredData(libMode);
 
     if (mode === 'ai') {
+      const quota = getGuestQuotaState();
+      if (quota.aiSearchRemaining <= 0) {
+        setQuotaState(quota);
+        setAiResult(buildFallbackResult('quota_exhausted', q, filteredTools, filteredArticles));
+        setNormalResult(null);
+        setLoading(false);
+        return;
+      }
+
       const aiResponse = await searchToolsWithAI(q, filteredTools, filteredArticles);
+      if (aiResponse.mode === 'ai') {
+        consumeGuestQuota('aiSearch', 1);
+      }
+      setQuotaState(getGuestQuotaState());
       setAiResult(aiResponse);
       setNormalResult(null);
     } else {
@@ -119,6 +141,11 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
 
   const isEyeCare = themeMode === 'eye-care';
   const isDemoMode = aiResult?.mode === 'demo';
+
+  const summaryText = aiResult?.summary || '';
+  const displaySummary = isDemoMode
+    ? summaryText.replace(/^演示模式[:：]\s*/, '')
+    : summaryText;
 
   return (
     <div className="w-full max-w-4xl mx-auto mb-12">
@@ -195,6 +222,14 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
           </div>
         </form>
 
+        {searchMode === 'ai' && (
+          <div className="mt-2 flex justify-end px-2">
+            <div className={`text-xs ${isEyeCare ? 'text-stone-500' : 'text-slate-500'}`}>
+              今日额度：AI 搜索 {quotaState.aiSearchRemaining}/{DAILY_GUEST_QUOTA_LIMITS.aiSearch} · 方案 {quotaState.aiSolutionRemaining}/{DAILY_GUEST_QUOTA_LIMITS.aiSolution}
+            </div>
+          </div>
+        )}
+
         {/* Results Area */}
         {isExpanded && !loading && (
           <div className="p-6 md:p-8 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -204,14 +239,14 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
                 {isDemoMode && (
                   <div className="mb-4 flex items-center gap-2 rounded-xl bg-amber-50 text-amber-800 px-4 py-3 border border-amber-100">
                     <AlertTriangle size={18} className="shrink-0" />
-                    <div className="text-sm font-medium">演示模式：AI 服务不可用，以下为基于评分与关键词的推荐结果。</div>
+                    <div className="text-sm font-medium">{aiResult.summary}</div>
                   </div>
                 )}
 
                 <div className="mb-8">
                   <h4 className="text-sm font-bold uppercase tracking-wider text-blue-600 mb-2">AI 推荐方案</h4>
                   <p className={`text-lg leading-relaxed font-medium mb-4 ${isEyeCare ? 'text-stone-800' : 'text-slate-800'}`}>
-                    {aiResult.summary}
+                    {displaySummary}
                   </p>
                   <div className={`p-4 rounded-xl text-sm leading-relaxed ${isEyeCare ? 'bg-amber-50 text-stone-700' : 'bg-slate-50 text-slate-600'}`}>
                     <span className="font-bold block mb-1">建议路径:</span>

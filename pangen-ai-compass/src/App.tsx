@@ -1,14 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { useRoutes } from 'react-router-dom';
+import { useRoutes, useLocation } from 'react-router-dom';
 import { AlertTriangle, X } from 'lucide-react';
 import { routes } from './routes';
 import { useAppStore } from './store/useAppStore';
 import { AppHeader, Footer } from './components/AppLayout';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { UI_COLORS, UI_DELAY } from './constants/ui';
 
 const App: React.FC = () => {
   const { themeMode, storageResetDetected, dismissStorageResetNotice } = useAppStore();
   const routeElement = useRoutes(routes);
+  const { pathname } = useLocation();
+
+  // 移动端底部导航在后台或登录页不显示
+  const showMobileNav = !pathname.startsWith('/admin') && !pathname.startsWith('/login');
 
   const [showNotice, setShowNotice] = useState(storageResetDetected);
 
@@ -57,9 +62,11 @@ const App: React.FC = () => {
 
       <AppHeader />
 
-      <main className="flex-grow pt-6">{routeElement}</main>
+      <main className={`flex-grow pt-6 ${showMobileNav ? 'pb-16 md:pb-0' : ''}`}>{routeElement}</main>
 
       <Footer />
+
+      <MobileBottomNav />
     </div>
   );
 };

@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, PlayCircle } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { ArrowLeft, List } from 'lucide-react';
 import { MOCK_ARTICLES, MOCK_TOPICS } from '../constants';
 import { useAppStore } from '../store/useAppStore';
+import { DocRenderer } from '../components/DocRenderer';
+import { extractDocToc } from '../utils/docMarkdown';
 
 export const ArticleReadPage: React.FC = () => {
   const { articleId } = useParams<{ articleId: string }>();
@@ -32,6 +33,16 @@ export const ArticleReadPage: React.FC = () => {
   const topic = effectiveTopicId ? MOCK_TOPICS.find((t) => t.id === effectiveTopicId) : null;
   const topicArticles = topic ? MOCK_ARTICLES.filter((a) => a.topicId === topic.id) : [];
   const isEyeCare = themeMode === 'eye-care';
+
+  const toc = useMemo(() => extractDocToc(article.content), [article.content]);
+  const [tocOpen, setTocOpen] = useState(false);
+
+  const scrollToHeading = (id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.history.replaceState(null, '', `#${id}`);
+  };
 
   return (
     <div className="flex min-h-[calc(100vh-64px)]">
@@ -98,7 +109,20 @@ export const ArticleReadPage: React.FC = () => {
         </div>
 
         <header className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-extrabold mb-4">{article.title}</h1>
+          <div className="flex items-start justify-between gap-4">
+            <h1 className="text-3xl md:text-4xl font-extrabold mb-4">{article.title}</h1>
+            <button
+              type="button"
+              onClick={() => setTocOpen(true)}
+              className="xl:hidden shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              <span className="inline-flex items-center gap-2">
+                <List size={16} />
+                目录
+              </span>
+            </button>
+          </div>
+
           <div className="flex items-center gap-4 text-sm text-slate-500">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-400"></div>
@@ -109,32 +133,12 @@ export const ArticleReadPage: React.FC = () => {
           </div>
         </header>
 
-        {article.isVideo && (
-          <div className="aspect-video bg-black rounded-xl mb-8 relative group cursor-pointer shadow-lg">
-            <img
-              src={article.imageUrl}
-              className="absolute inset-0 w-full h-full object-cover opacity-60"
-              alt=""
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <PlayCircle
-                size={64}
-                className="text-white opacity-80 group-hover:scale-110 transition-transform"
-                fill="currentColor"
-              />
-            </div>
-            <div className="absolute bottom-4 left-4 text-white text-xs bg-black/50 px-2 py-1 rounded">
-              模拟视频播放器
-            </div>
-          </div>
-        )}
-
         <article
           className={`prose prose-lg max-w-none ${
             isEyeCare ? 'prose-stone' : 'prose-slate'
           }`}
         >
-          <ReactMarkdown>{article.content}</ReactMarkdown>
+          <DocRenderer markdown={article.content} />
         </article>
 
         {/* Comments Section Mock */}
@@ -159,12 +163,69 @@ export const ArticleReadPage: React.FC = () => {
       {/* Right TOC - Desktop only */}
       <aside className="hidden xl:block w-64 p-6 sticky top-16 h-[calc(100vh-64px)]">
         <h4 className="text-sm font-bold uppercase text-slate-400 mb-4">目录</h4>
-        <div className="space-y-2 text-sm text-slate-500 border-l border-slate-200 pl-4">
-          <div className="hover:text-blue-600 cursor-pointer">视频重点摘要</div>
-          <div className="hover:text-blue-600 cursor-pointer">详细步骤</div>
-          <div className="hover:text-blue-600 cursor-pointer">总结</div>
+        <div className="border-l border-slate-200 pl-4">
+          {toc.length ? (
+            <div className="space-y-2 text-sm">
+              {toc.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => scrollToHeading(item.id)}
+                  style={{ paddingLeft: Math.max(0, (item.depth - 1) * 10) }}
+                  className="block w-full text-left text-slate-500 hover:text-blue-600"
+                >
+                  {item.text}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-slate-400">暂无目录</div>
+          )}
         </div>
       </aside>
+
+      {/* Mobile TOC Drawer */}
+      {tocOpen && (
+        <div className="fixed inset-0 z-50 xl:hidden">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setTocOpen(false)} />
+          <div
+            className={`absolute right-0 top-0 h-full w-[min(90vw,360px)] border-l border-slate-200 p-6 overflow-y-auto ${
+              isEyeCare ? 'bg-[#F7F6F2]' : 'bg-white'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm font-bold text-slate-500">目录</div>
+              <button
+                type="button"
+                onClick={() => setTocOpen(false)}
+                className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100"
+              >
+                关闭
+              </button>
+            </div>
+            {toc.length ? (
+              <div className="space-y-2 text-sm">
+                {toc.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      scrollToHeading(item.id);
+                      setTocOpen(false);
+                    }}
+                    style={{ paddingLeft: Math.max(0, (item.depth - 1) * 12) }}
+                    className="block w-full text-left rounded-md px-2 py-2 text-slate-700 hover:bg-slate-100"
+                  >
+                    {item.text}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-slate-400">暂无目录</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

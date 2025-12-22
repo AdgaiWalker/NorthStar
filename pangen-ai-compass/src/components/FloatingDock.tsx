@@ -32,7 +32,9 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
   if (toolIds.length === 0) return null;
 
   return (
-    <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300 w-auto max-w-[95vw]">
+    <>
+    {/* 桌面端：悬浮胶囊 */}
+    <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300 w-auto max-w-[95vw] hidden md:block">
       <div className="flex items-center p-2 rounded-full bg-[#1A1A1A]/95 backdrop-blur-2xl text-white shadow-[0_8px_40px_rgba(0,0,0,0.4)] border border-white/10 ring-1 ring-white/5 gap-4">
         {/* Left: Tools Preview & Count */}
         <div className="flex items-center pl-2 gap-3">
@@ -147,5 +149,48 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
         </div>
       </div>
     </div>
+
+    {/* 移动端：底部 Sheet */}
+    <div className="fixed bottom-14 left-0 right-0 z-50 md:hidden animate-in slide-in-from-bottom-10 fade-in duration-300 safe-area-pb">
+      <div className="bg-white/95 backdrop-blur-xl border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex -space-x-2">
+              {toolIds.slice(0, 3).map(id => {
+                const tool = MOCK_TOOLS.find(t => t.id === id);
+                if (!tool) return null;
+                return (
+                  <img
+                    key={id}
+                    src={tool.imageUrl}
+                    className="w-8 h-8 rounded-full border-2 border-white object-cover"
+                    alt={tool.name}
+                  />
+                );
+              })}
+            </div>
+            <span className="text-sm text-slate-600">
+              已选 <strong className="text-slate-900">{toolIds.length}</strong> 个工具
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClearSelection}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-500"
+            >
+              <Trash2 size={16} />
+            </button>
+            <button
+              onClick={onGenerate}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-full font-bold text-sm shadow-md flex items-center gap-1.5"
+            >
+              <Sparkles size={14} fill="currentColor" />
+              生成方案
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    </>
   );
 };

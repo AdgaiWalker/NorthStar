@@ -1,6 +1,12 @@
 export type AISearchMode = 'ai' | 'demo';
 
-export type FallbackReason = 'missing_key' | 'network_error' | 'parse_error' | 'empty_result' | '';
+export type FallbackReason =
+  | 'missing_key'
+  | 'network_error'
+  | 'parse_error'
+  | 'empty_result'
+  | 'quota_exhausted'
+  | '';
 
 export interface AISearchResultV2 {
   mode: AISearchMode;

@@ -4,6 +4,11 @@ export const STORAGE_KEYS = {
   selectedToolIds: 'pangen.selectedToolIds',
   userSolutions: 'pangen.userSolutions',
   analyticsEvents: 'pangen.analyticsEvents',
+
+  // 游客额度（本地存储）
+  guestQuotaAiSearch: 'pangen.quota.guest.aiSearch',
+  guestQuotaAiSolution: 'pangen.quota.guest.aiSolution',
+  guestQuotaResetAt: 'pangen.quota.guest.resetAt',
 } as const;
 
 export interface StorageReadResult<T> {

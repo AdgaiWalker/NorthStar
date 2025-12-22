@@ -1,11 +1,16 @@
-import { RouteObject } from 'react-router-dom';
+import { RouteObject, Navigate } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
 import { ToolDetailPage } from './pages/ToolDetailPage';
 import { ArticleReadPage } from './pages/ArticleReadPage';
 import { SolutionNewPage } from './pages/SolutionNewPage';
 import { UserCenterPage } from './pages/UserCenterPage';
 import { LoginPage } from './pages/LoginPage';
-import { AdminPage } from './pages/AdminPage';
+import { AdminLayout } from './components/AdminLayout';
+import { ReviewQueuePage } from './pages/admin/ReviewQueuePage';
+import { ReviewDetailPage } from './pages/admin/ReviewDetailPage';
+import { UnassignedPoolPage } from './pages/admin/UnassignedPoolPage';
+import { ReviewersPage } from './pages/admin/ReviewersPage';
+import { AuditLogPage } from './pages/admin/AuditLogPage';
 
 // 路由配置
 export const routes: RouteObject[] = [
@@ -39,10 +44,14 @@ export const routes: RouteObject[] = [
   },
   {
     path: '/admin',
-    element: <AdminPage />,
-  },
-  {
-    path: '/admin/:section',
-    element: <AdminPage />,
+    element: <AdminLayout />,
+    children: [
+      { index: true, element: <Navigate to="review-queue" replace /> },
+      { path: 'review-queue', element: <ReviewQueuePage /> },
+      { path: 'review/:taskId', element: <ReviewDetailPage /> },
+      { path: 'unassigned', element: <UnassignedPoolPage /> },
+      { path: 'reviewers', element: <ReviewersPage /> },
+      { path: 'audit', element: <AuditLogPage /> },
+    ],
   },
 ];
