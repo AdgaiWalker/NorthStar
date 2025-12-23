@@ -236,7 +236,7 @@ export const useReviewStore = create<ReviewState>()(
       },
 
       approveTask: (taskId) => {
-        const { tasks, reviewers, writeAudit } = get();
+        const { tasks, writeAudit } = get();
         const task = tasks.find((t) => t.id === taskId);
         if (!task || !['assigned', 'in_review'].includes(task.status)) return;
 
@@ -252,7 +252,7 @@ export const useReviewStore = create<ReviewState>()(
       },
 
       rejectTask: (taskId, reason) => {
-        const { tasks, reviewers, writeAudit } = get();
+        const { tasks, writeAudit } = get();
         const task = tasks.find((t) => t.id === taskId);
         if (!task || !['assigned', 'in_review'].includes(task.status)) return;
 

@@ -22,6 +22,19 @@ import { MOCK_TOOLS } from '../../constants';
 
 export type UserCenterTab = 'profile' | 'history' | 'favorites' | 'creator' | 'solutions' | 'stats' | 'settings';
 
+const LANGUAGE_OPTIONS: Array<{ id: 'zh' | 'en' | 'jp' | 'ru'; label: string }> = [
+  { id: 'zh', label: '简体中文' },
+  { id: 'en', label: 'English' },
+  { id: 'jp', label: '日本語' },
+  { id: 'ru', label: 'Русский' },
+];
+
+const EXPORT_FORMAT_OPTIONS: Array<{ id: 'md' | 'txt' | 'csv'; label: string }> = [
+  { id: 'md', label: 'Markdown (.md)' },
+  { id: 'txt', label: '纯文本 (.txt)' },
+  { id: 'csv', label: '表格数据 (.csv)' },
+];
+
 interface UserCenterViewProps {
   tab?: UserCenterTab;
   themeMode: ThemeMode;
@@ -296,15 +309,10 @@ export const UserCenterView: React.FC<UserCenterViewProps> = ({
                     <p className="text-xs text-slate-500 mt-1">界面显示语言</p>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    {[
-                      { id: 'zh', label: '简体中文' },
-                      { id: 'en', label: 'English' },
-                      { id: 'jp', label: '日本語' },
-                      { id: 'ru', label: 'Русский' },
-                    ].map(lang => (
+                    {LANGUAGE_OPTIONS.map((lang) => (
                       <button
                         key={lang.id}
-                        onClick={() => setSettingsLang(lang.id as any)}
+                        onClick={() => setSettingsLang(lang.id)}
                         className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                           settingsLang === lang.id
                             ? 'bg-blue-600 text-white shadow-md'
@@ -324,14 +332,10 @@ export const UserCenterView: React.FC<UserCenterViewProps> = ({
                     <p className="text-xs text-slate-500 mt-1">方案导出时的默认文件类型</p>
                   </div>
                   <div className="flex gap-2">
-                    {[
-                      { id: 'md', label: 'Markdown (.md)' },
-                      { id: 'txt', label: '纯文本 (.txt)' },
-                      { id: 'csv', label: '表格数据 (.csv)' },
-                    ].map(fmt => (
+                    {EXPORT_FORMAT_OPTIONS.map((fmt) => (
                       <button
                         key={fmt.id}
-                        onClick={() => setSettingsExport(fmt.id as any)}
+                        onClick={() => setSettingsExport(fmt.id)}
                         className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                           settingsExport === fmt.id
                             ? 'bg-slate-800 text-white shadow-md'

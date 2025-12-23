@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -8,8 +8,6 @@ import {
   Copy,
   Download,
   Layout,
-  MessageCircle,
-  MessageSquare,
   Share2,
   Sparkles,
   Trash2,
@@ -42,20 +40,27 @@ export const UserCenterPage: React.FC = () => {
   const [linkCopied, setLinkCopied] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
-  // 设置状态
-  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
-
-  useEffect(() => {
+  const resetMenus = () => {
     setShowShareMenu(false);
     setLinkCopied(false);
     setShowExportMenu(false);
-  }, [viewSolution]);
+  };
+
+  const openSolution = (sol: UserSolution) => {
+    resetMenus();
+    setViewSolution(sol);
+  };
+
+  const closeSolution = () => {
+    resetMenus();
+    setViewSolution(null);
+  };
 
   const handleDeleteConfirm = () => {
     if (!solutionToDelete) return;
     deleteSolution(solutionToDelete);
     if (viewSolution?.id === solutionToDelete) {
-      setViewSolution(null);
+      closeSolution();
     }
     setSolutionToDelete(null);
   };
@@ -156,7 +161,7 @@ export const UserCenterPage: React.FC = () => {
                   {userSolutions.map((sol) => (
                     <div
                       key={sol.id}
-                      onClick={() => setViewSolution(sol)}
+                      onClick={() => openSolution(sol)}
                       className={`p-6 rounded-2xl cursor-pointer hover:border-blue-400 transition-all ${
                         isEyeCare
                           ? 'bg-white border border-stone-200'
@@ -290,7 +295,7 @@ export const UserCenterPage: React.FC = () => {
         <div className="fixed inset-0 z-[60] flex justify-end">
           <div
             className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity"
-            onClick={() => setViewSolution(null)}
+            onClick={closeSolution}
           ></div>
           <div
             className={`relative w-full max-w-2xl h-full shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col ${
@@ -356,7 +361,7 @@ export const UserCenterPage: React.FC = () => {
                   )}
                 </div>
                 <button
-                  onClick={() => setViewSolution(null)}
+                  onClick={closeSolution}
                   className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
                   title="关闭"
                 >

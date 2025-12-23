@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Sparkles, Loader2, ArrowRight, AlertTriangle, Search, Library, Layers, BookOpen } from 'lucide-react';
 import { searchToolsWithAI } from '../services/AIService';
 import { buildFallbackResult } from '../services/aiFallback';
@@ -34,10 +34,6 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
 
   // 游客额度（本地存储）：用于展示与拦截
   const [quotaState, setQuotaState] = useState(() => getGuestQuotaState());
-
-  useEffect(() => {
-    setQuotaState(getGuestQuotaState());
-  }, []);
 
   // 根据库模式过滤数据
   const getFilteredData = (libMode: LibraryMode) => {
@@ -83,7 +79,7 @@ export const AISearch: React.FC<AISearchProps> = ({ tools, articles, onToolClick
     } else {
       const needle = q.toLowerCase();
       const matchedTools = filteredTools.filter(t =>
-        `${t.name} ${t.description}`.toLowerCase().includes(needle)
+        `${t.name} ${t.description} ${(t.tags || []).join(' ')}`.toLowerCase().includes(needle)
       );
       const matchedArticles = filteredArticles.filter(a =>
         `${a.title} ${a.summary}`.toLowerCase().includes(needle)

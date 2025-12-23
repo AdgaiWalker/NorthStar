@@ -22,7 +22,7 @@ const getPlainText = (children: React.ReactNode): string => {
       return;
     }
     if (React.isValidElement(node)) {
-      const el = node as React.ReactElement<any>;
+      const el = node as React.ReactElement<{ children?: React.ReactNode }>;
       walk(el.props.children);
       return;
     }
@@ -104,7 +104,8 @@ export const DocRenderer: React.FC<DocRendererProps> = ({ markdown }) => {
   const slugger = createSlugger();
 
   const Heading = (Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') => {
-    const Comp: React.FC<any> = ({ children, className, ...rest }) => {
+    type HeadingProps = React.ComponentPropsWithoutRef<'h1'>;
+    const Comp: React.FC<HeadingProps> = ({ children, className, ...rest }) => {
       const text = getPlainText(children);
       const id = slugger(text);
       const merged = [className, 'scroll-mt-24'].filter(Boolean).join(' ');
@@ -127,18 +128,18 @@ export const DocRenderer: React.FC<DocRendererProps> = ({ markdown }) => {
         h4: Heading('h4'),
         h5: Heading('h5'),
         h6: Heading('h6'),
-        pre: ({ children, ...props }: any) => {
+        pre: ({ children, ...props }: React.ComponentPropsWithoutRef<'pre'>) => {
           const childArray = React.Children.toArray(children);
           const onlyChild = childArray.length === 1 ? childArray[0] : null;
           if (React.isValidElement(onlyChild)) {
-            const el = onlyChild as React.ReactElement<any>;
+            const el = onlyChild as React.ReactElement<Record<string, unknown>>;
             if (el.props['data-pangen-block']) {
               return <>{onlyChild}</>;
             }
           }
           return <pre {...props}>{children}</pre>;
         },
-        code: (codeProps: any) => {
+        code: (codeProps: React.ComponentPropsWithoutRef<'code'> & { inline?: boolean }) => {
           const { inline, className, children, ...props } = codeProps;
           const match = /language-(\S+)/.exec(className || '');
           const lang = match?.[1] || '';
@@ -158,12 +159,12 @@ export const DocRenderer: React.FC<DocRendererProps> = ({ markdown }) => {
             </code>
           );
         },
-        blockquote: ({ children, ...props }: any) => {
+        blockquote: ({ children, ...props }: React.ComponentPropsWithoutRef<'blockquote'>) => {
           const arr = React.Children.toArray(children);
           const first = arr[0];
 
           if (React.isValidElement(first) && first.type === 'p') {
-            const firstEl = first as React.ReactElement<any>;
+            const firstEl = first as React.ReactElement<{ children?: React.ReactNode }>;
             const header = tryParseCalloutHeader(firstEl.props.children);
             if (header) {
               const style = getCalloutStyle(header.type);
@@ -173,8 +174,8 @@ export const DocRenderer: React.FC<DocRendererProps> = ({ markdown }) => {
                 .slice(1)
                 .filter((n) => {
                   if (!React.isValidElement(n)) return true;
-                  if ((n as React.ReactElement<any>).type !== 'p') return true;
-                  const t = getPlainText((n as React.ReactElement<any>).props.children);
+                  if ((n as React.ReactElement<{ children?: React.ReactNode }>).type !== 'p') return true;
+                  const t = getPlainText((n as React.ReactElement<{ children?: React.ReactNode }>).props.children);
                   return t.length > 0;
                 });
 

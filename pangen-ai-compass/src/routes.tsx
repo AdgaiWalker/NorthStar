@@ -11,6 +11,7 @@ import { ReviewDetailPage } from './pages/admin/ReviewDetailPage';
 import { UnassignedPoolPage } from './pages/admin/UnassignedPoolPage';
 import { ReviewersPage } from './pages/admin/ReviewersPage';
 import { AuditLogPage } from './pages/admin/AuditLogPage';
+import { RequireAuth } from './components/RequireAuth';
 
 // 路由配置
 export const routes: RouteObject[] = [
@@ -44,7 +45,11 @@ export const routes: RouteObject[] = [
   },
   {
     path: '/admin',
-    element: <AdminLayout />,
+    element: (
+      <RequireAuth>
+        <AdminLayout />
+      </RequireAuth>
+    ),
     children: [
       { index: true, element: <Navigate to="review-queue" replace /> },
       { path: 'review-queue', element: <ReviewQueuePage /> },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Shield, 
   LayoutDashboard, 
@@ -37,16 +37,14 @@ const MENU_ITEMS: { id: AdminSection; label: string; icon: React.ReactNode; desc
 
 export const AdminView: React.FC<AdminViewProps> = ({ navigate }) => {
   // Simple state for prototype, in real app this would sync with URL params
-  const [activeSection, setActiveSection] = useState<AdminSection>('content');
-
-  // Simulate URL param sync on mount (mock)
-  useEffect(() => {
+  const [activeSection, setActiveSection] = useState<AdminSection>(() => {
     const params = new URLSearchParams(window.location.search);
     const section = params.get('section') as AdminSection;
     if (section && MENU_ITEMS.find(m => m.id === section)) {
-      setActiveSection(section);
+      return section;
     }
-  }, []);
+    return 'content';
+  });
 
   const handleSectionChange = (section: AdminSection) => {
     setActiveSection(section);

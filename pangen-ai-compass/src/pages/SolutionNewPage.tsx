@@ -6,7 +6,7 @@ import { MOCK_TOOLS } from '../constants';
 import { useAppStore } from '../store/useAppStore';
 import { useShare } from '../hooks/useShare';
 import { SITE_URL } from '../constants/ui';
-import { buildFallbackSolution, generateSolutionWithAI } from '../services/AIService';
+import { generateSolutionWithAI } from '../services/AIService';
 import { DAILY_GUEST_QUOTA_LIMITS, consumeGuestQuota, getGuestQuotaState } from '../utils/quota';
 
 export const SolutionNewPage: React.FC = () => {
@@ -30,6 +30,9 @@ export const SolutionNewPage: React.FC = () => {
 
   const isEyeCare = themeMode === 'eye-care';
 
+  const [statusMessage, setStatusMessage] = useState<string>('');
+  const [statusType, setStatusType] = useState<'info' | 'error' | ''>('');
+
   // 如果没有选中工具，引导用户返回首页
   if (toolIds.length === 0) {
     return (
@@ -49,37 +52,19 @@ export const SolutionNewPage: React.FC = () => {
     );
   }
 
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [demoReason, setDemoReason] = useState<'quota_exhausted' | 'other' | null>(null);
-
   const handleGenerate = async () => {
     setIsGenerating(true);
-    setIsDemoMode(false);
-    setDemoReason(null);
+    setStatusMessage('');
+    setStatusType('');
 
     try {
       const effectiveGoal = goal.trim() || '探索这些工具的组合潜力';
 
-      // 额度不足：不调用真实 AI，直接进入 demo（不扣次）
       const quota = getGuestQuotaState();
       if (quota.aiSolutionRemaining <= 0) {
         setQuotaState(quota);
-        setIsDemoMode(true);
-        setDemoReason('quota_exhausted');
-
-        const result = buildFallbackSolution('quota_exhausted', effectiveGoal, selectedTools);
-        const newSolution: UserSolution = {
-          id: Date.now().toString(),
-          title: result.title,
-          targetGoal: effectiveGoal,
-          toolIds: toolIds,
-          aiAdvice: result.aiAdvice,
-          createdAt: new Date().toLocaleDateString(),
-        };
-
-        saveSolution(newSolution);
-        clearSelection();
-        navigate('/me/solutions');
+        setStatusMessage('今日 AI 方案额度已用完，暂无法生成。额度将于明日 00:00 重置。');
+        setStatusType('info');
         return;
       }
 
@@ -91,8 +76,9 @@ export const SolutionNewPage: React.FC = () => {
       setQuotaState(getGuestQuotaState());
 
       if (result.mode === 'demo') {
-        setIsDemoMode(true);
-        setDemoReason('other');
+        setStatusMessage('AI 服务暂不可用，当前无法生成方案，请稍后重试。');
+        setStatusType('info');
+        return;
       }
 
       const newSolution: UserSolution = {
@@ -109,22 +95,8 @@ export const SolutionNewPage: React.FC = () => {
       navigate('/me/solutions');
     } catch (error) {
       console.error('AI 方案生成失败:', error);
-      setIsDemoMode(true);
-      setDemoReason('other');
-
-      const effectiveGoal = goal.trim() || '探索这些工具的组合潜力';
-      const result = buildFallbackSolution('network_error', effectiveGoal, selectedTools);
-      const fallbackSolution: UserSolution = {
-        id: Date.now().toString(),
-        title: result.title,
-        targetGoal: effectiveGoal,
-        toolIds: toolIds,
-        aiAdvice: result.aiAdvice,
-        createdAt: new Date().toLocaleDateString(),
-      };
-      saveSolution(fallbackSolution);
-      clearSelection();
-      navigate('/me/solutions');
+      setStatusMessage('AI 请求失败。请检查网络或稍后重试，本次未保存任何方案。');
+      setStatusType('error');
     } finally {
       setIsGenerating(false);
     }
@@ -185,11 +157,24 @@ export const SolutionNewPage: React.FC = () => {
           </div>
         </div>
 
+        {statusMessage && (
+          <div
+            className={`mb-6 flex items-start gap-2 rounded-xl px-4 py-3 border ${
+              statusType === 'error'
+                ? 'bg-rose-50 text-rose-800 border-rose-100'
+                : 'bg-amber-50 text-amber-800 border-amber-100'
+            }`}
+          >
+            <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+            <div className="text-sm font-medium leading-relaxed">{statusMessage}</div>
+          </div>
+        )}
+
         {quotaState.aiSolutionRemaining <= 0 && (
           <div className="mb-6 flex items-start gap-2 rounded-xl bg-amber-50 text-amber-800 px-4 py-3 border border-amber-100">
             <AlertTriangle size={18} className="shrink-0 mt-0.5" />
             <div className="text-sm font-medium">
-              今日 AI 方案额度已用完。你仍可点击“生成方案”，系统将以演示模式生成基础草稿（不扣次数）。
+              今日 AI 方案额度已用完。请明日 00:00 后重试（额度会重置）。
             </div>
           </div>
         )}

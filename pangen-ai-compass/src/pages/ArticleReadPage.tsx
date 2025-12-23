@@ -13,7 +13,11 @@ export const ArticleReadPage: React.FC = () => {
   const navigate = useNavigate();
   const { themeMode } = useAppStore();
 
+  const [tocOpen, setTocOpen] = useState(false);
+
   const article = MOCK_ARTICLES.find((a) => a.id === articleId);
+  const articleContent = article?.content || '';
+  const toc = useMemo(() => extractDocToc(articleContent), [articleContent]);
   if (!article) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -33,9 +37,6 @@ export const ArticleReadPage: React.FC = () => {
   const topic = effectiveTopicId ? MOCK_TOPICS.find((t) => t.id === effectiveTopicId) : null;
   const topicArticles = topic ? MOCK_ARTICLES.filter((a) => a.topicId === topic.id) : [];
   const isEyeCare = themeMode === 'eye-care';
-
-  const toc = useMemo(() => extractDocToc(article.content), [article.content]);
-  const [tocOpen, setTocOpen] = useState(false);
 
   const scrollToHeading = (id: string) => {
     const el = document.getElementById(id);

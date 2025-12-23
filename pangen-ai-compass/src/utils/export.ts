@@ -18,8 +18,10 @@ const formatSolutionContent = (solution: UserSolution, format: 'md' | 'txt' | 'c
       return `# ${solution.title}\n\n**目标**: ${solution.targetGoal}\n**创建时间**: ${solution.createdAt}\n**工具组合**: ${toolNames}\n\n---\n\n${solution.aiAdvice}`;
     case 'txt':
       return `标题: ${solution.title}\n目标: ${solution.targetGoal}\n创建时间: ${solution.createdAt}\n工具组合: ${toolNames}\n\n----------------\n\n${sanitize(solution.aiAdvice)}`;
-    case 'csv':
-      return `ID,Title,Target Goal,Created At,Tools,AI Advice\n\"${solution.id}\",\"${solution.title.replace(/\"/g, '\"\"')}\",\"${solution.targetGoal.replace(/\"/g, '\"\"')}\",\"${solution.createdAt}\",\"${toolNames}\",\"${solution.aiAdvice.replace(/\"/g, '\"\"')}\"`;
+    case 'csv': {
+      const esc = (v: string) => v.replace(/"/g, '""');
+      return `ID,Title,Target Goal,Created At,Tools,AI Advice\n"${esc(solution.id)}","${esc(solution.title)}","${esc(solution.targetGoal)}","${esc(solution.createdAt)}","${esc(toolNames)}","${esc(solution.aiAdvice)}"`;
+    }
     default:
       return '';
   }

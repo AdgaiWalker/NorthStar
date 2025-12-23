@@ -13,7 +13,7 @@ const extractLikelyJson = (text: string): string => {
   return text.slice(first, last + 1);
 };
 
-const safeParseJsonObject = (raw: string): any => {
+const safeParseJsonObject = (raw: string): unknown => {
   const base = extractLikelyJson(String(raw || '')).trim();
   const candidates: string[] = [];
 
@@ -32,6 +32,22 @@ const safeParseJsonObject = (raw: string): any => {
 
   return JSON.parse(base || '{}');
 };
+
+type ZhipuChatResponse = {
+  choices?: Array<{
+    message?: {
+      content?: unknown;
+      tool_calls?: Array<{
+        function?: {
+          arguments?: unknown;
+        };
+      }>;
+    };
+  }>;
+};
+
+type UnknownRecord = Record<string, unknown>;
+const isRecord = (v: unknown): v is UnknownRecord => !!v && typeof v === 'object' && !Array.isArray(v);
 
 const normalizeStringArray = (value: unknown): string[] => {
   const out: string[] = [];
@@ -134,33 +150,35 @@ ${articleContext}
     }
  
     const payload: unknown = await response.json();
-    const toolArguments =
-      typeof (payload as any)?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments === 'string'
-        ? (payload as any).choices[0].message.tool_calls[0].function.arguments
-        : '';
+    const msg = (payload as ZhipuChatResponse).choices?.[0]?.message;
 
-    const content =
-      typeof (payload as any)?.choices?.[0]?.message?.content === 'string'
-        ? (payload as any).choices[0].message.content
-        : '';
+    const toolArgsValue = msg?.tool_calls?.[0]?.function?.arguments;
+    const toolArguments = typeof toolArgsValue === 'string' ? toolArgsValue : '';
+
+    const contentValue = msg?.content;
+    const content = typeof contentValue === 'string' ? contentValue : '';
 
     const jsonText = toolArguments || content || '{}';
-    const data = safeParseJsonObject(jsonText);
+    const parsed = safeParseJsonObject(jsonText);
+    const data = isRecord(parsed) ? parsed : {};
+
+    const summary = typeof data.summary === 'string' ? data.summary : '';
+    const recommendation = typeof data.recommendation === 'string' ? data.recommendation : '';
 
     const suggestedToolNames = normalizeStringArray(data.suggestedTools);
     const suggestedArticleTitles = normalizeStringArray(data.suggestedArticles);
 
-    if ((suggestedToolNames.length === 0 && suggestedArticleTitles.length === 0) || !data.summary) {
+    if ((suggestedToolNames.length === 0 && suggestedArticleTitles.length === 0) || !summary) {
       return buildFallbackResult('empty_result', query, availableTools, availableArticles);
     }
 
     return {
       mode: 'ai',
       fallbackReason: '',
-      summary: data.summary,
-      recommendation: data.recommendation || "请尝试手动浏览我们的目录。",
+      summary,
+      recommendation: recommendation || '请尝试手动浏览我们的目录。',
       suggestedTools: suggestedToolNames.slice(0, 3),
-      suggestedArticles: suggestedArticleTitles.slice(0, 2)
+      suggestedArticles: suggestedArticleTitles.slice(0, 2),
     };
 
   } catch (error) {
@@ -279,28 +297,30 @@ ${toolContext}
     }
 
     const payload: unknown = await response.json();
-    const toolArguments =
-      typeof (payload as any)?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments === 'string'
-        ? (payload as any).choices[0].message.tool_calls[0].function.arguments
-        : '';
+    const msg = (payload as ZhipuChatResponse).choices?.[0]?.message;
 
-    const content =
-      typeof (payload as any)?.choices?.[0]?.message?.content === 'string'
-        ? (payload as any).choices[0].message.content
-        : '';
+    const toolArgsValue = msg?.tool_calls?.[0]?.function?.arguments;
+    const toolArguments = typeof toolArgsValue === 'string' ? toolArgsValue : '';
+
+    const contentValue = msg?.content;
+    const content = typeof contentValue === 'string' ? contentValue : '';
 
     const jsonText = toolArguments || content || '{}';
-    const data = safeParseJsonObject(jsonText);
+    const parsed = safeParseJsonObject(jsonText);
+    const data = isRecord(parsed) ? parsed : {};
 
-    if (!data.title || !data.aiAdvice) {
+    const title = typeof data.title === 'string' ? data.title : '';
+    const aiAdvice = typeof data.aiAdvice === 'string' ? data.aiAdvice : '';
+
+    if (!title || !aiAdvice) {
       return buildFallbackSolution('empty_result', effectiveGoal, selectedTools);
     }
 
     return {
       mode: 'ai',
       fallbackReason: '',
-      title: data.title,
-      aiAdvice: data.aiAdvice,
+      title,
+      aiAdvice,
     };
 
   } catch (error) {

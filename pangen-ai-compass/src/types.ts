@@ -114,7 +114,7 @@ export interface AnalyticsEvent {
   timestamp: string;
   domain?: Domain;
   toolIds?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UserStats {

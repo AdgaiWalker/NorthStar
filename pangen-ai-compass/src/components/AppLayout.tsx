@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Layout, Sun, BookOpen, Globe, User, Menu, X, ChevronDown, Monitor, Video, Briefcase, LogOut, Shield, Check } from 'lucide-react';
 import { APP_NAME, ICP_LICENSE } from '../constants';
 import { Language, Domain } from '../types';
@@ -13,7 +13,6 @@ const domainMap: Record<Domain, { label: string; icon: React.ReactNode; color: s
 
 export const AppHeader: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   
   const { 
     themeMode, toggleTheme, 

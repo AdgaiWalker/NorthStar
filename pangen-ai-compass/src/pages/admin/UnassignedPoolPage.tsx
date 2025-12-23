@@ -32,7 +32,7 @@ export const UnassignedPoolPage: React.FC = () => {
           <List size={24} className="text-blue-600" /> 待分配池
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          审核任务因"无可用审核员"或"审核员已满载"等原因进入此池，管理员可手动分配或等待系统自动恢复。
+          审核任务因“无可用审核员”或“审核员已满载”等原因进入此池，管理员可手动分配或等待系统自动恢复。
         </p>
       </header>
 

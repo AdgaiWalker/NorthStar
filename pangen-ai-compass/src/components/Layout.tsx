@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout, Sun, BookOpen, Globe, User, Menu, X, ChevronDown, Monitor, Video, Briefcase, Settings, LogOut, Shield, Check } from 'lucide-react';
+import { Layout, Sun, BookOpen, Globe, User, Menu, X, ChevronDown, Monitor, Video, Briefcase, LogOut, Shield, Check } from 'lucide-react';
 import { APP_NAME, ICP_LICENSE } from '../constants';
 import { ThemeMode, ViewState, Language, Domain } from '../types';
 
@@ -17,7 +17,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
-  themeMode, toggleTheme, language, setLanguage, navigate, currentView, isLoggedIn, setIsLoggedIn, currentDomain, setDomain
+  themeMode, toggleTheme, language, setLanguage, navigate, isLoggedIn, setIsLoggedIn, currentDomain, setDomain
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [domainMenuOpen, setDomainMenuOpen] = useState(false);

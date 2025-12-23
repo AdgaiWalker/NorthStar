@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, Bookmark, PlayCircle, Video, FileText, ArrowRight, Layers, Users, CheckCircle, Circle, CheckCircle2 } from 'lucide-react';
+import { Star, PlayCircle, Video, FileText, Layers, Users, Circle, CheckCircle2 } from 'lucide-react';
 import { Tool, Article, ThemeMode, Topic } from '../types';
 
 interface ToolCardProps {
@@ -167,7 +167,9 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, onClick, themeMode 
   return (
     <div 
       onClick={onClick}
-      className={`group relative h-48 rounded-2xl overflow-hidden cursor-pointer shadow-sm hover:shadow-xl transition-all duration-300`}
+      className={`group relative h-48 rounded-2xl overflow-hidden cursor-pointer shadow-sm hover:shadow-xl transition-all duration-300 ${
+        isEyeCare ? 'ring-1 ring-stone-200' : 'ring-1 ring-slate-100'
+      }`}
     >
       <img src={topic.coverUrl} className="absolute inset-0 w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700" alt="" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end p-6 text-white">

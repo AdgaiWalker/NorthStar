@@ -1,0 +1,529 @@
+# 文档一致性审核报告（README + openspec vs 当前代码实现）
+审核范围（按“以代码为真”）：
+- 用户文档：`pangen-ai-compass/README.md`
+- 规格文档（openspec）：`openspec/Constitution/项目宪法.md`、`openspec/Specs/PRD-盘根AI指南针-标准版.md`、`openspec/Changes/2025-12-22-前端MVP-多端壳-游客额度-文档页-审核后台AI/*`
+- 代码与配置：`pangen-ai-compass/src/**`、`pangen-ai-compass/package.json`、`pangen-ai-compass/vite.config.ts`
+
+术语说明：
+- 契约（Contract）：对外/跨模块共享的接口定义（例如类型、schema、OpenAPI 等），应作为“单一事实来源”。
+- SSOT（Single Source of Truth）：单一事实来源，即“以哪个文件为准”。
+
+------------------------------------------------------------
+
+## 问题总览表（31 条）
+| # | 严重级别 | 标题 | 文档位置 | 代码位置 |
+|---:|:---:|---|---|---|
+| 1 | P1 | README 指向不存在的 PRD 文件（最终版 vs 标准版） | `pangen-ai-compass/README.md:3` | `openspec/Specs/*`（文件存在性） |
+| 2 | P1 | README 声称 `.zhipu.local.json` 可配 model，但实际请求模型固定 | `pangen-ai-compass/README.md:13` | `pangen-ai-compass/src/services/AIService.ts:6,115` |
+| 3 | P2 | README 未覆盖 build/preview/lint/format 等脚本，影响可复现 | `pangen-ai-compass/README.md:5-18` | `pangen-ai-compass/package.json:7-13` |
+| 4 | P2 | 推荐 pnpm 但缺少 `pnpm-lock.yaml`，安装不可复现 | `pangen-ai-compass/README.md:7-11` | `pangen-ai-compass/package.json:5` + lockfile 缺失 |
+| 5 | P2 | PRD V1 范围声明“普通搜索/库模式 V2”，但代码已实现 | `openspec/Specs/PRD-盘根AI指南针-标准版.md:175-182` | `pangen-ai-compass/src/components/AISearch.tsx:23-25,185-202` |
+| 6 | P1 | PRD 声称“AI 搜索需登录”，实现未做登录门槛 | `openspec/Specs/PRD-盘根AI指南针-标准版.md:459-463` | `pangen-ai-compass/src/components/AISearch.tsx:66-80` |
+| 7 | P1 | PRD 声称“方案生成仅登录用户可用”，实现为游客额度 | `openspec/Specs/PRD-盘根AI指南针-标准版.md:563-566` | `pangen-ai-compass/src/pages/SolutionNewPage.tsx:63-90` |
+| 8 | P2 | PRD 的 fallbackReason 枚举缺少 `quota_exhausted` | `openspec/Specs/PRD-盘根AI指南针-标准版.md:477-479` | `pangen-ai-compass/src/services/aiContract.ts:3-9` |
+| 9 | P1 | PRD 次数重置规则=每周；代码实现=每日 00:00 | `openspec/Specs/PRD-盘根AI指南针-标准版.md:1331-1339` | `pangen-ai-compass/src/utils/quota.ts:3-7,17-18` |
+| 10 | P2 | PRD 普通搜索应包含 tags；代码普通搜索未包含 tags | `openspec/Specs/PRD-盘根AI指南针-标准版.md:438-442` | `pangen-ai-compass/src/components/AISearch.tsx:84-90` |
+| 11 | P2 | PRD 承诺搜索结果可分页；代码未实现分页 | `openspec/Specs/PRD-盘根AI指南针-标准版.md:450-452` | `pangen-ai-compass/src/components/AISearch.tsx:314-341` |
+| 12 | P2 | PRD 首页包含“校内专区”模块；代码首页缺失该模块 | `openspec/Specs/PRD-盘根AI指南针-标准版.md:401-407` | `pangen-ai-compass/src/pages/HomePage.tsx:21-226` |
+| 13 | P2 | PRD 校内专区访问规则未落地（未认证过滤/本校 schoolId） | `openspec/Specs/PRD-盘根AI指南针-标准版.md:443-446` | `pangen-ai-compass/src/pages/HomePage.tsx:24-33` |
+| 14 | P0 | 宪法承诺后台高权限隔离，但 `/admin` 无任何访问控制 | `openspec/Constitution/项目宪法.md:68-69` | `pangen-ai-compass/src/routes.tsx:46-56` |
+| 15 | P1 | PRD 方案生成“预览→保存”流程与实现不一致（实现直接保存并跳转） | `openspec/Specs/PRD-盘根AI指南针-标准版.md:573-594` | `pangen-ai-compass/src/pages/SolutionNewPage.tsx:98-110` |
+| 16 | P2 | PRD 要求失败时给错误与重试入口；实现直接落 demo 并跳转 | `openspec/Specs/PRD-盘根AI指南针-标准版.md:575-577` | `pangen-ai-compass/src/pages/SolutionNewPage.tsx:110-128` |
+| 17 | P2 | PRD 阅读页“视频区域（isVideo）”与实现不一致（视频为块语法） | `openspec/Specs/PRD-盘根AI指南针-标准版.md:549-550` | `pangen-ai-compass/src/components/DocRenderer.tsx:146-153` |
+| 18 | P2 | PRD Markdown 支持清单未包含受控块/双链，但实现已支持并使用 | `openspec/Specs/PRD-盘根AI指南针-标准版.md:551-560` | `pangen-ai-compass/src/utils/docMarkdown.ts:40-94` |
+| 19 | P2 | PRD 用户后台导航项（我的次数/学生认证/使用概览等）未实现 | `openspec/Specs/PRD-盘根AI指南针-标准版.md:659-668` | `pangen-ai-compass/src/pages/UserCenterPage.tsx:26-33,93-133` |
+| 20 | P2 | PRD 设置应含主题/语言；UserCenter 的设置页为占位 | `openspec/Specs/PRD-盘根AI指南针-标准版.md:668-669` | `pangen-ai-compass/src/pages/UserCenterPage.tsx:265-276` |
+| 21 | P2 | PRD 个人资料字段与实现不一致（缺少简介/手机号/注册时间等） | `openspec/Specs/PRD-盘根AI指南针-标准版.md:672-680` | `pangen-ai-compass/src/pages/UserCenterPage.tsx:225-260` |
+| 22 | P1 | PRD User 数据规格与代码 `User` 类型不一致（契约漂移） | `openspec/Specs/PRD-盘根AI指南针-标准版.md:1462-1477` | `pangen-ai-compass/src/types.ts:61-68` |
+| 23 | P2 | PRD AuditLog 数据规格过简/字段不一致，无法作为 SSOT | `openspec/Specs/PRD-盘根AI指南针-标准版.md:1616-1622` | `pangen-ai-compass/src/types/review.ts:84-94` |
+| 24 | P2 | 变更文档的 ReviewTask 状态机与代码枚举不一致 | `openspec/Changes/.../02-技术方案.md:87-92` | `pangen-ai-compass/src/types/review.ts:4-11` |
+| 25 | P2 | 变更文档的审计 action 枚举与代码 `AuditAction` 不一致 | `openspec/Changes/.../02-技术方案.md:125-130` | `pangen-ai-compass/src/types/review.ts:65-79` |
+| 26 | P1 | 变更文档要求后台 AI 以 Diff 预览呈现；实现仅展示纯文本 | `openspec/Changes/.../02-技术方案.md:139-140` | `pangen-ai-compass/src/pages/admin/ReviewDetailPage.tsx:280-285` |
+| 27 | P1 | 变更文档要求“应用可撤销”；实现无 rollback/撤销路径 | `openspec/Changes/.../02-技术方案.md:140` | `pangen-ai-compass/src/store/useReviewStore.ts:23-50` |
+| 28 | P2 | 变更文档列出的 AI 按钮含“修订稿改动总结”；实现缺失该按钮 | `openspec/Changes/.../02-技术方案.md:144-148` | `pangen-ai-compass/src/pages/admin/ReviewDetailPage.tsx:244-271` |
+| 29 | P2 | 变更文档要求“未创建文档可点击创建（后续）”；实现为删除线不可点击 | `openspec/Changes/.../02-技术方案.md:77-79` | `pangen-ai-compass/src/utils/wikilink.ts:125-132` |
+| 30 | P2 | 变更文档要求待分配池自动恢复；实现未在恢复接单时触发重新分配 | `openspec/Changes/.../02-技术方案.md:116-118` | `pangen-ai-compass/src/store/useReviewStore.ts:374-384` |
+| 31 | P2 | 变更文档建议新增 3 个 Spec 文件但未创建（Specs 未同步） | `openspec/Changes/.../04-规格增量.md:14-36` | `openspec/Specs/*`（文件存在性） |
+
+------------------------------------------------------------
+
+## 问题明细（按模板逐条）
+
+### 1) 标题：README 指向不存在的 PRD 文件（最终版 vs 标准版）
+- 严重级别：P1
+- 位置：
+  - `pangen-ai-compass/README.md:3`
+- 证据：
+  - 文档片段：`pangen-ai-compass/README.md:3`：最终 PRD 指向 `../openspec/Specs/PRD-盘根AI指南针-最终版.md`
+  - 代码片段：`openspec/Specs/PRD-盘根AI指南针-最终版.md` 不存在；`openspec/Specs/PRD-盘根AI指南针-标准版.md` 存在
+- 影响：
+  - 用户按 README 找不到“单一事实来源”，直接阻断阅读与对齐。
+- 建议（最小修正）：
+  - 修改 README，把链接改为当前存在的 `../openspec/Specs/PRD-盘根AI指南针-标准版.md`（或补齐“最终版”文件并保持同步）。
+- 关联原则：
+  - 面向用户的承诺优先 / 可运行与可复现
+
+### 2) 标题：README 声称 `.zhipu.local.json` 可配 model，但实际请求模型固定
+- 严重级别：P1
+- 位置：
+  - `pangen-ai-compass/README.md:13`
+  - `pangen-ai-compass/src/services/AIService.ts:6,115`
+- 证据：
+  - 文档片段：`pangen-ai-compass/README.md:13`：`.zhipu.local.json` 可选写入 `model`
+  - 代码片段：`pangen-ai-compass/src/services/AIService.ts:6`：`const ZHIPU_MODEL = 'glm-4.6';`；`AIService.ts:115`：请求体 `model: ZHIPU_MODEL`
+- 影响：
+  - 用户以为改了 model 会生效，但当前实现不生效，导致排障与配置成本上升。
+- 建议（最小修正）：
+  - 更新 README 说明“当前 model 固定”；或更新代码让 model 可配置并同步 README。
+- 关联原则：
+  - 以代码为真 / 面向用户的承诺优先
+
+### 3) 标题：README 未覆盖 build/preview/lint/format 等脚本，影响可复现
+- 严重级别：P2
+- 位置：
+  - `pangen-ai-compass/README.md:5-18`
+  - `pangen-ai-compass/package.json:7-13`
+- 证据：
+  - 文档片段：README 仅说明 dev 启动
+  - 代码片段：`package.json` 存在 `build/preview/lint/lint:fix/format`
+- 影响：
+  - 读者无法按文档完成构建/预览/规范检查。
+- 建议（最小修正）：
+  - README 增补“常用命令”与脚本说明。
+- 关联原则：
+  - 可运行与可复现
+
+### 4) 标题：推荐 pnpm 但缺少 `pnpm-lock.yaml`，安装不可复现
+- 严重级别：P2
+- 位置：
+  - `pangen-ai-compass/README.md:7-11`
+  - `pangen-ai-compass/package.json:5`
+- 证据：
+  - 文档片段：README 建议 pnpm
+  - 代码片段：`package.json:5` 声明 `pnpm@9.0.0`；但 `pangen-ai-compass/pnpm-lock.yaml` 不存在
+- 影响：
+  - 依赖版本漂移，协作与 CI 可复现性差。
+- 建议（最小修正）：
+  - 提交 pnpm lockfile 或统一为 npm 并说明。
+- 关联原则：
+  - 可运行与可复现
+
+### 5) 标题：PRD V1 范围声明“普通搜索/库模式 V2”，但代码已实现
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:175-182`
+  - `pangen-ai-compass/src/components/AISearch.tsx:23-25,185-202`
+- 证据：
+  - 文档片段：`❌ 普通搜索、库模式选择（V2）`
+  - 代码片段：`AISearch.tsx` 具备 `searchMode(ai/normal)` 与 `libraryMode(professional/comprehensive)`
+- 影响：
+  - 版本边界描述失真。
+- 建议（最小修正）：
+  - 更新 PRD 的 V1 范围说明。
+- 关联原则：
+  - 以代码为真 / 面向用户的承诺优先
+
+### 6) 标题：PRD 声称“AI 搜索需登录”，实现未做登录门槛
+- 严重级别：P1
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:459-463`
+  - `pangen-ai-compass/src/components/AISearch.tsx:66-80`
+- 证据：
+  - 文档片段：AI 搜索“需登录”
+  - 代码片段：仅判断 quota，不判断登录
+- 影响：
+  - 权限/成本治理规则不一致。
+- 建议（最小修正）：
+  - PRD 与实现二选一对齐（建议以当前游客额度实现为准更新 PRD）。
+- 关联原则：
+  - 面向用户的承诺优先 / 以代码为真
+
+### 7) 标题：PRD 声称“方案生成仅登录用户可用”，实现为游客额度
+- 严重级别：P1
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:563-566`
+  - `pangen-ai-compass/src/pages/SolutionNewPage.tsx:63-90`
+- 证据：
+  - 文档片段：仅登录用户可用
+  - 代码片段：游客额度不足进入 demo；成功才扣次
+- 影响：
+  - 登录价值与用户预期不一致。
+- 建议（最小修正）：
+  - 同第 6 条。
+- 关联原则：
+  - 面向用户的承诺优先 / 以代码为真
+
+### 8) 标题：PRD 的 fallbackReason 枚举缺少 `quota_exhausted`
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:477-479`
+  - `pangen-ai-compass/src/services/aiContract.ts:3-9`
+- 证据：
+  - 文档片段：枚举未含 `quota_exhausted`
+  - 代码片段：`aiContract.ts` 含 `quota_exhausted`
+- 影响：
+  - 枚举分支缺失，展示层可能漏处理。
+- 建议（最小修正）：
+  - PRD 枚举补齐并解释。
+- 关联原则：
+  - 合同优先 / 术语与枚举一致
+
+### 9) 标题：PRD 次数重置规则=每周；代码实现=每日 00:00
+- 严重级别：P1
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:1331-1339`
+  - `pangen-ai-compass/src/utils/quota.ts:3-7,17-18`
+- 证据：
+  - 文档片段：每周一 00:00
+  - 代码片段：次日 00:00
+- 影响：
+  - 用户可感知规则不一致。
+- 建议（最小修正）：
+  - PRD 改为“每日 00:00”（或代码改周重置并同步）。
+- 关联原则：
+  - 面向用户的承诺优先 / 可运行与可复现
+
+### 10) 标题：PRD 普通搜索应包含 tags；代码普通搜索未包含 tags
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:438-442`
+  - `pangen-ai-compass/src/components/AISearch.tsx:84-90`
+- 证据：
+  - 文档片段：工具搜索范围含 tags
+  - 代码片段：仅 name/description
+- 影响：
+  - 搜索体验与承诺不一致。
+- 建议（最小修正）：
+  - 把 tags 纳入普通搜索或更新 PRD。
+- 关联原则：
+  - 面向用户的承诺优先
+
+### 11) 标题：PRD 承诺搜索结果可分页；代码未实现分页
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:450-452`
+  - `pangen-ai-compass/src/components/AISearch.tsx:314-341`
+- 证据：
+  - 文档片段：可分页
+  - 代码片段：无分页 state/控件
+- 影响：
+  - 数据量增长后体验与性能风险。
+- 建议（最小修正）：
+  - PRD 标注 V1 不分页或实现最小分页。
+- 关联原则：
+  - 可运行与可复现
+
+### 12) 标题：PRD 首页包含“校内专区”模块；代码首页缺失该模块
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:401-407`
+  - `pangen-ai-compass/src/pages/HomePage.tsx:21-226`
+- 证据：
+  - 文档片段：校内专区模块
+  - 代码片段：仅工具/经验模块
+- 影响：
+  - IA 与 UI 不一致。
+- 建议（最小修正）：
+  - PRD 降级或在 UI 增加 Locked 入口。
+- 关联原则：
+  - 面向用户的承诺优先
+
+### 13) 标题：PRD 校内专区访问规则未落地（未认证过滤/本校 schoolId）
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:443-446`
+  - `pangen-ai-compass/src/pages/HomePage.tsx:24-33`
+- 证据：
+  - 文档片段：权限规则
+  - 代码片段：未实现认证/schoolId
+- 影响：
+  - 后续接真实数据存在越权风险。
+- 建议（最小修正）：
+  - 先在 PRD 标注未实现，或补齐过滤逻辑。
+- 关联原则：
+  - 安全默认收紧
+
+### 14) 标题：宪法承诺后台高权限隔离，但 `/admin` 无任何访问控制
+- 严重级别：P0
+- 位置：
+  - `openspec/Constitution/项目宪法.md:68-69`
+  - `pangen-ai-compass/src/routes.tsx:46-56`
+- 证据：
+  - 文档片段：后台仅 reviewer/editor/admin 可访问
+  - 代码片段：`/admin` 路由无 guard
+- 影响：
+  - 与安全承诺冲突，属于阻断项。
+- 建议（最小修正）：
+  - `/admin/*` 加最小路由守卫（未登录跳转/无权限 403），并同步文档。
+- 关联原则：
+  - 安全默认收紧 / 面向用户的承诺优先
+
+### 15) 标题：PRD 方案生成“预览→保存”流程与实现不一致（实现直接保存并跳转）
+- 严重级别：P1
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:573-594`
+  - `pangen-ai-compass/src/pages/SolutionNewPage.tsx:98-110`
+- 证据：
+  - 文档片段：先预览再保存
+  - 代码片段：生成后立即保存并跳转
+- 影响：
+  - 关键交互偏差。
+- 建议（最小修正）：
+  - PRD 改为“生成即保存”或补齐预览/保存。
+- 关联原则：
+  - 面向用户的承诺优先
+
+### 16) 标题：PRD 要求失败时给错误与重试入口；实现直接落 demo 并跳转
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:575-577`
+  - `pangen-ai-compass/src/pages/SolutionNewPage.tsx:110-128`
+- 证据：
+  - 文档片段：失败要错误与重试
+  - 代码片段：catch 后直接保存 fallback 并跳转
+- 影响：
+  - 失败不可感知、不可重试。
+- 建议（最小修正）：
+  - 增加最小错误提示与重试，或 PRD 标注自动回退。
+- 关联原则：
+  - 可运行与可复现
+
+### 17) 标题：PRD 阅读页“视频区域（isVideo）”与实现不一致（视频为块语法）
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:549-550`
+  - `pangen-ai-compass/src/components/DocRenderer.tsx:146-153`
+- 证据：
+  - 文档片段：视频区域
+  - 代码片段：`:::video{...}:::` 块渲染
+- 影响：
+  - 内容规范对齐困难。
+- 建议（最小修正）：
+  - PRD 改为“视频作为文档内块”。
+- 关联原则：
+  - 以代码为真 / 术语与枚举一致
+
+### 18) 标题：PRD Markdown 支持清单未包含受控块/双链，但实现已支持并使用
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:551-560`
+  - `pangen-ai-compass/src/utils/docMarkdown.ts:40-94`
+- 证据：
+  - 文档片段：仅基础 Markdown
+  - 代码片段：支持 `:::video`/`:::callout`
+- 影响：
+  - 功能存在但文档缺失。
+- 建议（最小修正）：
+  - PRD 补充受控块与双链语法示例。
+- 关联原则：
+  - 面向用户的承诺优先
+
+### 19) 标题：PRD 用户后台导航项（我的次数/学生认证/使用概览等）未实现
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:659-668`
+  - `pangen-ai-compass/src/pages/UserCenterPage.tsx:26-33,93-133`
+- 证据：
+  - 文档片段：导航项包含更多模块
+  - 代码片段：tab 仅 4 项
+- 影响：
+  - 规格与 UI 不一致。
+- 建议（最小修正）：
+  - PRD 补充“V1 仅 4 项”或 UI 增加 Locked。
+- 关联原则：
+  - 面向用户的承诺优先
+
+### 20) 标题：PRD 设置应含主题/语言；UserCenter 的设置页为占位
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:668-669`
+  - `pangen-ai-compass/src/pages/UserCenterPage.tsx:265-276`
+- 证据：
+  - 文档片段：设置包含主题/语言
+  - 代码片段：设置页显示“开发中”
+- 影响：
+  - 用户预期落差。
+- 建议（最小修正）：
+  - 文档说明设置位置或补齐页面。
+- 关联原则：
+  - 面向用户的承诺优先
+
+### 21) 标题：PRD 个人资料字段与实现不一致（缺少简介/手机号/注册时间等）
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:672-680`
+  - `pangen-ai-compass/src/pages/UserCenterPage.tsx:225-260`
+- 证据：
+  - 文档片段：个人资料字段列表
+  - 代码片段：仅昵称与邮箱
+- 影响：
+  - 数据模型与 UI 对齐困难。
+- 建议（最小修正）：
+  - PRD 标注 V1 简化字段或补齐 UI。
+- 关联原则：
+  - 面向用户的承诺优先
+
+### 22) 标题：PRD User 数据规格与代码 `User` 类型不一致（契约漂移）
+- 严重级别：P1
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:1462-1477`
+  - `pangen-ai-compass/src/types.ts:61-68`
+- 证据：
+  - 文档片段：User 字段/枚举更完整
+  - 代码片段：User 字段/role 枚举不同
+- 影响：
+  - 联调/实现易分歧。
+- 建议（最小修正）：
+  - 选定 SSOT（PRD 或代码）并同步另一方。
+- 关联原则：
+  - 合同优先 / 术语与枚举一致
+
+### 23) 标题：PRD AuditLog 数据规格过简/字段不一致，无法作为 SSOT
+- 严重级别：P2
+- 位置：
+  - `openspec/Specs/PRD-盘根AI指南针-标准版.md:1616-1622`
+  - `pangen-ai-compass/src/types/review.ts:84-94`
+- 证据：
+  - 文档片段：字段过少
+  - 代码片段：字段更完整
+- 影响：
+  - 审计对象规格不可用。
+- 建议（最小修正）：
+  - PRD 补齐字段或拆分 Spec。
+- 关联原则：
+  - 合同优先
+
+### 24) 标题：变更文档的 ReviewTask 状态机与代码枚举不一致
+- 严重级别：P2
+- 位置：
+  - `openspec/Changes/.../02-技术方案.md:87-92`
+  - `pangen-ai-compass/src/types/review.ts:4-11`
+- 证据：
+  - 文档片段：状态机较少
+  - 代码片段：多了 `pending_review/revision`
+- 影响：
+  - 状态流转/文案不一致。
+- 建议（最小修正）：
+  - 文档补齐状态与语义。
+- 关联原则：
+  - 术语与枚举一致
+
+### 25) 标题：变更文档的审计 action 枚举与代码 `AuditAction` 不一致
+- 严重级别：P2
+- 位置：
+  - `openspec/Changes/.../02-技术方案.md:125-130`
+  - `pangen-ai-compass/src/types/review.ts:65-79`
+- 证据：
+  - 文档片段：action 枚举不同
+  - 代码片段：action 枚举不同
+- 影响：
+  - 审计统计与追溯会混乱。
+- 建议（最小修正）：
+  - 统一枚举并提供映射。
+- 关联原则：
+  - 术语与枚举一致
+
+### 26) 标题：变更文档要求后台 AI 以 Diff 预览呈现；实现仅展示纯文本
+- 严重级别：P1
+- 位置：
+  - `openspec/Changes/.../02-技术方案.md:139-140`
+  - `pangen-ai-compass/src/pages/admin/ReviewDetailPage.tsx:280-285`
+- 证据：
+  - 文档片段：Diff 预览
+  - 代码片段：纯文本输出
+- 影响：
+  - 审核效率/风险控制不足。
+- 建议（最小修正）：
+  - 文档降级承诺或实现最小 diff。
+- 关联原则：
+  - 面向用户的承诺优先
+
+### 27) 标题：变更文档要求“应用可撤销”；实现无 rollback/撤销路径
+- 严重级别：P1
+- 位置：
+  - `openspec/Changes/.../02-技术方案.md:140`
+  - `pangen-ai-compass/src/store/useReviewStore.ts:23-50`
+- 证据：
+  - 文档片段：可撤销
+  - 代码片段：无撤销 API
+- 影响：
+  - 高风险操作无回滚。
+- 建议（最小修正）：
+  - 增加最小撤销或降低文档承诺。
+- 关联原则：
+  - 安全默认收紧
+
+### 28) 标题：变更文档列出的 AI 按钮含“修订稿改动总结”；实现缺失该按钮
+- 严重级别：P2
+- 位置：
+  - `openspec/Changes/.../02-技术方案.md:144-148`
+  - `pangen-ai-compass/src/pages/admin/ReviewDetailPage.tsx:244-271`
+- 证据：
+  - 文档片段：按钮列表
+  - 代码片段：按钮缺失
+- 影响：
+  - 验收不一致。
+- 建议（最小修正）：
+  - 文档删减或补齐按钮。
+- 关联原则：
+  - 面向用户的承诺优先
+
+### 29) 标题：变更文档要求“未创建文档可点击创建（后续）”；实现为删除线不可点击
+- 严重级别：P2
+- 位置：
+  - `openspec/Changes/.../02-技术方案.md:77-79`
+  - `pangen-ai-compass/src/utils/wikilink.ts:125-132`
+- 证据：
+  - 文档片段：可创建
+  - 代码片段：`~~label~~` 删除线
+- 影响：
+  - 用户对双链行为预期不一致。
+- 建议（最小修正）：
+  - 渲染 Locked 链接并提示；或更新文档。
+- 关联原则：
+  - 面向用户的承诺优先
+
+### 30) 标题：变更文档要求待分配池自动恢复；实现未在恢复接单时触发重新分配
+- 严重级别：P2
+- 位置：
+  - `openspec/Changes/.../02-技术方案.md:116-118`
+  - `pangen-ai-compass/src/store/useReviewStore.ts:374-384`
+- 证据：
+  - 文档片段：自动恢复
+  - 代码片段：resumeReviewer 仅改 isPaused
+- 影响：
+  - 待分配池可能卡住。
+- 建议（最小修正）：
+  - resume 后触发一次分配尝试。
+- 关联原则：
+  - 可运行与可复现
+
+### 31) 标题：变更文档建议新增 3 个 Spec 文件但未创建（Specs 未同步）
+- 严重级别：P2
+- 位置：
+  - `openspec/Changes/.../04-规格增量.md:14-36`
+  - `openspec/Specs/*`（文件存在性）
+- 证据：
+  - 文档片段：建议新增 3 份 Spec
+  - 代码片段：对应文件不存在
+- 影响：
+  - 变更无法沉淀为主规格，PRD 容易长期过时。
+- 建议（最小修正）：
+  - 创建 3 份 Spec 文档并在 PRD 引用。
+- 关联原则：
+  - 可运行与可复现 / 以代码为真
+
+------------------------------------------------------------
+
+## 审核结论（整体汇总）
+- 结论：不通过（阻断项：P0#14）
+- 汇总统计：
+  - P0：1 项
+  - P1：9 项
+  - P2：21 项
+  - P3：0 项
+  - 待证据补充：0 项
+- 建议修复优先级：
+  - 先修复 P0 → P1 → P2（P3 视排期）
+- 变更影响：
+  - 需要同步更新 README、PRD 与后台/文档系统相关 Specs；对外 Demo/截图/流程若存在也需同步。
