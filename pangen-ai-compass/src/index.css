@@ -18,3 +18,8 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+/* Safe Area 辅助：移动端底部保留刘海/圆角空间 */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

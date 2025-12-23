@@ -6,7 +6,7 @@ import { MOCK_TOOLS } from '../constants';
 import { useAppStore } from '../store/useAppStore';
 import { useShare } from '../hooks/useShare';
 import { SITE_URL } from '../constants/ui';
-import { generateSolutionWithAI } from '../services/AIService';
+import { generateSolutionWithAI, buildFallbackSolution } from '../services/AIService';
 import { DAILY_GUEST_QUOTA_LIMITS, consumeGuestQuota, getGuestQuotaState } from '../utils/quota';
 
 export const SolutionNewPage: React.FC = () => {
@@ -59,34 +59,34 @@ export const SolutionNewPage: React.FC = () => {
 
     try {
       const effectiveGoal = goal.trim() || '探索这些工具的组合潜力';
-
       const quota = getGuestQuotaState();
-      if (quota.aiSolutionRemaining <= 0) {
-        setQuotaState(quota);
-        setStatusMessage('今日 AI 方案额度已用完，暂无法生成。额度将于明日 00:00 重置。');
-        setStatusType('info');
-        return;
-      }
 
-      // 调用真实 AI 方案生成（demo 回退不扣次）
-      const result = await generateSolutionWithAI(effectiveGoal, selectedTools);
-      if (result.mode === 'ai') {
+      // 额度耗尽：直接使用演示模式结果，不中断流程
+      const finalResult =
+        quota.aiSolutionRemaining <= 0
+          ? buildFallbackSolution('quota_exhausted', effectiveGoal, selectedTools)
+          : await generateSolutionWithAI(effectiveGoal, selectedTools);
+
+      if (finalResult.mode === 'ai') {
         consumeGuestQuota('aiSolution', 1);
       }
       setQuotaState(getGuestQuotaState());
 
-      if (result.mode === 'demo') {
-        setStatusMessage('AI 服务暂不可用，当前无法生成方案，请稍后重试。');
+      if (finalResult.mode === 'demo') {
+        setStatusMessage(
+          finalResult.fallbackReason === 'quota_exhausted'
+            ? '演示模式：今日 AI 方案额度已用完，已为你提供不消耗次数的方案草稿。明日 00:00 自动恢复。'
+            : '演示模式：AI 服务不可用，已提供基础方案草稿。'
+        );
         setStatusType('info');
-        return;
       }
 
       const newSolution: UserSolution = {
         id: Date.now().toString(),
-        title: result.title,
+        title: finalResult.title,
         targetGoal: effectiveGoal,
         toolIds: toolIds,
-        aiAdvice: result.aiAdvice,
+        aiAdvice: finalResult.aiAdvice,
         createdAt: new Date().toLocaleDateString(),
       };
 

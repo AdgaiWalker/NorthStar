@@ -127,21 +127,21 @@ export const preprocessWikiLinks = (md: string): string => {
       const label = parsed.alias || parsed.title;
       const suffix = parsed.anchor ? `#${parsed.anchor}` : '';
       if (href) return `[${label}](${href}${suffix})`;
-      // 不存在的文档，保留原文
-      return `~~${label}~~`;
+      // 不存在的文档，显式提示
+      return `\`未找到：${label}\``;
     }
 
     if (parsed.kind === 'tool') {
       const href = resolveToolHref(parsed.id);
       const label = parsed.alias || parsed.id;
       if (href) return `[${label}](${href})`;
-      return `~~${label}~~`;
+      return `\`未找到：${label}\``;
     }
 
     if (parsed.kind === 'solution') {
       // 方案本地存储，暂不支持路由
       const label = parsed.alias || parsed.id;
-      return `~~${label}~~`;
+      return `\`未找到：${label}\``;
     }
 
     return `[[${inner}]]`;

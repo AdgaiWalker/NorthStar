@@ -47,6 +47,7 @@ interface ReviewState {
 
   // 审计
   writeAudit: (action: AuditAction, taskId?: string, taskTitle?: string, note?: string, targetId?: string) => void;
+  tryAssignFromUnassigned: () => void;
 }
 
 // --------------------------
@@ -60,6 +61,13 @@ export const useReviewStore = create<ReviewState>()(
       auditLogs: [],
       currentUserId: 'admin',
       currentUserName: '系统管理员',
+
+      // 尝试从待分配池重新分配一条任务（容量释放/恢复接单时调用）
+      tryAssignFromUnassigned: () => {
+        const { tasks, autoAssign } = get();
+        const pending = tasks.find((t) => t.status === 'unassigned');
+        if (pending) autoAssign(pending.id);
+      },
 
       // ----- 审计 -----
       writeAudit: (action, taskId, taskTitle, note, targetId) => {
@@ -236,7 +244,7 @@ export const useReviewStore = create<ReviewState>()(
       },
 
       approveTask: (taskId) => {
-        const { tasks, writeAudit } = get();
+        const { tasks, writeAudit, tryAssignFromUnassigned } = get();
         const task = tasks.find((t) => t.id === taskId);
         if (!task || !['assigned', 'in_review'].includes(task.status)) return;
 
@@ -249,10 +257,11 @@ export const useReviewStore = create<ReviewState>()(
           ),
         }));
         writeAudit('approve', taskId, task.title);
+        tryAssignFromUnassigned();
       },
 
       rejectTask: (taskId, reason) => {
-        const { tasks, writeAudit } = get();
+        const { tasks, writeAudit, tryAssignFromUnassigned } = get();
         const task = tasks.find((t) => t.id === taskId);
         if (!task || !['assigned', 'in_review'].includes(task.status)) return;
 
@@ -265,6 +274,7 @@ export const useReviewStore = create<ReviewState>()(
           ),
         }));
         writeAudit('reject', taskId, task.title, reason);
+        tryAssignFromUnassigned();
       },
 
       submitRevision: (originalTaskId, newContent) => {
@@ -372,7 +382,7 @@ export const useReviewStore = create<ReviewState>()(
       },
 
       resumeReviewer: (reviewerId) => {
-        const { reviewers, writeAudit } = get();
+        const { reviewers, writeAudit, tryAssignFromUnassigned } = get();
         const reviewer = reviewers.find((r) => r.id === reviewerId);
         if (!reviewer) return;
         set((s) => ({
@@ -381,6 +391,7 @@ export const useReviewStore = create<ReviewState>()(
           ),
         }));
         writeAudit('resume_reviewer', undefined, undefined, undefined, reviewerId);
+        tryAssignFromUnassigned();
       },
     }),
     {
