@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { List } from 'lucide-react';
 import { useReviewStore } from '../../store/useReviewStore';
-import { UnassignedReason } from '../../types/review';
+import { UnassignedReason, WIP_LIMIT } from '../../types/review';
 
 const REASON_LABEL: Record<UnassignedReason, string> = {
   no_reviewer_available: '无可用审核员',
@@ -17,7 +17,7 @@ export const UnassignedPoolPage: React.FC = () => {
   const [selectedReviewer, setSelectedReviewer] = useState<Record<string, string>>({});
 
   const unassigned = tasks.filter((t) => t.status === 'unassigned');
-  const availableReviewers = reviewers.filter((r) => !r.isPaused && r.wipCount < 10);
+  const baseCandidates = reviewers.filter((r) => !r.isPaused && r.wipCount < WIP_LIMIT);
 
   const handleAssign = (taskId: string) => {
     const rid = selectedReviewer[taskId];
@@ -69,11 +69,13 @@ export const UnassignedPoolPage: React.FC = () => {
                         onChange={(e) => setSelectedReviewer({ ...selectedReviewer, [t.id]: e.target.value })}
                       >
                         <option value="">选择审核员</option>
-                        {availableReviewers.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name} ({r.wipCount}/10)
-                          </option>
-                        ))}
+                        {baseCandidates
+                          .filter((r) => r.domains.includes(t.domain))
+                          .map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.name} ({r.wipCount}/{WIP_LIMIT})
+                            </option>
+                          ))}
                       </select>
                       <button
                         className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"

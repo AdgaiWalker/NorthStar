@@ -180,6 +180,12 @@ export const useReviewStore = create<ReviewState>()(
         const reviewer = reviewers.find((r) => r.id === reviewerId);
         if (!task || !reviewer) return;
 
+        // 手动指派也遵循“领域匹配”规则
+        if (!reviewer.domains.includes(task.domain)) {
+          console.warn('目标审核员不负责该领域');
+          return;
+        }
+
         if (reviewer.wipCount >= WIP_LIMIT) {
           moveToUnassigned(taskId, 'all_reviewers_over_capacity');
           return;
@@ -318,6 +324,12 @@ export const useReviewStore = create<ReviewState>()(
         const currentUser = reviewers.find((r) => r.id === currentUserId);
         if (!task || !newReviewer) return;
 
+        // 状态校验：仅允许改派 assigned / in_review
+        if (!['assigned', 'in_review'].includes(task.status)) {
+          console.warn('仅可改派已分配或审核中的任务');
+          return;
+        }
+
         // 权限校验
         const currentRole = currentUser?.role ?? 'admin';
         if (task.status === 'in_review' && currentRole !== 'admin') {
@@ -326,6 +338,12 @@ export const useReviewStore = create<ReviewState>()(
         }
         if (currentRole === 'reviewer') {
           console.warn('reviewer 不可改派');
+          return;
+        }
+
+        // 强制改派必须填写原因（in_review 仅 admin）
+        if (task.status === 'in_review' && !forceReason?.trim()) {
+          console.warn('强制改派必须填写原因');
           return;
         }
 

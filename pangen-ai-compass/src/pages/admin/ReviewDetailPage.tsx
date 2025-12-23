@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Eye, Code, Bot, Check, X, Loader2 } from 'lucide-react';
 import { useReviewStore } from '../../store/useReviewStore';
 import { DocRenderer } from '../../components/DocRenderer';
-import { ReviewTaskStatus } from '../../types/review';
+import { ReviewTaskStatus, WIP_LIMIT } from '../../types/review';
+import { canReassignTask, getCurrentReviewerRole, requiresForceReason } from '../../utils/reviewPermissions';
 
 type ViewMode = 'preview' | 'raw';
 
@@ -48,13 +49,16 @@ const mockRiskScan = () => `风险扫描结果：\n- 未发现敏感词\n- 未�
 export const ReviewDetailPage: React.FC = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     tasks,
     reviewers,
+    currentUserId,
     startReview,
     approveTask,
     rejectTask,
     submitRevision,
+    reassignTask,
     writeAudit,
   } = useReviewStore();
 
@@ -64,8 +68,18 @@ export const ReviewDetailPage: React.FC = () => {
   const [aiOutput, setAiOutput] = useState<{ type: string; text: string } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
+  // 改派面板（可由 query 参数触发）
+  const [reassignOpen, setReassignOpen] = useState(searchParams.get('reassign') === '1');
+  const [reassignTo, setReassignTo] = useState('');
+  const [forceReason, setForceReason] = useState('');
+  const [reassignTip, setReassignTip] = useState<string>('');
+
   const task = tasks.find((t) => t.id === taskId);
   const assignee = task?.assignedTo ? reviewers.find((r) => r.id === task.assignedTo) : null;
+
+  const currentRole = getCurrentReviewerRole(reviewers, currentUserId);
+  const canReassign = task ? canReassignTask(task.status, currentRole) : false;
+  const needsReason = task ? requiresForceReason(task.status) : false;
 
   if (!task) {
     return <div className="text-center py-20 text-slate-400">未找到审核任务 {taskId}</div>;
@@ -134,12 +148,105 @@ export const ReviewDetailPage: React.FC = () => {
           <div className="text-sm text-slate-500 mt-1 flex flex-wrap items-center gap-4">
             <span>作者: {task.authorName}</span>
             <span>提交: {formatDate(task.createdAt)}</span>
-            {assignee && <span>审核员: {assignee.name}</span>}
+            <span>审核员: {assignee?.name || '-'}</span>
             <span className={`px-2 py-0.5 rounded text-xs ${STATUS_COLOR[task.status]}`}>
               {STATUS_LABEL[task.status]}
             </span>
           </div>
         </header>
+
+        {/* 改派入口（editor/admin；in_review 仅 admin 且必填原因） */}
+        {currentRole !== 'reviewer' && ['assigned', 'in_review'].includes(task.status) && (
+          <div className="mb-4">
+            <button
+              type="button"
+              className={`px-4 py-2 rounded-lg text-sm border ${
+                canReassign
+                  ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                  : 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
+              }`}
+              onClick={() => {
+                if (!canReassign) return;
+                setReassignOpen((v) => !v);
+              }}
+              disabled={!canReassign}
+            >
+              更改指派
+            </button>
+            {!canReassign && (
+              <span className="ml-3 text-xs text-slate-400">审核中的任务仅管理员可改派</span>
+            )}
+          </div>
+        )}
+
+        {reassignTip && (
+          <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            {reassignTip}
+          </div>
+        )}
+
+        {reassignOpen && canReassign && (
+          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="text-sm font-bold text-slate-700">改派审核员</div>
+            <div className="mt-3 flex flex-col gap-3">
+              <select
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                value={reassignTo}
+                onChange={(e) => setReassignTo(e.target.value)}
+              >
+                <option value="">选择审核员</option>
+                {reviewers
+                  .filter((r) => !r.isPaused)
+                  .filter((r) => r.domains.includes(task.domain))
+                  .filter((r) => r.id !== task.assignedTo)
+                  .filter((r) => r.wipCount < WIP_LIMIT)
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}（{r.wipCount}/{WIP_LIMIT}）
+                    </option>
+                  ))}
+              </select>
+
+              {needsReason && (
+                <textarea
+                  className="w-full border border-slate-200 rounded-lg p-3 text-sm"
+                  rows={3}
+                  placeholder="强制改派原因（必填）"
+                  value={forceReason}
+                  onChange={(e) => setForceReason(e.target.value)}
+                />
+              )}
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm hover:bg-amber-700 disabled:opacity-50"
+                  disabled={!reassignTo || (needsReason && !forceReason.trim())}
+                  onClick={() => {
+                    reassignTask(task.id, reassignTo, forceReason);
+                    const next = reviewers.find((r) => r.id === reassignTo);
+                    setReassignTip(`已改派给：${next?.name || reassignTo}`);
+                    setReassignOpen(false);
+                    setForceReason('');
+                    setReassignTo('');
+                  }}
+                >
+                  确认改派
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200"
+                  onClick={() => setReassignOpen(false)}
+                >
+                  取消
+                </button>
+              </div>
+              <div className="text-xs text-slate-400">
+                仅显示：未暂停、领域匹配、且未满载（WIP &lt; {WIP_LIMIT}）的审核员。
+              </div>
+            </div>
+          </div>
+        )}
 
         {task.status === 'assigned' && (
           <div className="mb-4">

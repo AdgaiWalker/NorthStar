@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Inbox } from 'lucide-react';
 import { useReviewStore } from '../../store/useReviewStore';
 import { ReviewTaskStatus } from '../../types/review';
+import { canReassignTask, getCurrentReviewerRole } from '../../utils/reviewPermissions';
 
 const STATUS_LABEL: Record<ReviewTaskStatus, string> = {
   pending_review: '待审核',
@@ -28,7 +29,8 @@ const formatDate = (ts: number) => new Date(ts).toLocaleString('zh-CN', { dateSt
 
 export const ReviewQueuePage: React.FC = () => {
   const navigate = useNavigate();
-  const { tasks, reviewers, submitTask, addReviewer } = useReviewStore();
+  const { tasks, reviewers, submitTask, addReviewer, currentUserId } = useReviewStore();
+  const currentRole = getCurrentReviewerRole(reviewers, currentUserId);
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
 
@@ -128,12 +130,22 @@ export const ReviewQueuePage: React.FC = () => {
                   </td>
                   <td className="px-4 py-3 text-slate-500">{formatDate(t.createdAt)}</td>
                   <td className="px-4 py-3">
-                    <button
-                      className="text-blue-600 hover:underline text-sm"
-                      onClick={() => navigate(`/admin/review/${t.id}`)}
-                    >
-                      查看
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        className="text-blue-600 hover:underline text-sm"
+                        onClick={() => navigate(`/admin/review/${t.id}`)}
+                      >
+                        查看
+                      </button>
+                      {canReassignTask(t.status, currentRole) && (
+                        <button
+                          className="text-amber-700 hover:underline text-sm"
+                          onClick={() => navigate(`/admin/review/${t.id}?reassign=1`)}
+                        >
+                          更改指派
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
