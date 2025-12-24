@@ -1,13 +1,16 @@
 import { create } from 'zustand';
-import { ThemeMode, Language, UserSolution, Domain } from '../types';
+import { ThemeMode, Language, UserSolution, Domain, ExportFormat, StudentCertification } from '../types';
 import { STORAGE_KEYS, storageGet, storageSet } from '../utils/storage';
-import { isThemeMode, isLanguage, isStringArray, isUserSolutionArray } from '../utils/guards';
+import { isThemeMode, isLanguage, isStringArray, isUserSolutionArray, isExportFormat, isStudentCertification } from '../utils/guards';
 
 // 初始化时从 localStorage 读取
 const initTheme = storageGet(STORAGE_KEYS.themeMode, 'light' as ThemeMode, isThemeMode);
 const initLang = storageGet(STORAGE_KEYS.language, 'zh' as Language, isLanguage);
 const initSelectedToolIds = storageGet(STORAGE_KEYS.selectedToolIds, [] as string[], isStringArray);
 const initUserSolutions = storageGet(STORAGE_KEYS.userSolutions, [] as UserSolution[], isUserSolutionArray);
+const initFavoriteToolIds = storageGet(STORAGE_KEYS.favoriteToolIds, [] as string[], isStringArray);
+const initDefaultExportFormat = storageGet(STORAGE_KEYS.defaultExportFormat, 'md' as ExportFormat, isExportFormat);
+const initStudentCert = storageGet(STORAGE_KEYS.studentCertification, { status: 'none' } as StudentCertification, isStudentCertification);
 
 interface AppState {
   // 主题与语言
@@ -36,6 +39,22 @@ interface AppState {
   saveSolution: (solution: UserSolution) => void;
   deleteSolution: (id: string) => void;
 
+  // 收藏
+  favoriteToolIds: Set<string>;
+  toggleFavoriteTool: (toolId: string) => void;
+  isToolFavorited: (toolId: string) => boolean;
+
+  // 默认导出格式
+  defaultExportFormat: ExportFormat;
+  setDefaultExportFormat: (fmt: ExportFormat) => void;
+
+  // 学生认证（前端演示状态机）
+  studentCertification: StudentCertification;
+  submitStudentCertification: (payload: { schoolId: string; schoolName: string }) => void;
+  mockApproveStudentCertification: () => void;
+  mockRejectStudentCertification: (reason: string) => void;
+  resetStudentCertification: () => void;
+
   // 存储重置检测
   storageResetDetected: boolean;
   dismissStorageResetNotice: () => void;
@@ -49,11 +68,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoggedIn: false,
   selectedToolIds: new Set(initSelectedToolIds.value),
   userSolutions: initUserSolutions.value,
+  favoriteToolIds: new Set(initFavoriteToolIds.value),
+  defaultExportFormat: initDefaultExportFormat.value,
+  studentCertification: initStudentCert.value,
   storageResetDetected:
     initTheme.resetDetected ||
     initLang.resetDetected ||
     initSelectedToolIds.resetDetected ||
-    initUserSolutions.resetDetected,
+    initUserSolutions.resetDetected ||
+    initFavoriteToolIds.resetDetected ||
+    initDefaultExportFormat.resetDetected ||
+    initStudentCert.resetDetected,
 
   // 主题
   setThemeMode: (mode) => {
@@ -106,6 +131,65 @@ export const useAppStore = create<AppState>((set, get) => ({
     const next = get().userSolutions.filter((s) => s.id !== id);
     set({ userSolutions: next });
     storageSet(STORAGE_KEYS.userSolutions, next);
+  },
+
+  // 收藏
+  toggleFavoriteTool: (toolId) => {
+    const prev = get().favoriteToolIds;
+    const next = new Set(prev);
+    if (next.has(toolId)) {
+      next.delete(toolId);
+    } else {
+      next.add(toolId);
+    }
+    set({ favoriteToolIds: next });
+    storageSet(STORAGE_KEYS.favoriteToolIds, Array.from(next));
+  },
+  isToolFavorited: (toolId) => get().favoriteToolIds.has(toolId),
+
+  // 默认导出格式
+  setDefaultExportFormat: (fmt) => {
+    set({ defaultExportFormat: fmt });
+    storageSet(STORAGE_KEYS.defaultExportFormat, fmt);
+  },
+
+  // 学生认证状态机
+  submitStudentCertification: (payload) => {
+    const cert: StudentCertification = {
+      status: 'pending',
+      schoolId: payload.schoolId,
+      schoolName: payload.schoolName,
+      submittedAt: new Date().toISOString(),
+    };
+    set({ studentCertification: cert });
+    storageSet(STORAGE_KEYS.studentCertification, cert);
+  },
+  mockApproveStudentCertification: () => {
+    const prev = get().studentCertification;
+    const cert: StudentCertification = {
+      ...prev,
+      status: 'verified',
+      reviewedAt: new Date().toISOString(),
+      rejectReason: undefined,
+    };
+    set({ studentCertification: cert });
+    storageSet(STORAGE_KEYS.studentCertification, cert);
+  },
+  mockRejectStudentCertification: (reason) => {
+    const prev = get().studentCertification;
+    const cert: StudentCertification = {
+      ...prev,
+      status: 'rejected',
+      reviewedAt: new Date().toISOString(),
+      rejectReason: reason,
+    };
+    set({ studentCertification: cert });
+    storageSet(STORAGE_KEYS.studentCertification, cert);
+  },
+  resetStudentCertification: () => {
+    const cert: StudentCertification = { status: 'none' };
+    set({ studentCertification: cert });
+    storageSet(STORAGE_KEYS.studentCertification, cert);
   },
 
   // 存储重置提示

@@ -78,7 +78,23 @@ export interface UserSolution {
 
 export type ThemeMode = 'light' | 'eye-care';
 
-export type Language = 'zh' | 'en' | 'jp' | 'ru';
+export type Language = 'zh' | 'en';
+
+// 导出格式
+export type ExportFormat = 'md' | 'txt' | 'csv';
+
+// 学生认证状态
+export type CertificationStatus = 'none' | 'pending' | 'verified' | 'rejected';
+
+// 学生认证信息
+export interface StudentCertification {
+  status: CertificationStatus;
+  schoolId?: string;
+  schoolName?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+  rejectReason?: string;
+}
 
 // AI 搜索库模式: professional=专业库(精选), comprehensive=综合库(全量)
 export type LibraryMode = 'professional' | 'comprehensive';

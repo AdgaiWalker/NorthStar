@@ -16,21 +16,36 @@ export const HomePage: React.FC = () => {
     selectedToolIds,
     toggleToolSelection,
     clearSelection,
+    studentCertification,
   } = useAppStore();
 
   const [contentType, setContentType] = useState<ContentType>(ContentType.TOOL);
   const [experienceTab, setExperienceTab] = useState<ExperienceTab>('featured');
 
-  // 数据过滤
-  const filteredTools = MOCK_TOOLS.filter((t) => t.domain === currentDomain);
+  // 校内内容访问权限判定
+  const canAccessCampusContent = (item: { visibility?: string; schoolId?: string }) => {
+    if (item.visibility !== 'campus') return true; // 公开内容
+    // 校内内容需认证通过且学校匹配
+    return (
+      studentCertification.status === 'verified' &&
+      studentCertification.schoolId === item.schoolId
+    );
+  };
+
+  // 数据过滤（排除无权访问的校内内容）
+  const filteredTools = MOCK_TOOLS.filter(
+    (t) => t.domain === currentDomain && canAccessCampusContent(t)
+  );
   const filteredTopics = MOCK_TOPICS.filter((t) => t.domain === currentDomain);
   const featuredArticles = MOCK_ARTICLES.filter(
-    (a) => a.domain === currentDomain && a.isFeatured && !a.topicId
+    (a) => a.domain === currentDomain && a.isFeatured && !a.topicId && canAccessCampusContent(a)
   );
   const plazaArticles = MOCK_ARTICLES.filter(
-    (a) => a.domain === currentDomain && !a.isFeatured
+    (a) => a.domain === currentDomain && !a.isFeatured && canAccessCampusContent(a)
   );
-  const domainArticles = MOCK_ARTICLES.filter((a) => a.domain === currentDomain);
+  const domainArticles = MOCK_ARTICLES.filter(
+    (a) => a.domain === currentDomain && canAccessCampusContent(a)
+  );
 
   const isEyeCare = themeMode === 'eye-care';
 

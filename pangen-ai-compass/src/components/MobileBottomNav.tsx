@@ -1,20 +1,25 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Sparkles, User } from 'lucide-react';
+import { Home, Sparkles, User, GraduationCap } from 'lucide-react';
+import { useAppStore } from '../store/useAppStore';
+import { t } from '../i18n';
 
 const NAV_ITEMS = [
-  { key: 'home', label: '首页', icon: Home, path: '/' },
-  { key: 'solution', label: '方案', icon: Sparkles, path: '/solution/new' },
-  { key: 'me', label: '我的', icon: User, path: '/me' },
+  { key: 'home', i18nKey: 'nav.home', icon: Home, path: '/' },
+  { key: 'campus', i18nKey: 'nav.campus', icon: GraduationCap, path: '/campus' },
+  { key: 'solution', i18nKey: 'nav.solution', icon: Sparkles, path: '/solution/new' },
+  { key: 'me', i18nKey: 'nav.me', icon: User, path: '/me' },
 ];
 
 export const MobileBottomNav: React.FC = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { language } = useAppStore();
 
   // 判断当前激活的 tab
   const getActiveKey = () => {
     if (pathname === '/' || pathname.startsWith('/article') || pathname.startsWith('/tool')) return 'home';
+    if (pathname.startsWith('/campus')) return 'campus';
     if (pathname.startsWith('/solution')) return 'solution';
     if (pathname.startsWith('/me')) return 'me';
     return '';
@@ -39,7 +44,7 @@ export const MobileBottomNav: React.FC = () => {
               }`}
             >
               <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-              <span className={`text-[10px] mt-0.5 ${isActive ? 'font-bold' : ''}`}>{item.label}</span>
+              <span className={`text-[10px] mt-0.5 ${isActive ? 'font-bold' : ''}`}>{t(item.i18nKey, language)}</span>
             </button>
           );
         })}

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, List } from 'lucide-react';
+import { ArrowLeft, List, Lock, GraduationCap } from 'lucide-react';
 import { MOCK_ARTICLES, MOCK_TOPICS } from '../constants';
 import { useAppStore } from '../store/useAppStore';
 import { DocRenderer } from '../components/DocRenderer';
@@ -11,7 +11,7 @@ export const ArticleReadPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const topicIdFromQuery = searchParams.get('topicId');
   const navigate = useNavigate();
-  const { themeMode } = useAppStore();
+  const { themeMode, studentCertification } = useAppStore();
 
   const [tocOpen, setTocOpen] = useState(false);
 
@@ -37,6 +37,38 @@ export const ArticleReadPage: React.FC = () => {
   const topic = effectiveTopicId ? MOCK_TOPICS.find((t) => t.id === effectiveTopicId) : null;
   const topicArticles = topic ? MOCK_ARTICLES.filter((a) => a.topicId === topic.id) : [];
   const isEyeCare = themeMode === 'eye-care';
+
+  // 校内内容访问控制
+  const isCampusContent = article.visibility === 'campus';
+  const canAccess = !isCampusContent || (
+    studentCertification.status === 'verified' &&
+    studentCertification.schoolId === article.schoolId
+  );
+
+  // 校内内容无权访问时展示锁定态
+  if (isCampusContent && !canAccess) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center animate-in fade-in">
+        <div className={`p-8 rounded-2xl ${isEyeCare ? 'bg-[#FDFCF8] border border-stone-200' : 'bg-white shadow-lg'}`}>
+          <Lock size={48} className="mx-auto mb-4 text-slate-300" />
+          <h2 className="text-xl font-bold mb-2">校内专属内容</h2>
+          <p className="text-sm text-slate-500 mb-6">该文章仅对认证通过的学生开放，请先完成学生认证。</p>
+          <button
+            onClick={() => navigate('/me/certification')}
+            className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
+          >
+            <GraduationCap size={18} /> 去学生认证
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="mt-4 text-sm text-slate-400 hover:text-slate-600"
+          >
+            返回首页
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const scrollToHeading = (id: string) => {
     const el = document.getElementById(id);

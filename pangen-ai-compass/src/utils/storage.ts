@@ -9,6 +9,13 @@ export const STORAGE_KEYS = {
   guestQuotaAiSearch: 'pangen.quota.guest.aiSearch',
   guestQuotaAiSolution: 'pangen.quota.guest.aiSolution',
   guestQuotaResetAt: 'pangen.quota.guest.resetAt',
+
+  // 收藏与设置
+  favoriteToolIds: 'pangen.favoriteToolIds',
+  defaultExportFormat: 'pangen.export.defaultFormat',
+
+  // 学生认证
+  studentCertification: 'pangen.user.studentCertification',
 } as const;
 
 export interface StorageReadResult<T> {

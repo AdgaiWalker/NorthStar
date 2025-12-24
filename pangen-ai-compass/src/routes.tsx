@@ -4,6 +4,7 @@ import { ToolDetailPage } from './pages/ToolDetailPage';
 import { ArticleReadPage } from './pages/ArticleReadPage';
 import { SolutionNewPage } from './pages/SolutionNewPage';
 import { UserCenterPage } from './pages/UserCenterPage';
+import { CampusPage } from './pages/CampusPage';
 import { LoginPage } from './pages/LoginPage';
 import { AdminLayout } from './components/AdminLayout';
 import { ReviewQueuePage } from './pages/admin/ReviewQueuePage';
@@ -38,6 +39,10 @@ export const routes: RouteObject[] = [
   {
     path: '/me/:tab',
     element: <UserCenterPage />,
+  },
+  {
+    path: '/campus',
+    element: <CampusPage />,
   },
   {
     path: '/login',

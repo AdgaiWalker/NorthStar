@@ -102,7 +102,23 @@ export const MOCK_TOOLS: Tool[] = [
     imageUrl: 'https://picsum.photos/400/300?random=6',
     url: 'https://notion.so',
     isFavorite: true,
-  }
+  },
+  // 校内专区内容（黑河学院专属）
+  {
+    id: 't-campus-1',
+    name: '黑河学院 AI 实验室',
+    description: '专为黑河学院学生提供的 AI 工具实训环境。',
+    fullDescription: '黑河学院 AI 实验室提供包含 GPT-4、Claude 等大模型的实训环境，让学生可以在无网络限制的情况下学习 AI 应用。',
+    domain: 'dev',
+    tags: ['AI 实训', '校内专属', '大模型'],
+    rating: 4.9,
+    usageCount: '320',
+    imageUrl: 'https://picsum.photos/400/300?random=campus1',
+    url: 'https://ai-lab.heihe.edu.cn',
+    isFavorite: false,
+    visibility: 'campus',
+    schoolId: 'heihe',
+  },
 ];
 
 export const MOCK_ARTICLES: Article[] = [
@@ -212,5 +228,36 @@ export const MOCK_ARTICLES: Article[] = [
     isVideo: false,
     isFeatured: true,
     stats: { views: 300, likes: 50, comments: 12 }
+  },
+  // 校内专区文章（黑河学院专属）
+  {
+    id: 'a-campus-1',
+    topicId: undefined,
+    title: '黑河学院 AI 课程实训指南',
+    summary: '黑河学院 AI 实验室使用教程，包含账号申请、课程选择和作业提交流程。',
+    content: `
+# 黑河学院 AI 实验室使用指南
+
+:::callout{type="tip" title="校内专属内容"}
+本教程仅对黑河学院学生开放。
+:::
+
+## 1. 账号申请
+使用学号登录教务系统后，在 AI 实验室模块点击“申请账号”。
+
+## 2. 课程学习
+选择你感兴趣的 AI 课程，按顺序完成每个实验。
+    `,
+    domain: 'dev',
+    author: '黑河学院教务处',
+    authorLevel: 'certified',
+    date: '2024-01-15',
+    readTime: '10 分钟',
+    imageUrl: 'https://picsum.photos/800/400?random=campus-article',
+    isVideo: false,
+    isFeatured: true,
+    stats: { views: 156, likes: 28, comments: 5 },
+    visibility: 'campus',
+    schoolId: 'heihe',
   }
 ];

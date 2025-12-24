@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Heart } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Heart, Lock, GraduationCap } from 'lucide-react';
 import { MOCK_ARTICLES, MOCK_TOOLS } from '../constants';
 import { useAppStore } from '../store/useAppStore';
 import { ArticleCard } from '../components/CardComponents';
@@ -8,7 +8,7 @@ import { ArticleCard } from '../components/CardComponents';
 export const ToolDetailPage: React.FC = () => {
   const { toolId } = useParams<{ toolId: string }>();
   const navigate = useNavigate();
-  const { themeMode } = useAppStore();
+  const { themeMode, isToolFavorited, toggleFavoriteTool, studentCertification } = useAppStore();
 
   const tool = MOCK_TOOLS.find((t) => t.id === toolId);
   if (!tool) {
@@ -27,6 +27,39 @@ export const ToolDetailPage: React.FC = () => {
 
   const relatedArticles = MOCK_ARTICLES.filter((a) => a.relatedToolId === tool.id);
   const isEyeCare = themeMode === 'eye-care';
+  const isFavorited = isToolFavorited(tool.id);
+
+  // 校内内容访问控制
+  const isCampusContent = tool.visibility === 'campus';
+  const canAccess = !isCampusContent || (
+    studentCertification.status === 'verified' &&
+    studentCertification.schoolId === tool.schoolId
+  );
+
+  // 校内内容无权访问时展示锁定态
+  if (isCampusContent && !canAccess) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center animate-in fade-in">
+        <div className={`p-8 rounded-2xl ${isEyeCare ? 'bg-[#FDFCF8] border border-stone-200' : 'bg-white shadow-lg'}`}>
+          <Lock size={48} className="mx-auto mb-4 text-slate-300" />
+          <h2 className="text-xl font-bold mb-2">校内专属内容</h2>
+          <p className="text-sm text-slate-500 mb-6">该工具仅对认证通过的学生开放，请先完成学生认证。</p>
+          <button
+            onClick={() => navigate('/me/certification')}
+            className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
+          >
+            <GraduationCap size={18} /> 去学生认证
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="mt-4 text-sm text-slate-400 hover:text-slate-600"
+          >
+            返回首页
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -69,8 +102,16 @@ export const ToolDetailPage: React.FC = () => {
             >
               访问官网 <ExternalLink size={18} />
             </a>
-            <button className="border border-slate-200 hover:bg-slate-50 text-slate-700 px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2">
-              <Heart size={18} /> 收藏
+            <button
+              onClick={() => toggleFavoriteTool(tool.id)}
+              className={`px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2 ${
+                isFavorited
+                  ? 'bg-pink-50 border border-pink-200 text-pink-600'
+                  : 'border border-slate-200 hover:bg-slate-50 text-slate-700'
+              }`}
+            >
+              <Heart size={18} className={isFavorited ? 'fill-pink-500' : ''} />
+              {isFavorited ? '已收藏' : '收藏'}
             </button>
           </div>
 
