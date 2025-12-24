@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, List, Lock, GraduationCap } from 'lucide-react';
 import { MOCK_ARTICLES, MOCK_TOPICS } from '../constants';
 import { useAppStore } from '../store/useAppStore';
+import { useContentStore } from '../store/useContentStore';
+import { canAccessContent } from '../utils/access';
 import { DocRenderer } from '../components/DocRenderer';
 import { extractDocToc } from '../utils/docMarkdown';
 
@@ -15,9 +17,31 @@ export const ArticleReadPage: React.FC = () => {
 
   const [tocOpen, setTocOpen] = useState(false);
 
-  const article = MOCK_ARTICLES.find((a) => a.id === articleId);
+  const contentStore = useContentStore();
+  const fromStore = contentStore.getArticleById(articleId || '');
+  const mapped = fromStore
+    ? {
+        id: fromStore.id,
+        topicId: fromStore.tags.find((t) => t.startsWith('topic:'))?.slice('topic:'.length),
+        title: fromStore.title,
+        summary: fromStore.summary,
+        content: fromStore.markdown,
+        domain: fromStore.domain,
+        author: '站长',
+        authorLevel: 'certified',
+        date: new Date(fromStore.publishedAt || fromStore.updatedAt).toLocaleDateString(),
+        readTime: '3 min',
+        imageUrl: fromStore.coverImageUrl,
+        isVideo: false,
+        isFeatured: fromStore.tags.includes('featured'),
+        stats: { views: fromStore.stats?.views ?? 0, likes: fromStore.stats?.likes ?? 0, comments: 0 },
+        visibility: fromStore.visibility,
+        schoolId: fromStore.schoolId,
+      }
+    : null;
+  const article = mapped || MOCK_ARTICLES.find((a) => a.id === articleId);
   const articleContent = article?.content || '';
-  const toc = useMemo(() => extractDocToc(articleContent), [articleContent]);
+  const toc = extractDocToc(articleContent);
   if (!article) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -38,12 +62,9 @@ export const ArticleReadPage: React.FC = () => {
   const topicArticles = topic ? MOCK_ARTICLES.filter((a) => a.topicId === topic.id) : [];
   const isEyeCare = themeMode === 'eye-care';
 
-  // 校内内容访问控制
+  // 校内内容访问控制（统一）
   const isCampusContent = article.visibility === 'campus';
-  const canAccess = !isCampusContent || (
-    studentCertification.status === 'verified' &&
-    studentCertification.schoolId === article.schoolId
-  );
+  const canAccess = canAccessContent({ visibility: article.visibility, schoolId: article.schoolId }, studentCertification);
 
   // 校内内容无权访问时展示锁定态
   if (isCampusContent && !canAccess) {

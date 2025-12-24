@@ -1,51 +1,89 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ContentType, ExperienceTab } from '../types';
-import { MOCK_TOOLS, MOCK_ARTICLES, MOCK_TOPICS } from '../constants';
+import { ContentType, ExperienceTab, Article, ContentItem, Domain } from '../types';
+import { MOCK_ARTICLES, MOCK_TOOLS, MOCK_TOPICS } from '../constants';
 import { useAppStore } from '../store/useAppStore';
+import { useContentStore } from '../store/useContentStore';
+import { canAccessContent } from '../utils/access';
 import { AISearch } from '../components/AISearch';
 import { ArticleCard, ToolCard, TopicCard } from '../components/CardComponents';
 import { FloatingDock } from '../components/FloatingDock';
 import { Book, FileText, Layout, Zap } from 'lucide-react';
+import { LifeEmptyState } from '../components/LifeEmptyState';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const {
     themeMode,
     currentDomain,
+    studentCertification,
     selectedToolIds,
     toggleToolSelection,
     clearSelection,
-    studentCertification,
   } = useAppStore();
 
   const [contentType, setContentType] = useState<ContentType>(ContentType.TOOL);
   const [experienceTab, setExperienceTab] = useState<ExperienceTab>('featured');
 
-  // 校内内容访问权限判定
-  const canAccessCampusContent = (item: { visibility?: string; schoolId?: string }) => {
-    if (item.visibility !== 'campus') return true; // 公开内容
-    // 校内内容需认证通过且学校匹配
-    return (
-      studentCertification.status === 'verified' &&
-      studentCertification.schoolId === item.schoolId
-    );
-  };
+  // 统一访问策略
+  const canAccessCampusContent = (item: { domain: Domain; visibility?: string; schoolId?: string }) =>
+    canAccessContent(item, studentCertification);
 
   // 数据过滤（排除无权访问的校内内容）
   const filteredTools = MOCK_TOOLS.filter(
     (t) => t.domain === currentDomain && canAccessCampusContent(t)
   );
-  const filteredTopics = MOCK_TOPICS.filter((t) => t.domain === currentDomain);
-  const featuredArticles = MOCK_ARTICLES.filter(
-    (a) => a.domain === currentDomain && a.isFeatured && !a.topicId && canAccessCampusContent(a)
-  );
-  const plazaArticles = MOCK_ARTICLES.filter(
-    (a) => a.domain === currentDomain && !a.isFeatured && canAccessCampusContent(a)
-  );
-  const domainArticles = MOCK_ARTICLES.filter(
-    (a) => a.domain === currentDomain && canAccessCampusContent(a)
-  );
+  const filteredTopics = currentDomain === 'life'
+    ? []
+    : MOCK_TOPICS.filter((t) => t.domain === currentDomain);
+  // 改为使用内容存储（已发布）作为文章源
+  const contentStore = useContentStore();
+  const published = contentStore.getPublishedArticlesByDomain(currentDomain);
+  const mapToArticle = (it: ContentItem): Article => {
+    const topicTag = it.tags.find((t) => t.startsWith('topic:'));
+    const topicId = topicTag ? topicTag.slice('topic:'.length) : undefined;
+    const isFeatured = it.tags.includes('featured');
+
+    return {
+      id: it.id,
+      topicId,
+      title: it.title,
+      summary: it.summary,
+      content: it.markdown,
+      domain: it.domain,
+      author: '站长',
+      authorLevel: 'certified',
+      date: new Date(it.publishedAt || it.updatedAt).toLocaleDateString(),
+      readTime: '3 min',
+      relatedToolId: it.relatedToolIds?.[0],
+      imageUrl: it.coverImageUrl,
+      isVideo: false,
+      isFeatured,
+      stats: { views: it.stats?.views ?? 0, likes: it.stats?.likes ?? 0, comments: 0 },
+      visibility: it.visibility,
+      schoolId: it.schoolId,
+    };
+  };
+  const mappedArticles = published.filter(canAccessCampusContent).map(mapToArticle);
+
+  // 生活专区：未认证直接空状态
+  if (currentDomain === 'life' && studentCertification.status !== 'verified') {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-16">
+        <LifeEmptyState />
+      </div>
+    );
+  }
+
+  // 生活专区：已认证仅显示本校
+  const scopedArticles =
+    currentDomain === 'life' && studentCertification.schoolId
+      ? mappedArticles.filter((a) => a.schoolId === studentCertification.schoolId)
+      : mappedArticles;
+
+  const featuredArticles = scopedArticles.filter((a) => a.isFeatured && !a.topicId);
+  const plazaArticles = scopedArticles.filter((a) => !a.isFeatured);
+  const domainArticles = scopedArticles;
 
   const isEyeCare = themeMode === 'eye-care';
 
@@ -186,14 +224,22 @@ export const HomePage: React.FC = () => {
                           topic={topic}
                           themeMode={themeMode}
                           onClick={() => {
-                            const firstArticle = domainArticles.find(
+                            const firstFromStore = domainArticles.find(
                               (a) => a.topicId === topic.id
                             );
+
+                            const firstFromMock = MOCK_ARTICLES.find(
+                              (a) => a.topicId === topic.id && a.domain === currentDomain
+                            );
+
+                            const firstArticle = firstFromStore || firstFromMock;
+
                             if (firstArticle) {
-                              navigate(
-                                `/article/${firstArticle.id}?topicId=${topic.id}`
-                              );
+                              navigate(`/article/${firstArticle.id}?topicId=${topic.id}`);
+                              return;
                             }
+
+                            window.alert('该系列暂时没有可阅读的内容');
                           }}
                         />
                       ))}

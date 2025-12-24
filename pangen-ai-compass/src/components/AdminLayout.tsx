@@ -7,9 +7,13 @@ import {
   List,
   ArrowLeft,
   Shield,
+  FileText,
+  PenTool,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
+  { label: '内容工作室', path: '/admin/studio', icon: PenTool },
+  { label: '内容列表', path: '/admin/content', icon: FileText },
   { label: '审核队列', path: '/admin/review-queue', icon: Inbox },
   { label: '待分配池', path: '/admin/unassigned', icon: List },
   { label: '审核员管理', path: '/admin/reviewers', icon: Users },

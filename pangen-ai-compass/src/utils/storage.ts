@@ -16,6 +16,11 @@ export const STORAGE_KEYS = {
 
   // 学生认证
   studentCertification: 'pangen.user.studentCertification',
+
+  // 内容管理（本地 mock）
+  contentItems: 'pangen.content.items',
+  contentAssets: 'pangen.content.assets',
+  contentFolders: 'pangen.content.folders',
 } as const;
 
 export interface StorageReadResult<T> {

@@ -100,6 +100,9 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [react()],
     resolve: {
+      // pnpm + peerDependencies 可能导致 React 被解析为多个实例，触发 Invalid hook call。
+      // 这里强制去重，确保所有依赖引用同一份 react/react-dom。
+      dedupe: ['react', 'react-dom'],
       alias: {
         '@': path.resolve(__dirname, 'src'),
       },

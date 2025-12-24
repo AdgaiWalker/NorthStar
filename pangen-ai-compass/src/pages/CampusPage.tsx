@@ -2,7 +2,8 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GraduationCap, Lock, Book, Zap } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { MOCK_TOOLS, MOCK_ARTICLES } from '../constants';
+import { MOCK_TOOLS } from '../constants';
+import { useContentStore } from '../store/useContentStore';
 import { ToolCard, ArticleCard } from '../components/CardComponents';
 
 export const CampusPage: React.FC = () => {
@@ -26,12 +27,26 @@ export const CampusPage: React.FC = () => {
       t.domain === currentDomain &&
       t.schoolId === userSchoolId
   );
-  const campusArticles = MOCK_ARTICLES.filter(
-    (a) =>
-      a.visibility === 'campus' &&
-      a.domain === currentDomain &&
-      a.schoolId === userSchoolId
-  );
+  const contentStore = useContentStore();
+  const published = contentStore.getPublishedArticlesByDomain(currentDomain);
+  const campusArticles = published
+    .filter((a) => a.visibility === 'campus' && a.schoolId === userSchoolId)
+    .map((it) => ({
+      id: it.id,
+      title: it.title,
+      summary: it.summary,
+      content: it.markdown,
+      domain: it.domain,
+      author: '站长',
+      date: new Date(it.publishedAt || it.updatedAt).toLocaleDateString(),
+      readTime: '3 min',
+      imageUrl: it.coverImageUrl,
+      isVideo: false,
+      isFeatured: false,
+      stats: { views: it.stats?.views ?? 0, likes: it.stats?.likes ?? 0, comments: 0 },
+      visibility: it.visibility,
+      schoolId: it.schoolId,
+    }));
 
   // 未认证或认证未通过：展示锁定态
   if (!isVerified) {

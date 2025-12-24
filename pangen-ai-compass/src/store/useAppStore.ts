@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ThemeMode, Language, UserSolution, Domain, ExportFormat, StudentCertification } from '../types';
+import { ThemeMode, Language, UserSolution, Domain, ExportFormat, StudentCertification, User } from '../types';
 import { STORAGE_KEYS, storageGet, storageSet } from '../utils/storage';
 import { isThemeMode, isLanguage, isStringArray, isUserSolutionArray, isExportFormat, isStudentCertification } from '../utils/guards';
 
@@ -27,6 +27,8 @@ interface AppState {
   // 登录状态（前端模拟）
   isLoggedIn: boolean;
   setIsLoggedIn: (v: boolean) => void;
+  currentUser: User | null;
+  setCurrentUser: (user: User | null) => void;
 
   // 已选工具
   selectedToolIds: Set<string>;
@@ -102,6 +104,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // 登录
   setIsLoggedIn: (v) => set({ isLoggedIn: v }),
+  currentUser: null, // 默认无用户，或 mock 一个 superadmin
+  setCurrentUser: (user) => set({ currentUser: user }),
 
   // 工具选择
   toggleToolSelection: (id) => {

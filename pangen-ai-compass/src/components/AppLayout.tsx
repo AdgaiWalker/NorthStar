@@ -1,15 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Sun, BookOpen, Globe, User, Menu, X, ChevronDown, Monitor, Video, Briefcase, LogOut, Shield, Check } from 'lucide-react';
+import { Layout, Sun, BookOpen, Globe, User, Menu, X, ChevronDown, LogOut, Shield, Check, Lock } from 'lucide-react';
 import { APP_NAME, ICP_LICENSE } from '../constants';
 import { Language, Domain } from '../types';
+import { DOMAIN_CONFIG, DOMAIN_LIST } from '../constants/domains';
 import { useAppStore } from '../store/useAppStore';
-
-const domainMap: Record<Domain, { label: string; icon: React.ReactNode; color: string; desc: string }> = {
-  'creative': { label: '影视创作', icon: <Video size={18} />, color: 'text-purple-600', desc: 'AI 视频与图像生成' },
-  'dev': { label: '编程开发', icon: <Monitor size={18} />, color: 'text-blue-600', desc: '代码助手与开发工具' },
-  'work': { label: '通用办公', icon: <Briefcase size={18} />, color: 'text-orange-600', desc: '文档、PPT 与效率工具' },
-};
 
 export const AppHeader: React.FC = () => {
   const navigate = useNavigate();
@@ -18,7 +13,8 @@ export const AppHeader: React.FC = () => {
     themeMode, toggleTheme, 
     language, setLanguage, 
     currentDomain, setCurrentDomain, 
-    isLoggedIn, setIsLoggedIn 
+    isLoggedIn, setIsLoggedIn,
+    studentCertification,
   } = useAppStore();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -35,6 +31,11 @@ export const AppHeader: React.FC = () => {
     setDomainMenuOpen(false);
     navigate('/');
   };
+
+  const currentDomainLabel =
+    currentDomain === 'life' && studentCertification.schoolName
+      ? studentCertification.schoolName
+      : DOMAIN_CONFIG[currentDomain].label;
 
   const handleLogout = () => {
     setIsLoggedIn(false);
@@ -72,7 +73,7 @@ export const AppHeader: React.FC = () => {
                    </span>
                    <div className="flex items-center gap-1.5">
                       <span className={`font-bold text-sm leading-none ${isEyeCare ? 'text-stone-800' : 'text-slate-800'}`}>
-                        {domainMap[currentDomain].label}
+                        {currentDomainLabel}
                       </span>
                       <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${domainMenuOpen ? 'rotate-180' : ''}`} />
                    </div>
@@ -85,28 +86,41 @@ export const AppHeader: React.FC = () => {
                  <div className="fixed inset-0 z-10 cursor-default" onClick={() => setDomainMenuOpen(false)}></div>
                  <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 transition-all duration-200 transform origin-top-left z-20 animate-in fade-in zoom-in-95">
                     <div className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">切换领域</div>
-                    {(Object.keys(domainMap) as Domain[]).map(domain => (
-                      <button
-                        key={domain}
-                        onClick={() => handleDomainSelect(domain)}
-                        className={`w-full flex items-start gap-3 px-3 py-3 rounded-xl text-sm transition-colors text-left group/item ${
-                          currentDomain === domain
-                            ? 'bg-slate-50'
-                            : 'hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className={`mt-0.5 p-1.5 rounded-lg ${currentDomain === domain ? 'bg-white shadow-sm ring-1 ring-slate-200' : 'bg-slate-100 text-slate-500 group-hover/item:text-slate-700'}`}>
-                           <span className={domainMap[domain].color}>{domainMap[domain].icon}</span>
-                        </div>
-                        <div className="flex-1">
-                           <div className={`font-bold flex items-center justify-between ${currentDomain === domain ? 'text-slate-900' : 'text-slate-700'}`}>
-                              {domainMap[domain].label}
-                              {currentDomain === domain && <Check size={14} className="text-blue-600" />}
-                           </div>
-                           <div className="text-xs text-slate-500 mt-0.5 font-normal">{domainMap[domain].desc}</div>
-                        </div>
-                      </button>
-                    ))}
+                    {DOMAIN_LIST.map((domain) => {
+                      const config = DOMAIN_CONFIG[domain];
+                      const Icon = config.icon;
+                      const isActive = currentDomain === domain;
+                      const requiresAuth = config.requiresAuth;
+                      const notVerified = requiresAuth && studentCertification.status !== 'verified';
+
+                      return (
+                        <React.Fragment key={domain}>
+                          {domain === 'life' && (
+                            <div className="h-px my-1 mx-3 bg-slate-100 rounded-full" />
+                          )}
+                          <button
+                            onClick={() => handleDomainSelect(domain)}
+                            className={`w-full flex items-start gap-3 px-3 py-3 rounded-xl text-sm transition-colors text-left group/item ${
+                              isActive ? 'bg-slate-50' : 'hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className={`mt-0.5 p-1.5 rounded-lg ${isActive ? 'bg-white shadow-sm ring-1 ring-slate-200' : 'bg-slate-100 text-slate-500 group-hover/item:text-slate-700'}`}>
+                              <Icon size={18} />
+                            </div>
+                            <div className="flex-1">
+                              <div className={`font-bold flex items-center justify-between ${isActive ? 'text-slate-900' : 'text-slate-700'}`}>
+                                <span>{config.label}</span>
+                                <span className="flex items-center gap-1">
+                                  {notVerified && domain === 'life' && <Lock size={14} className="text-slate-400" />}
+                                  {isActive && <Check size={14} className="text-blue-600" />}
+                                </span>
+                              </div>
+                              <div className="text-xs text-slate-500 mt-0.5 font-normal">{config.description}</div>
+                            </div>
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
                  </div>
                </>
              )}

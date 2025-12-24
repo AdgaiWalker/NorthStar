@@ -13,7 +13,8 @@ const App: React.FC = () => {
   const { pathname } = useLocation();
 
   // 移动端底部导航在后台或登录页不显示
-  const showMobileNav = !pathname.startsWith('/admin') && !pathname.startsWith('/login');
+  const isAdmin = pathname.startsWith('/admin');
+  const showMobileNav = !isAdmin && !pathname.startsWith('/login');
 
   const [showNotice, setShowNotice] = useState(storageResetDetected);
 
@@ -60,11 +61,13 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <AppHeader />
+      {!isAdmin && <AppHeader />}
 
-      <main className={`flex-grow pt-6 ${showMobileNav ? 'pb-16 md:pb-0' : ''}`}>{routeElement}</main>
+      <main className={`flex-grow ${isAdmin ? 'p-0' : 'pt-6'} ${showMobileNav ? 'pb-16 md:pb-0' : ''}`}>
+        {routeElement}
+      </main>
 
-      <Footer />
+      {!isAdmin && <Footer />}
 
       <MobileBottomNav />
     </div>

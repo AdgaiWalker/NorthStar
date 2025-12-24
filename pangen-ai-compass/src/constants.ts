@@ -103,6 +103,21 @@ export const MOCK_TOOLS: Tool[] = [
     url: 'https://notion.so',
     isFavorite: true,
   },
+  // 生活专区工具（本校）
+  {
+    id: 't-life-1',
+    name: '校园二手集市',
+    description: '本校二手物品与拼车信息聚合',
+    fullDescription: '针对本校学生的二手交易、拼车、失物招领信息流。',
+    domain: 'life',
+    tags: ['二手', '拼车', '校内'],
+    rating: 4.6,
+    usageCount: '1.1k',
+    imageUrl: 'https://picsum.photos/400/300?random=life1',
+    url: 'https://campus.example.com/market',
+    isFavorite: false,
+    schoolId: 'heihe',
+  },
   // 校内专区内容（黑河学院专属）
   {
     id: 't-campus-1',
@@ -258,6 +273,23 @@ export const MOCK_ARTICLES: Article[] = [
     isFeatured: true,
     stats: { views: 156, likes: 28, comments: 5 },
     visibility: 'campus',
+    schoolId: 'heihe',
+  },
+  {
+    id: 'a-life-1',
+    topicId: undefined,
+    title: '黑河学院周末拼车指南',
+    summary: '周末返城拼车群、集合点与价格参考，持续更新。',
+    content: `# 拼车指南\n\n- 校门口集合点：北门便利店旁\n- 常见目的地：哈尔滨、齐齐哈尔\n- 平均价格：80-120 元/人\n- 安全提醒：优先选择认证司机，结伴同行。\n`,
+    domain: 'life',
+    author: '学生会出行组',
+    authorLevel: 'certified',
+    date: '2024-02-10',
+    readTime: '5 分钟',
+    imageUrl: 'https://picsum.photos/800/400?random=life-article',
+    isVideo: false,
+    isFeatured: true,
+    stats: { views: 320, likes: 76, comments: 9 },
     schoolId: 'heihe',
   }
 ];

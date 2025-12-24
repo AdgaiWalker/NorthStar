@@ -1,5 +1,5 @@
 
-export type Domain = 'creative' | 'dev' | 'work';
+export type Domain = 'creative' | 'dev' | 'work' | 'life';
 
 export enum ContentType {
   TOOL = 'Tool',
@@ -63,7 +63,7 @@ export interface User {
   name: string;
   email: string;
   avatar: string;
-  role: 'user' | 'admin' | 'creator';
+  role: 'user' | 'admin' | 'creator' | 'superadmin' | 'editor' | 'reviewer';
   isPro: boolean;
 }
 
@@ -150,4 +150,47 @@ export interface PlatformStats {
   topTools: { name: string; usage: number }[];
   topSearchTerms: { term: string; count: number }[];
   trend: { date: string; users: number; aiCalls: number }[];
+}
+
+// ---- 内容管理（本地 mock）数据模型 ----
+// 注意：避免与上方已有枚举重名，使用 ContentStatus/ContentVisibility 等新类型名。
+export type ContentStatus = 'draft' | 'published';
+export type ContentVisibility = 'public' | 'campus';
+
+export interface ContentItem {
+  id: string;
+  type: 'article';
+  title: string;
+  summary: string;
+  coverImageUrl: string;
+  domain: Domain;
+  status: ContentStatus;
+  visibility: ContentVisibility;
+  schoolId?: string;
+  schoolName?: string;
+  tags: string[];
+  relatedToolIds: string[];
+  markdown: string;
+  createdAt: string; // ISO
+  updatedAt: string; // ISO
+  publishedAt?: string; // ISO
+  stats: { views: number; likes: number };
+  folder?: string; // 虚拟文件夹路径，例如 "/创作/AI教程"
+  sortIndex?: number; // 排序索引
+}
+
+export interface ContentAsset {
+  id: string;
+  mime: string;
+  size: number; // bytes
+  dataUrl: string; // base64 data URL
+  createdAt: string; // ISO
+}
+
+// 文件夹元数据（用于虚拟文件树与领域继承）
+export interface FolderMeta {
+  path: string;       // 文件夹路径，例如 "/创作"
+  domain?: Domain;    // 绑定的领域（可选，用于继承）
+  sortIndex?: number; // 排序索引
+  createdAt: string;  // ISO 时间
 }
