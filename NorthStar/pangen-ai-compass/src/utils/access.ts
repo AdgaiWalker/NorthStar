@@ -10,12 +10,14 @@ export function canAccessDomain(domain: Domain, cert: StudentCertification): boo
 
 /**
  * 内容访问控制
- * 所有领域内容均公开可访问
+ * campus 可见性内容需要验证学校 ID
  */
 export function canAccessContent(
   meta: { domain: Domain; visibility?: string; schoolId?: string },
-  _cert: StudentCertification
+  cert: StudentCertification
 ): boolean {
-  // 所有 AI 前端内容公开
+  if (meta.visibility !== 'campus') return true;
+  if (cert.status !== 'verified') return false;
+  if (cert.schoolId !== meta.schoolId) return false;
   return true;
 }
