@@ -97,7 +97,8 @@
 ### Key Entities
 
 - **CampusTopic（专题）**: 跨文章的内容容器，包含标题、描述、封面图、所属分类、关联文章 ID 列表。对标全球站的 Topic。
-- **CampusArticle（文章）**: 最小内容单元，新增可选字段 `topicId` 表示所属专题。无 topicId 的文章为独立文章。
+- **CampusArticle（文章）**: 最小内容单元，包含 `id`、`title`、`summary`、`content`、`coverImage`、`category`、`visibility`（`'public' | 'campus'`）、`schoolId`（campus 可见性时必填）、`views`、`likes`、`publishedAt`、`createdAt`、`updatedAt`、`topicId`（可选，表示所属专题）。无 topicId 的文章为独立文章。
+- **CampusCategoryDef（分类定义）**: 分类元数据，包含 `slug`、`name`、`icon`、`color`、`description`、`sortOrder`（排序权重）、`enabled`（是否在 UI 中展示）
 
 ## Success Criteria *(mandatory)*
 

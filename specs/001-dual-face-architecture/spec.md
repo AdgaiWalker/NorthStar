@@ -154,6 +154,8 @@ pangen-ai-compass/（同一项目）
 
 - **Face**: `'ai' | 'campus-life'`
 - **CampusLifeCategory**: `arrival | food | shopping | transport | admin | activity | secondhand | pitfalls`
+- **CampusCategoryDef**: 分类定义接口，包含 `slug`、`name`、`icon`、`color`、`description`、`sortOrder`（排序权重）、`enabled`（是否在 UI 中展示）
+- **CampusArticle**: 文章接口，包含 `id`、`title`、`summary`、`content`、`coverImage`、`category`、`visibility`（`'public' | 'campus'`）、`schoolId`（campus 可见性时必填）、`views`、`likes`、`publishedAt`、`createdAt`、`updatedAt`、`topicId`（可选）
 
 ---
 
