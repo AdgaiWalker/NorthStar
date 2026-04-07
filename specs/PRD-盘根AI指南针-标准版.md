@@ -1080,7 +1080,7 @@ Header Logo 区域集成领域切换下拉菜单，与全球站 `AppHeader` 的 
 | --- | --- |
 | 语言 | TypeScript |
 | 运行时 | Node.js |
-| 包管理器 | pnpm |
+| 包管理器 | pnpm（严格模式） |
 | 项目结构 | 前后端分离 |
 
 ### 20.2 前端技术栈（Web）
@@ -1094,6 +1094,8 @@ Header Logo 区域集成领域切换下拉菜单，与全球站 `AppHeader` 的 
 | 路由 | React Router v7 |
 | 状态管理 | Zustand |
 | 数据请求 | TanStack Query |
+| 表单 | React Hook Form + Zod |
+| Markdown 渲染 | react-markdown + remark-gfm + rehype-raw/sanitize |
 
 ### 20.3 App 端（独立开发）
 
@@ -1129,7 +1131,7 @@ Header Logo 区域集成领域切换下拉菜单，与全球站 `AppHeader` 的 
 | 语言 | Go |
 | Web 框架 | Gin / Fiber |
 | 数据库 | PostgreSQL |
-| ORM | sqlc / GORM |
+| ORM | sqlc |
 | 认证 | JWT + bcrypt |
 | AI 模型 | 智谱 AI（HTTP JSON 直连） |
 
