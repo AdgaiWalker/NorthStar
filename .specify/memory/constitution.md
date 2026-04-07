@@ -134,7 +134,7 @@ Safari / Chrome 为主。
 
 ### 十、参考规格与单一事实来源
 
-- 单一事实来源（PRD）：`NorthStar/openspec/Specs/PRD-盘根AI指南针-标准版.md`
+- 单一事实来源（PRD）：`specs/PRD-盘根AI指南针-标准版.md`
 - 变更规格：`NorthStar/openspec/Changes/` 下最新变更目录。
 - 本宪法是所有开发决策的最高约束文件。规格文档与宪法冲突时，以宪法为准。
 
