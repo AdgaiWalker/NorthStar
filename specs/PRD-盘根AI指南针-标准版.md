@@ -607,8 +607,12 @@ Header Logo 区域集成领域切换下拉菜单，与全球站 `AppHeader` 的 
 **输入**
 
 - `query`：用户自然语言问题
-- `domain`：当前领域
-- `availableContent`：按 domain 过滤后的内容列表
+- `availableTools`：工具数组（全球站）
+- `availableArticles`：文章数组（两站）
+- `availableTopics`：专题数组（两站）
+- `providerId`：指定厂商（可选）
+- `model`：指定模型（可选）
+- `contentScope`：内容范围（专业库/综合库）
 
 **输出（契约）**
 
@@ -618,9 +622,9 @@ Header Logo 区域集成领域切换下拉菜单，与全球站 `AppHeader` 的 
 | fallbackReason | string? | 回退原因 |
 | summary | string | 中文摘要 |
 | recommendation | string | 中文路径建议 |
-| suggestedTools | string[] | 推荐工具（全球站 ≤3） |
+| suggestedTools | string[] | 推荐工具（≤3） |
 | suggestedArticles | string[] | 推荐文章（≤2） |
-| suggestedTopics | string[] | 推荐专题（国内站） |
+| suggestedTopics | string[] | 推荐专题 |
 
 ### 8.4 方案生成
 
@@ -886,6 +890,7 @@ Header Logo 区域集成领域切换下拉菜单，与全球站 `AppHeader` 的 
 | availableTopics | Topic[] | 专题数组（两站） |
 | providerId | string? | 指定厂商（可选） |
 | model | string? | 指定模型（可选） |
+| contentScope | string | 内容范围（专业库/综合库） |
 
 **输出字段**：
 
@@ -897,6 +902,7 @@ Header Logo 区域集成领域切换下拉菜单，与全球站 `AppHeader` 的 
 | recommendation | string | 路径建议 |
 | suggestedTools | string[] | 推荐工具（≤3） |
 | suggestedArticles | string[] | 推荐内容（≤2） |
+| suggestedTopics | string[] | 推荐专题 |
 
 ### 12.2 AI 网关与多模型
 
