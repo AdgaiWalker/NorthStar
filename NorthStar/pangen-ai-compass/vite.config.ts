@@ -109,6 +109,12 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       minify: false, // 避免 Windows/Node 25 下 esbuild 压缩异常
+      rollupOptions: {
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+          campus: path.resolve(__dirname, 'campus.html'),
+        },
+      },
     },
   };
 });

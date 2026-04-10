@@ -81,6 +81,17 @@ const CampusHeader: React.FC = () => {
             <span className="text-[10px] text-slate-400 leading-tight">xyzidea.cn</span>
           </div>
         </div>
+        <a
+          href="https://xyzidea.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-1"
+        >
+          跳转全球站
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 10L10 2M10 2H4M10 2V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </a>
       </div>
     </header>
   );

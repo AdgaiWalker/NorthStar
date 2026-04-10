@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Search } from 'lucide-react';
 import { CAMPUS_CATEGORIES } from '../constants';
 import { useCampusStore } from '../store';
+import { CampusAISearch } from '../components/CampusAISearch';
 
 export const CampusHomePage: React.FC = () => {
   const initialize = useCampusStore((s) => s.initialize);
@@ -10,27 +10,15 @@ export const CampusHomePage: React.FC = () => {
   const articles = useCampusStore((s) => s.articles);
   const topics = useCampusStore((s) => s.topics);
 
-  const [searchQuery, setSearchQuery] = useState('');
-
   useEffect(() => {
     initialize();
   }, [initialize]);
 
-  // 从 articles 派生热门和搜索结果
+  // 从 articles 派生热门内容
   const featured = useMemo(
     () => articles.filter((a) => a.publishedAt).sort((a, b) => b.views - a.views).slice(0, 6),
     [articles],
   );
-
-  const searchResults = useMemo(() => {
-    if (!searchQuery) return [];
-    const q = searchQuery.toLowerCase();
-    return articles.filter(
-      (a) => a.publishedAt && (a.title.toLowerCase().includes(q) || a.summary.toLowerCase().includes(q)),
-    );
-  }, [articles, searchQuery]);
-
-  const isSearching = searchQuery.length > 0;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
@@ -44,46 +32,33 @@ export const CampusHomePage: React.FC = () => {
         </p>
       </div>
 
-      {/* 搜索框 */}
-      <div className="mb-8">
-        <div className="relative max-w-2xl mx-auto">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-          <input
-            type="text"
-            placeholder="搜索校园内容..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-full border border-slate-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-          />
-        </div>
+      {/* AI 搜索框 */}
+      <CampusAISearch />
+
+      {/* 8 分类入口 */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10">
+        {CAMPUS_CATEGORIES.map((cat) => {
+          const Icon = cat.icon;
+          return (
+            <Link
+              key={cat.slug}
+              to={`/category/${cat.slug}`}
+              className="group flex flex-col items-center gap-2 p-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+            >
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm"
+                style={{ backgroundColor: cat.color }}
+              >
+                <Icon size={24} className="text-white" />
+              </div>
+              <span className="text-sm font-medium text-slate-700">{cat.name}</span>
+            </Link>
+          );
+        })}
       </div>
 
-      {/* 8 分类入口 - 搜索时隐藏 */}
-      {!isSearching && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10">
-          {CAMPUS_CATEGORIES.map((cat) => {
-            const Icon = cat.icon;
-            return (
-              <Link
-                key={cat.slug}
-                to={`/category/${cat.slug}`}
-                className="group flex flex-col items-center gap-2 p-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
-              >
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm"
-                  style={{ backgroundColor: cat.color }}
-                >
-                  <Icon size={24} className="text-white" />
-                </div>
-                <span className="text-sm font-medium text-slate-700">{cat.name}</span>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-
-      {/* 专题推荐 - 搜索时隐藏 */}
-      {!isSearching && topics.length > 0 && (
+      {/* 专题推荐 */}
+      {topics.length > 0 && (
         <div className="mb-10">
           <h2 className="text-lg font-semibold text-slate-800 mb-4">专题推荐</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -122,90 +97,42 @@ export const CampusHomePage: React.FC = () => {
         </div>
       )}
 
-      {/* 搜索结果 / 热门内容 */}
-      <div>
-        {/* 搜索中 */}
-        {isSearching ? (
-          <>
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">
-              搜索结果 ({searchResults.length})
-            </h2>
-            {searchResults.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {searchResults.map((article) => (
-                  <Link
-                    key={article.id}
-                    to={`/article/${article.id}`}
-                    className="group block rounded-xl overflow-hidden bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
-                  >
-                    {article.coverImage && (
-                      <div className="aspect-video overflow-hidden bg-slate-100">
-                        <img
-                          src={article.coverImage}
-                          alt={article.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      </div>
-                    )}
-                    <div className="p-4">
-                      <h3 className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-2">
-                        {article.title}
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">{article.summary}</p>
-                      <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
-                        <span>{article.views} 阅读</span>
-                        <span>·</span>
-                        <span>{article.likes} 喜欢</span>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-slate-500">没有找到相关内容，试试其他关键词？</p>
-              </div>
-            )}
-          </>
-        ) : (
-          /* 默认热门内容 */
-          featured.length > 0 && (
-            <div>
-              <h2 className="text-lg font-semibold text-slate-800 mb-4">热门内容</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {featured.map((article) => (
-                  <Link
-                    key={article.id}
-                    to={`/article/${article.id}`}
-                    className="group block rounded-xl overflow-hidden bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
-                  >
-                    {article.coverImage && (
-                      <div className="aspect-video overflow-hidden bg-slate-100">
-                        <img
-                          src={article.coverImage}
-                          alt={article.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      </div>
-                    )}
-                    <div className="p-4">
-                      <h3 className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-2">
-                        {article.title}
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">{article.summary}</p>
-                      <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
-                        <span>{article.views} 阅读</span>
-                        <span>·</span>
-                        <span>{article.likes} 喜欢</span>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )
-        )}
-      </div>
+      {/* 热门内容 */}
+      {featured.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">热门内容</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {featured.map((article) => (
+              <Link
+                key={article.id}
+                to={`/article/${article.id}`}
+                className="group block rounded-xl overflow-hidden bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+              >
+                {article.coverImage && (
+                  <div className="aspect-video overflow-hidden bg-slate-100">
+                    <img
+                      src={article.coverImage}
+                      alt={article.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                )}
+                <div className="p-4">
+                  <h3 className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-2">
+                    {article.title}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1 line-clamp-2">{article.summary}</p>
+                  <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
+                    <span>{article.views} 阅读</span>
+                    <span>·</span>
+                    <span>{article.likes} 喜欢</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
