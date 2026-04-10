@@ -4,3 +4,5 @@ dist/
 .DS_Store
 *.log
 .vscode/
+.playwright-mcp/
+NorthStar/server/prisma/dev.db
