@@ -34,7 +34,7 @@
 | 七、内容与文档标准不变量 | ✅ 通过 | 种子内容为 Markdown 格式 |
 | 八、后台与协作不变量 | ✅ 通过 | 不涉及后台 |
 | 九、本地存储不变量 | ✅ 通过 | Zustand persist 已有原子写入 + guard（数据损坏自动重置） |
-| 十、参考规格与单一事实来源 | ✅ 通过 | 规格对齐 PRD v1.8 §2.2 + product_planning.md 原型 2 |
+| 十、参考规格与单一事实来源 | ✅ 通过 | 规格对齐 PRD v2.0 §2 + specs/implementation/specs.md |
 | 十一、双面架构不变量 | ✅ 通过 | campus.html + vite.config.ts 双入口，校园站独立 BrowserRouter，不共享导航组件，站间链接遵循规则 |
 
 **结论**: 全部通过，无违规项。
