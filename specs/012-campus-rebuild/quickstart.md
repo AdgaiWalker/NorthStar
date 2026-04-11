@@ -62,4 +62,4 @@ pnpm build
 
 - 部分分类未达 10 篇目标：transport(5), secondhand(7), shopping(8)
 - 种子数据中有 2 个重复文章 ID（campus-b4, campus-b13）
-- 校园站尚未实施 3 领域重构（属于 003-campus-mirror-global）
+- 校园站尚未实施 3 领域重构（待后续版本实施，PRD v2.0 已定义 daily/growth/deal 三领域映射）

@@ -188,5 +188,5 @@ Task T023: "transport 分类 5 篇文章"
 ### Known Gaps (Post-012)
 
 - transport(5)、secondhand(7)、shopping(8) 未达 10 篇目标 — 需后续补充
-- 3 领域重构（日常起居/成长提升/精明消费）属于 003-campus-mirror-global
+- 3 领域重构（日常起居/成长提升/精明消费）待后续版本实施，PRD v2.0 已定义映射关系
 - 重复文章 ID 需修复（campus-b4, campus-b13）

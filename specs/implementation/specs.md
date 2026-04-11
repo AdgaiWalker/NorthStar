@@ -450,7 +450,7 @@ type Domain = 'creative' | 'dev' | 'work'
 | 类型 | 数量 | 说明 |
 |------|------|------|
 | SEED_TOPICS | 8 | 新生报到、省钱、美食、出行等 |
-| SEED_ARTICLES | ~40 | 覆盖美食、购物、出行、行政、活动、二手、避坑 |
+| SEED_ARTICLES | 67 | 覆盖美食、购物、出行、行政、活动、二手、避坑 |
 
 **需要调整**：将现有 8 个分类（arrival/food/shopping/transport/admin/activity/secondhand/pitfalls）归入 PRD 定义的 3 个领域：
 
