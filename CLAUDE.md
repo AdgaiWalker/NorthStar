@@ -1,6 +1,6 @@
 # NS Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-08
+Auto-generated from all feature plans. Last updated: 2026-04-10
 
 ## Active Technologies
 - TypeScript 5.8 + React 19 + Zustand 5（状态管理）、React Router v7（路由）、Tailwind CSS 3（样式）、lucide-react（图标） (002-campus-align-global)
