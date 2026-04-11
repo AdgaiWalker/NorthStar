@@ -2,7 +2,7 @@
 
 > 一半生活，一半理想 — AI 时代的熵减器
 
-[![License: UNLICENSED](https://img.shields.io/badge/License-UNLICENSED-red.svg)](#许可证)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6-646cff.svg)](https://vitejs.dev/)
@@ -139,4 +139,4 @@ NorthStar/
 
 ## 许可证
 
-[UNLICENSED](https://choosealicense.com/no-permission/) — 内部项目，保留所有权利
+[Apache License 2.0](LICENSE)
