@@ -73,7 +73,7 @@ export const CategoryPage: React.FC = () => {
             {topics.map((topic) => (
               <Link
                 key={topic.id}
-                to={topic.articleIds[0] ? `/article/${topic.articleIds[0]}` : '#'}
+                to={topic.articleIds[0] ? `/article/${topic.articleIds[0]}` : `/category/${topic.category}`}
                 className="group flex gap-4 p-4 rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden"
               >
                 {/* 专题封面图 */}
@@ -110,7 +110,7 @@ export const CategoryPage: React.FC = () => {
         <div className="flex items-center gap-2 mb-4">
           <button
             onClick={() => setSortType('hot')}
-            className={`px-4 py-1.5 text-sm rounded-full transition-colors ${
+            className={`px-4 py-2 text-sm rounded-full transition-colors ${
               sortType === 'hot'
                 ? 'bg-blue-500 text-white'
                 : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -120,7 +120,7 @@ export const CategoryPage: React.FC = () => {
           </button>
           <button
             onClick={() => setSortType('new')}
-            className={`px-4 py-1.5 text-sm rounded-full transition-colors ${
+            className={`px-4 py-2 text-sm rounded-full transition-colors ${
               sortType === 'new'
                 ? 'bg-blue-500 text-white'
                 : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -138,16 +138,18 @@ export const CategoryPage: React.FC = () => {
           <p className="text-xs text-slate-300 mt-1">内容即将上线，敬请期待</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sortedArticles.map((article) => (
+        <div className="space-y-3">
+          {sortedArticles.map((article) => {
+            const cat = getCategoryBySlug(article.category);
+            const CatIcon = cat?.icon;
+            return (
             <Link
               key={article.id}
               to={`/article/${article.id}`}
-              className="group block p-4 rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+              className="group flex flex-col md:flex-row gap-5 p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-lg transition-all duration-300"
             >
-              {/* 封面图 */}
               {article.coverImage && (
-                <div className="aspect-video rounded-lg overflow-hidden mb-3 bg-slate-100">
+                <div className="w-full md:w-40 h-28 rounded-xl overflow-hidden bg-slate-100 shrink-0">
                   <img
                     src={article.coverImage}
                     alt={article.title}
@@ -155,20 +157,25 @@ export const CategoryPage: React.FC = () => {
                   />
                 </div>
               )}
-              {/* 标题 */}
-              <h3 className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 line-clamp-2">
-                {article.title}
-              </h3>
-              {/* 摘要 */}
-              <p className="text-xs text-slate-400 line-clamp-2">{article.summary}</p>
-              {/* 统计信息 */}
-              <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
-                <span>{article.views} 阅读</span>
-                <span>·</span>
-                <span>{article.likes} 喜欢</span>
+              <div className="flex-1 min-w-0 flex flex-col justify-center">
+                {cat && (
+                  <div className="flex items-center gap-1 mb-1">
+                    {CatIcon && <CatIcon size={12} style={{ color: cat.color }} />}
+                    <span className="text-xs font-medium" style={{ color: cat?.color }}>{cat?.name}</span>
+                  </div>
+                )}
+                <h3 className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-2">
+                  {article.title}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 line-clamp-2">{article.summary}</p>
+                <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
+                  <span>{article.views} 阅读</span>
+                  <span>·</span>
+                  <span>{article.likes} 喜欢</span>
+                </div>
               </div>
             </Link>
-          ))}
+          );})}
         </div>
       )}
     </div>
