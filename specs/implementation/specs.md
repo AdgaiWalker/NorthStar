@@ -1,8 +1,10 @@
 # 实现规格（Implementation Specs）
 
 > 本文档供 AI 代码生成使用。所有规格基于现有代码库结构编写。
-> 前端代码路径：`NorthStar/pangen-ai-compass/src/`
-> 后端代码路径：`NorthStar/server/src/`
+> 全球站前端：`NorthStar/packages/frontai-web/src/`
+> 校园站前端：`NorthStar/packages/frontlife-web/src/`
+> 共享包：`NorthStar/packages/shared/src/`
+> 后端代码路径：`NorthStar/packages/server/`（待建）
 
 ---
 
@@ -164,13 +166,30 @@ type Domain = 'creative' | 'dev' | 'work'
 
 ### 1.2 校园站数据模型（cn 站，已有前端类型）
 
-**CampusCategoryDef**（校园领域定义）
+**CampusCategoryDef**（校园分类定义，数据层 8 分类 + 展示层 3 领域）
 
-| slug | 名称 | 对应 PRD 领域 |
-|------|------|--------------|
-| daily | 日常起居 | 吃穿住行 |
-| growth | 成长提升 | 学社交社团 |
-| deal | 精明消费 | 买二手省钱 |
+数据层 8 分类（原型阶段直接展示）：
+
+| slug | 名称 | 对应领域 |
+|------|------|---------|
+| arrival | 新生报到 | daily |
+| food | 吃 | daily |
+| transport | 出行 | daily |
+| admin | 办事 | growth |
+| activity | 活动 | growth |
+| shopping | 买 | deal |
+| secondhand | 二手 | deal |
+| pitfalls | 避坑 | deal |
+
+展示层 3 领域（上线后聚合展示）：
+
+| 领域 slug | 名称 | 包含分类 |
+|-----------|------|---------|
+| daily | 日常起居 | arrival, food, transport |
+| growth | 成长提升 | admin, activity |
+| deal | 精明消费 | shopping, secondhand, pitfalls |
+
+映射关系以代码中 `campus/constants.ts` 的 `DOMAIN_MAP` 为准。
 
 **CampusTopic**（校园专题）
 
@@ -414,18 +433,17 @@ type Domain = 'creative' | 'dev' | 'work'
 
 | 文件 | 核心类型 |
 |------|---------|
-| `src/types.ts` | Domain, Topic, Tool, Article, User, UserSolution, ThemeMode, Language, ExportFormat, CertificationStatus, StudentCertification, LibraryMode, ViewState, AnalyticsEvent, UserStats, PlatformStats, ContentStatus, ContentVisibility, ContentItem |
-| `src/types/review.ts` | ReviewTask, Reviewer, AuditLog, ReviewTaskStatus |
-| `src/services/aiContract.ts` | AISearchMode, FallbackReason, AISearchResultV2, AISolutionResult |
-| `src/campus/store.ts` | CampusTopic, CampusArticle, CampusState |
-| `src/campus/constants.ts` | CampusCategoryDef |
-| `src/campus/services/campusAIService.ts` | CampusAISearchResult |
-| `src/store/useAppStore.ts` | AppState（主题、语言、登录态、选中工具、方案、收藏、认证） |
-| `src/store/useContentStore.ts` | ContentState（内容管理）、TreeNode |
-| `src/store/useReviewStore.ts` | ReviewState（审核流程） |
-| `src/campus/store.ts` | CampusState（校园站数据） |
-| `src/utils/quota.ts` | GuestQuotaState（游客额度） |
-| 🆕 `src/types/content.ts` | News, UserAction, Comment, AnalysisReport, MediaType |
+| `@ns/shared` (types.ts) | Domain, Topic, Tool, Article, User, UserSolution, CampusArticle, CampusTopic, GuestQuotaState, ContentStatus, ContentVisibility, ContentItem 等 |
+| `@ns/shared` (ai-contract.ts) | AISearchMode, FallbackReason, AISearchResultV2, AISolutionResult |
+| `@ns/shared` (sensitive.ts) | SensitiveCheckResult, checkSensitiveWords |
+| `frontai-web/src/types.ts` | Re-export @ns/shared + 本地 ViewState |
+| `frontai-web/src/types/review.ts` | ReviewTask, Reviewer, AuditLog, ReviewTaskStatus |
+| `frontlife-web/src/store.ts` | CampusState（校园站数据），类型从 @ns/shared 导入 |
+| `frontlife-web/src/constants.ts` | CampusCategoryDef, CampusDomain, DOMAIN_MAP |
+| `frontlife-web/src/services/aiService.ts` | CampusAISearchResult |
+| `frontai-web/src/store/useAppStore.ts` | AppState（主题、语言、登录态、选中工具、方案、收藏、认证） |
+| `frontai-web/src/store/useContentStore.ts` | ContentState（内容管理）、TreeNode |
+| `frontai-web/src/store/useReviewStore.ts` | ReviewState（审核流程） |
 
 ---
 
@@ -433,7 +451,7 @@ type Domain = 'creative' | 'dev' | 'work'
 
 ### 4.1 全球站（com）种子数据
 
-当前已有 mock 数据（`src/constants.ts`）：
+当前已有 mock 数据（`frontai-web/src/constants.ts`）：
 
 | 类型 | 数量 | 说明 |
 |------|------|------|
@@ -445,7 +463,7 @@ type Domain = 'creative' | 'dev' | 'work'
 
 ### 4.2 校园站（cn）种子数据
 
-当前已有种子数据（`src/campus/store.ts`）：
+当前已有种子数据（`frontlife-web/src/store.ts`）：
 
 | 类型 | 数量 | 说明 |
 |------|------|------|

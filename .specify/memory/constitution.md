@@ -172,11 +172,11 @@ Safari / Chrome 为主。
 | --- | --- | --- |
 | 定位 | 区域知识平台（以校园为锚点，服务所在区域所有人） | 全球 AI 知识平台（前沿资讯 + 工具方法 + 创新实践） |
 | 域名 | `xyzidea.cn`（国内服务器，ICP 备案） | `xyzidea.com`（海外服务器） |
-| 入口 | `campus.html` + `vite.config.ts`（待重建） | `index.html` + `vite.config.ts`（当前就绪） |
+| 入口 | `index.html` + `vite.config.ts`（frontlife-web 独立包） | `index.html` + `vite.config.ts`（frontai-web 独立包） |
 | 目标用户 | 校园所在区域的全体居民（学生、教职工、当地居民） | 全球想用 AI 解决真实问题的人 |
 | 核心理念 | 人生无限可能——让生活更好 | Idea 无限可能——让创新落地 |
 | AI 搜索 | 智谱 GLM-4-Flash，系统提示定位为"校园生活顾问" | 智谱 GLM-4-Flash，系统提示定位为"AI 软件顾问" |
-| 内容领域 | `daily`（日常起居）、`growth`（成长提升）、`deal`（精明消费） | `creative`（影视创作）、`dev`（编程开发）、`work`（通用办公） |
+| 内容领域 | 展示层 3 领域（`daily`/`growth`/`deal`）← 数据层 8 分类（arrival/food/…），映射见 `campus/constants.ts` DOMAIN_MAP | `creative`（影视创作）、`dev`（编程开发）、`work`（通用办公） |
 | 注册方式 | 手机号 + 验证码 | 申请制 + 邀请制 + GitHub OAuth |
 | 区域化管理 | ✅ 以校园为锚点，内容按区域组织 | ❌ 全球统一 |
 
