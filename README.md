@@ -13,31 +13,30 @@
 
 ## 功能亮点
 
-| 功能 | 说明 |
-|------|------|
-| AI 智能搜索 | 智谱 GLM-4-Flash，输入问题返回摘要 + 推荐工具 + 推荐文章 |
-| 方案生成 | 选工具 → 描述目标 → AI 生成操作步骤 → 保存/导出（md/txt/csv） |
-| 双站对称 | 两站布局和交互完全一致，仅内容领域和认证方式不同 |
-| 校园 AI 顾问 | 校园站使用"校园生活顾问"角色，回答校园生活问题 |
-| 工具展览 | 全球站精选工具沉浸式展示（com 站独有） |
-| 内容管理 | 管理后台支持文章/专题/工具/资讯的 CRUD + 审核 + 数据分析 |
+| 功能       | 说明                                         |
+| -------- | ------------------------------------------ |
+| AI 智能搜索  | 智谱 GLM-4-Flash，输入问题返回摘要 + 推荐工具 + 推荐文章      |
+| 方案生成     | 选工具 → 描述目标 → AI 生成操作步骤 → 保存/导出（md/txt/csv） |
+| 校园 AI 顾问 | 校园站使用"校园生活顾问"角色，回答校园生活问题                   |
+| 工具展览     | 全球站精选工具沉浸式展示（com 站独有）                      |
+| 内容管理     | 管理后台支持文章/专题/工具/资讯的 CRUD + 审核 + 数据分析        |
+| 敏感词管控    | 输入拦截 + 输出过滤，敏感词库共享于 `@ns/shared`          |
 
 ---
 
 ## 技术栈
 
-| 层级 | 技术 | 说明 |
-|------|------|------|
-| 语言 | TypeScript 5.8 | strict mode |
-| 前端框架 | React 19 | Concurrent 特性 |
-| 构建 | Vite 6 | 双入口（index.html + campus.html） |
-| 样式 | Tailwind CSS 3 | — |
-| 路由 | React Router v7 | — |
-| 状态管理 | Zustand 5 | localStorage 持久化（原型阶段） |
-| AI 模型 | 智谱 GLM-4-Flash | Vite proxy 转发，生产环境走后端网关 |
-| 后端 | Hono + Drizzle + Zod | 搭建中 |
-| 数据库 | PostgreSQL | 原型阶段用 localStorage mock |
-| 包管理 | pnpm | — |
+| 层级    | 技术                   | 说明                            |
+| ----- | -------------------- | ----------------------------- |
+| 语言    | TypeScript 5.8       | strict mode                   |
+| 前端框架  | React 19             | Concurrent 特性                 |
+| 构建    | Vite 6               | 双站各自独立 Vite 实例                 |
+| 样式    | Tailwind CSS 3       | —                             |
+| 路由    | React Router v7      | —                             |
+| 状态管理  | Zustand 5            | localStorage 持久化（原型阶段）        |
+| AI 模型 | 智谱 GLM-4-Flash       | Vite proxy 转发，生产环境走后端网关       |
+| 后端    | Hono + Drizzle + Zod | 待建                           |
+| 包管理   | pnpm workspace       | monorepo                     |
 
 ---
 
@@ -45,43 +44,32 @@
 
 ### 前置条件
 
-- Node.js ≥ 18
-- pnpm ≥ 9
+- Node.js >= 18
+- pnpm >= 9
 
 ### 安装
 
 ```bash
-cd NorthStar/pangen-ai-compass
-pnpm install
+cd NorthStar && pnpm install
 ```
 
 ### 开发
 
 ```bash
-# 全球站（默认）
-pnpm dev              # http://localhost:5173
+# 全球站
+cd NorthStar/packages/frontai-web && pnpm dev     # http://localhost:3000
 
 # 校园站
-pnpm dev:campus       # http://localhost:5173（自动重写到校园站入口）
-```
-
-### 构建
-
-```bash
-pnpm build            # 全球站
-pnpm build:campus     # 校园站
+cd NorthStar/packages/frontlife-web && pnpm dev   # http://localhost:3001
 ```
 
 ### 配置 AI（可选）
 
-本地演示模式下 AI 功能对游客开放。
+本地演示模式下 AI 功能对游客开放。在对应 web 包目录下创建：
 
 ```bash
-# 方式1：.zhipu.local.json
-echo '{"api_key": "your-key", "base_url": "https://open.bigmodel.cn"}' > .zhipu.local.json
-
-# 方式2：.env.development.local
-echo "ZHIPU_API_KEY=your-key" >> .env.development.local
+# frontai-web/.zhipu.local.json
+echo '{"api_key": "your-key", "base_url": "https://open.bigmodel.cn"}' > NorthStar/packages/frontai-web/.zhipu.local.json
 ```
 
 ---
@@ -89,43 +77,33 @@ echo "ZHIPU_API_KEY=your-key" >> .env.development.local
 ## 项目结构
 
 ```
-NorthStar/
-├── pangen-ai-compass/          # 前端（双站共享）
-│   ├── index.html               # 全球站入口
-│   ├── campus.html              # 校园站入口
-│   ├── vite.config.ts           # 全球站构建配置
-│   ├── vite.config.campus.ts    # 校园站构建配置
-│   └── src/
-│       ├── components/          # 全球站组件
-│       ├── campus/              # 校园站代码（独立）
-│       │   ├── pages/           # 首页、分类页、文章页
-│       │   ├── components/      # 校园站 AI 搜索等
-│       │   ├── services/        # AI 搜索服务
-│       │   └── store.ts         # Zustand store + 种子数据
-│       ├── constants/           # 共享常量
-│       ├── store/               # 全局状态
-│       ├── services/            # AI 契约等
-│       └── types/               # 类型定义
-├── server/                      # 后端（搭建中）
-│   └── prisma/                  # 数据库（待迁移至 Drizzle）
-└── specs/                       # 规格文档
-    ├── PRD-盘根AI指南针-标准版.md    # 产品需求文档 v2.0
-    ├── implementation/specs.md      # 实现规格
-    ├── ui-prompts.md                # UI 原型提示词
-    └── 012-campus-rebuild/          # 校园站重建规格
+NS/
+├── CLAUDE.md                    # AI 开发指南
+├── specs/                       # 规格文档
+│   ├── PRD-盘根AI指南针-标准版.md
+│   ├── implementation/specs.md
+│   └── ui-prompts.md
+│
+└── NorthStar/                   # 所有代码
+    ├── pnpm-workspace.yaml
+    ├── tsconfig.base.json
+    └── packages/
+        ├── shared/              # @ns/shared — 跨产品共享（纯 TS）
+        ├── frontai-web/         # 全球站（xyzidea.com）→ localhost:3000
+        ├── frontlife-web/       # 校园站（xyzidea.cn）→ localhost:3001
+        └── server/              # @ns/server — 后端（待建）
 ```
 
 ---
 
 ## 文档索引
 
-| 文档 | 说明 |
-|------|------|
-| [PRD v2.0](specs/PRD-盘根AI指南针-标准版.md) | 产品需求文档，单一事实来源 |
-| [实现规格](specs/implementation/specs.md) | 数据模型、API 契约、认证流程、部署配置 |
-| [项目宪法](.specify/memory/constitution.md) | 开发决策的最高约束文件 |
-| [UI 提示词](specs/ui-prompts.md) | 18 套 AI 设计工具提示词（双站 + 管理端） |
-| [比赛冲刺计划](specs/比赛冲刺计划.md) | 4.22 比赛时间线 |
+| 文档                                                  | 说明                    |
+| --------------------------------------------------- | --------------------- |
+| [PRD v2.0](specs/PRD-盘根AI指南针-标准版.md)                | 产品需求文档，单一事实来源         |
+| [实现规格](specs/implementation/specs.md)               | 数据模型、API 契约、认证流程、部署配置 |
+| [项目宪法](.specify/memory/constitution.md)             | 开发决策的最高约束文件           |
+| [UI 提示词](specs/ui-prompts.md)                       | 18 套 AI 设计工具提示词       |
 
 ---
 

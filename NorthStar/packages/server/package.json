@@ -1,0 +1,9 @@
+{
+  "name": "@ns/server",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "dependencies": {
+    "@ns/shared": "workspace:*"
+  }
+}

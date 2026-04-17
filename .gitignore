@@ -1,8 +1,8 @@
 node_modules/
 dist/
 .env
+*.local.json
 .DS_Store
 *.log
 .vscode/
 .playwright-mcp/
-NorthStar/server/prisma/dev.db
