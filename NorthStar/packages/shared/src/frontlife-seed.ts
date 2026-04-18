@@ -1,11 +1,7 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { CampusArticle, CampusTopic } from '@ns/shared';
-
-export type { CampusArticle, CampusTopic };
+import type { CampusArticle, CampusTopic } from './types';
 
 // 种子专题
-const SEED_TOPICS: CampusTopic[] = [
+export const SEED_TOPICS: CampusTopic[] = [
   {
     id: 'topic-arrival',
     title: '新生报到全攻略',
@@ -73,7 +69,7 @@ const SEED_TOPICS: CampusTopic[] = [
 ];
 
 // 种子数据
-const SEED_ARTICLES: CampusArticle[] = [
+export const SEED_ARTICLES: CampusArticle[] = [
   {
     id: 'campus-a1',
     title: '二食堂三楼麻辣烫实测',
@@ -961,96 +957,3 @@ const SEED_ARTICLES: CampusArticle[] = [
     updatedAt: '2026-03-01T08:00:00Z',
   },
 ];
-
-interface CampusState {
-  articles: CampusArticle[];
-  topics: CampusTopic[];
-  initialized: boolean;
-  initialize: () => void;
-  getPublishedArticles: () => CampusArticle[];
-  getArticlesByCategory: (category: string) => CampusArticle[];
-  getArticleById: (id: string) => CampusArticle | undefined;
-  searchArticles: (query: string) => CampusArticle[];
-  getFeaturedArticles: (limit?: number) => CampusArticle[];
-  getTopics: () => CampusTopic[];
-  getTopicsByCategory: (categorySlug: string) => CampusTopic[];
-  getArticlesByTopic: (topicId: string) => CampusArticle[];
-  getTopicById: (id: string) => CampusTopic | undefined;
-}
-
-export const useCampusStore = create<CampusState>()(
-  persist(
-    (set, get) => ({
-      articles: [],
-      topics: [],
-      initialized: false,
-
-      initialize: () => {
-        set((state) => {
-          if (!state.initialized) {
-            return {
-              articles: SEED_ARTICLES,
-              topics: SEED_TOPICS,
-              initialized: true,
-            };
-          }
-          return state;
-        });
-      },
-
-      getPublishedArticles: () => {
-        return get().articles.filter((a) => a.publishedAt);
-      },
-
-      getArticlesByCategory: (category: string) => {
-        return get().articles.filter(
-          (a) => a.category === category && a.publishedAt,
-        );
-      },
-
-      getArticleById: (id: string) => {
-        return get().articles.find((a) => a.id === id);
-      },
-
-      searchArticles: (query: string) => {
-        const q = query.toLowerCase();
-        return get().articles.filter(
-          (a) =>
-            a.publishedAt &&
-            (a.title.toLowerCase().includes(q) ||
-              a.summary.toLowerCase().includes(q)),
-        );
-      },
-
-      getFeaturedArticles: (limit = 6) => {
-        return get()
-          .articles.filter((a) => a.publishedAt)
-          .sort((a, b) => b.views - a.views)
-          .slice(0, limit);
-      },
-
-      getTopics: () => {
-        return get().topics;
-      },
-
-      getTopicsByCategory: (categorySlug: string) => {
-        return get().topics.filter((t) => t.category === categorySlug);
-      },
-
-      getArticlesByTopic: (topicId: string) => {
-        const topic = get().topics.find((t) => t.id === topicId);
-        if (!topic) return [];
-        return topic.articleIds
-          .map((aid) => get().articles.find((a) => a.id === aid))
-          .filter((a): a is CampusArticle => !!a && !!a.publishedAt);
-      },
-
-      getTopicById: (id: string) => {
-        return get().topics.find((t) => t.id === id);
-      },
-    }),
-    {
-      name: 'campus-store',
-    },
-  ),
-);

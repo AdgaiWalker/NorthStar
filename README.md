@@ -7,7 +7,7 @@
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6-646cff.svg)](https://vitejs.dev/)
 
-双前端 + 单后端架构：**校园站**（xyzidea.cn，生活面）+ **全球站**（xyzidea.com，理想面），共享同一代码库，通过站点配置切换行为。
+双前端 + 单后端架构：**校园站**（xyzidea.cn，生活面）+ **全球站**（xyzidea.com，理想面），共享 `@ns/shared` 跨产品代码，各自独立构建。
 
 ---
 
@@ -59,8 +59,8 @@ cd NorthStar && pnpm install
 # 全球站
 cd NorthStar/packages/frontai-web && pnpm dev     # http://localhost:3000
 
-# 校园站
-cd NorthStar/packages/frontlife-web && pnpm dev   # http://localhost:3001
+# 校园站（待重建）
+# cd NorthStar/packages/frontlife-web && pnpm dev  # http://localhost:3001
 ```
 
 ### 配置 AI（可选）
@@ -90,7 +90,7 @@ NS/
     └── packages/
         ├── shared/              # @ns/shared — 跨产品共享（纯 TS）
         ├── frontai-web/         # 全球站（xyzidea.com）→ localhost:3000
-        ├── frontlife-web/       # 校园站（xyzidea.cn）→ localhost:3001
+        ├── frontlife-web/       # 校园站（xyzidea.cn）→ localhost:3001（待重建）
         └── server/              # @ns/server — 后端（待建）
 ```
 
@@ -103,7 +103,7 @@ NS/
 | [PRD v2.0](specs/PRD-盘根AI指南针-标准版.md)                | 产品需求文档，单一事实来源         |
 | [实现规格](specs/implementation/specs.md)               | 数据模型、API 契约、认证流程、部署配置 |
 | [项目宪法](.specify/memory/constitution.md)             | 开发决策的最高约束文件           |
-| [UI 提示词](specs/ui-prompts.md)                       | 18 套 AI 设计工具提示词       |
+| [项目现状](STATUS.md)                                   | 全站内容、数据、开发进度总览     |
 
 ---
 
