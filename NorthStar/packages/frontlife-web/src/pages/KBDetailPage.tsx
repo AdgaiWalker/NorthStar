@@ -11,8 +11,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  MessageSquare,
 } from 'lucide-react';
-import { getKB, getArticle, getUser } from '@/data/mock';
+import { getKB, getArticle, getUser, getKBPosts, TAG_LABELS } from '@/data/mock';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
 import { generateSummary } from '@/services/AIService';
@@ -38,6 +39,7 @@ export default function KBDetailPage() {
   const [aiSummary, setAiSummary] = useState('');
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [aiSummaryError, setAiSummaryError] = useState('');
+  const [activeTab, setActiveTab] = useState<'articles' | 'discussions'>('articles');
 
   const showAiSummaryBtn = article && article.content.length > 1000;
 
@@ -87,7 +89,7 @@ export default function KBDetailPage() {
     window.scrollTo(0, 0);
   };
 
-  if (!kb || !article) {
+  if (!kb) {
     return (
       <div className="px-5 py-20 text-center text-ink-muted">
         内容不存在
@@ -95,8 +97,9 @@ export default function KBDetailPage() {
     );
   }
 
-  const author = getUser(article.authorId);
-  const isBookmarked = bookmarks[article.id];
+  const kbPosts = getKBPosts(kb.id);
+  const author = article ? getUser(article.authorId) : null;
+  const isBookmarked = article ? bookmarks[article.id] : false;
 
   return (
     <div className="flex min-h-[calc(100vh-var(--nav-h))]">
@@ -134,36 +137,66 @@ export default function KBDetailPage() {
         </div>
       </aside>
 
-      {/* Middle TOC */}
-      <aside className="sticky top-nav-h hidden h-[calc(100vh-var(--nav-h))] w-[200px] shrink-0 overflow-y-auto py-6 pl-6 pr-3 xl:block">
-        <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
-          目录
-        </div>
-        {headings.map((h) => (
-          <button
-            key={h.id}
-            onClick={() => scrollToHeading(h.id)}
-            className={cn(
-              'block w-full border-l-2 py-1.5 pl-3 text-left text-[13px] leading-relaxed transition-all',
-              activeHeading === h.id
-                ? 'border-sage bg-sage-light font-semibold text-sage'
-                : 'border-border-light text-ink-muted hover:border-ink-muted hover:text-ink'
-            )}
-          >
-            {h.text}
-          </button>
-        ))}
-      </aside>
+      {/* Middle TOC - only show in articles tab */}
+      {activeTab === 'articles' && (
+        <aside className="sticky top-nav-h hidden h-[calc(100vh-var(--nav-h))] w-[200px] shrink-0 overflow-y-auto py-6 pl-6 pr-3 xl:block">
+          <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+            目录
+          </div>
+          {headings.map((h) => (
+            <button
+              key={h.id}
+              onClick={() => scrollToHeading(h.id)}
+              className={cn(
+                'block w-full border-l-2 py-1.5 pl-3 text-left text-[13px] leading-relaxed transition-all',
+                activeHeading === h.id
+                  ? 'border-sage bg-sage-light font-semibold text-sage'
+                  : 'border-border-light text-ink-muted hover:border-ink-muted hover:text-ink'
+              )}
+            >
+              {h.text}
+            </button>
+          ))}
+        </aside>
+      )}
 
       {/* Content */}
       <article className="min-w-0 flex-1 px-4 py-6 md:px-10 md:py-8 lg:max-w-[720px]">
-        <h1 className="font-display text-[28px] font-bold leading-tight text-ink">
-          {article.title}
-        </h1>
+        {/* Tab Switcher */}
+        <div className="mb-6 flex gap-1 rounded-lg border border-border-light bg-bg-subtle p-1">
+          <button
+            onClick={() => setActiveTab('articles')}
+            className={cn(
+              'flex-1 rounded-md py-2 text-sm font-medium transition-all',
+              activeTab === 'articles'
+                ? 'bg-white text-ink shadow-sm'
+                : 'text-ink-muted hover:text-ink'
+            )}
+          >
+            文章 ({kb.articles.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('discussions')}
+            className={cn(
+              'flex-1 rounded-md py-2 text-sm font-medium transition-all',
+              activeTab === 'discussions'
+                ? 'bg-white text-ink shadow-sm'
+                : 'text-ink-muted hover:text-ink'
+            )}
+          >
+            讨论 ({kbPosts.length})
+          </button>
+        </div>
+
+        {activeTab === 'articles' && article && (
+          <>
+            <h1 className="font-display text-[28px] font-bold leading-tight text-ink">
+              {article.title}
+            </h1>
 
         <div className="mb-7 mt-3 flex flex-wrap items-center justify-between gap-y-2 border-b border-border-light pb-5 text-[13px] text-ink-muted">
           <div className="flex flex-wrap items-center gap-2.5">
-            <span>{author.name}</span>
+            <span>{author!.name}</span>
             <span>·</span>
             <span>更新于 {article.updatedAt}</span>
             <span>·</span>
@@ -369,7 +402,63 @@ export default function KBDetailPage() {
             <div />
           )}
         </div>
-      </article>
+      </>
+    )}
+
+    {activeTab === 'discussions' && (
+      <div className="space-y-4">
+        {kbPosts.length === 0 && (
+          <div className="py-20 text-center text-ink-muted">
+            该知识库暂无讨论
+          </div>
+        )}
+        {kbPosts.map((post: any) => {
+          const u = getUser(post.authorId);
+          return (
+            <button
+              key={post.id}
+              onClick={() => navigate(`/post/${post.id}`)}
+              className="mb-3 w-full rounded-lg border border-border-light bg-surface p-5 text-left transition-all hover:border-border hover:shadow-md hover:-translate-y-0.5"
+            >
+              <div className="mb-2 flex items-center gap-2">
+                <div
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white"
+                  style={{ background: u.color }}
+                >
+                  {u.name[0]}
+                </div>
+                <span className="text-[13px] font-medium text-ink-secondary">
+                  {u.name}
+                </span>
+                <span className="text-xs text-ink-faint">· {post.time}</span>
+              </div>
+              <p className="line-clamp-3 text-[17px] font-medium leading-relaxed text-ink">
+                {post.content}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {post.tags.map((t: string) => (
+                  <span
+                    key={t}
+                    className="rounded-full bg-bg-subtle px-2 py-0.5 text-[11px] font-medium text-ink-muted"
+                  >
+                    {TAG_LABELS[t]}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-4 text-xs text-ink-faint">
+                <span className="flex items-center gap-1">
+                  <MessageSquare size={12} /> {post.replies.length}
+                </span>
+                <span className="flex items-center gap-1">
+                  <EyeIcon /> {post.views}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    )}
+  </article>
     </div>
   );
 }

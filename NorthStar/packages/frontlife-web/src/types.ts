@@ -16,6 +16,7 @@ export interface FeedPost {
   views: number;
   replies: Reply[];
   images?: string[];
+  kbId: string; // 所属知识库
 }
 
 export type PostTag = 'help' | 'secondhand' | 'event' | 'discussion' | 'share';

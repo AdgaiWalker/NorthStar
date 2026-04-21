@@ -93,6 +93,17 @@ export const KNOWLEDGE_BASES: Record<string, KnowledgeBase> = {
     views: 450,
     section: '最新',
   },
+  freeboard: {
+    id: 'freeboard',
+    icon: '💬',
+    name: '自由广场',
+    desc: '快问快答、闲聊、找不到合适板块的发这里',
+    authorId: 'zhang',
+    articles: [],
+    saves: 0,
+    views: 1200,
+    section: '最新',
+  },
 };
 
 export interface ArticleData {
@@ -279,6 +290,7 @@ export const POSTS: FeedPost[] = [
       { id: 'r1', authorId: 'wang', time: '3分钟前', text: '在哪在哪？一楼还是二楼？', stars: 2 },
       { id: 'r2', authorId: 'zhao', time: '1分钟前', text: '一楼左侧，新开的那个窗口', stars: 5 },
     ],
+    kbId: 'food',
   },
   {
     id: 'p2',
@@ -292,6 +304,7 @@ export const POSTS: FeedPost[] = [
       { id: 'r3', authorId: 'li', time: '18分钟前', text: '工作日 8:00-22:00，周末 9:00-21:00', stars: 12 },
       { id: 'r4', authorId: 'zhao', time: '15分钟前', text: '三楼自习室到 23:00，比主馆晚', stars: 8 },
     ],
+    kbId: 'freeboard',
   },
   {
     id: 'p3',
@@ -302,6 +315,7 @@ export const POSTS: FeedPost[] = [
     saves: 8,
     views: 234,
     replies: [],
+    kbId: 'secondhand',
   },
   {
     id: 'p4',
@@ -315,6 +329,7 @@ export const POSTS: FeedPost[] = [
       { id: 'r5', authorId: 'wang', time: '1小时前', text: '可以！需要自备吉他吗？', stars: 1 },
       { id: 'r6', authorId: 'liu', time: '45分钟前', text: '不用，社团有练习琴', stars: 3 },
     ],
+    kbId: 'guitar',
   },
   {
     id: 'p5',
@@ -325,6 +340,7 @@ export const POSTS: FeedPost[] = [
     saves: 22,
     views: 456,
     replies: [],
+    kbId: 'secondhand',
   },
   {
     id: 'p6',
@@ -338,6 +354,7 @@ export const POSTS: FeedPost[] = [
       { id: 'r7', authorId: 'li', time: '3小时前', text: '羽毛球！老师人超好，基本不挂人', stars: 6 },
       { id: 'r8', authorId: 'zhang', time: '2小时前', text: '选过瑜伽，考试就是做一套动作，超简单', stars: 4 },
     ],
+    kbId: 'freeboard',
   },
 ];
 
@@ -371,4 +388,8 @@ export function getArticle(id: string) {
 
 export function getKB(id: string) {
   return KNOWLEDGE_BASES[id];
+}
+
+export function getKBPosts(kbId: string) {
+  return POSTS.filter((p) => p.kbId === kbId);
 }

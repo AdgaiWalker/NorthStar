@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, ImagePlus, X } from 'lucide-react';
+import { ArrowLeft, Send, ImagePlus, X, BookOpen } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
+import { KNOWLEDGE_BASES } from '@/data/mock';
 import type { PostTag } from '@/types';
 
 const TAG_OPTIONS: { tag: PostTag; label: string }[] = [
@@ -21,6 +22,7 @@ export default function CreatePostPage() {
   const userName = useAppStore((s) => s.userName);
   const [content, setContent] = useState('');
   const [selectedTags, setSelectedTags] = useState<PostTag[]>([]);
+  const [selectedKb, setSelectedKb] = useState('freeboard');
   const [publishing, setPublishing] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +71,7 @@ export default function CreatePostPage() {
       views: 0,
       replies: [],
       images: images.length > 0 ? images : undefined,
+      kbId: selectedKb,
     };
 
     addPost(newPost);
@@ -169,6 +172,28 @@ export default function CreatePostPage() {
               </button>
             );
           })}
+        </div>
+      </div>
+
+      {/* Knowledge Base Selector */}
+      <div className="mt-4">
+        <div className="mb-2 text-sm font-medium text-ink-secondary">发布到</div>
+        <div className="relative">
+          <select
+            value={selectedKb}
+            onChange={(e) => setSelectedKb(e.target.value)}
+            className="h-10 w-full appearance-none rounded-lg border border-border bg-white pl-9 pr-8 text-sm text-ink outline-none focus:border-sage"
+          >
+            {Object.values(KNOWLEDGE_BASES).map((kb) => (
+              <option key={kb.id} value={kb.id}>
+                {kb.icon} {kb.name}
+              </option>
+            ))}
+          </select>
+          <BookOpen
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+          />
         </div>
       </div>
 
