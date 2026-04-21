@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, BookOpen, Star } from 'lucide-react';
 import { KNOWLEDGE_BASES, getUser } from '@/data/mock';
@@ -6,9 +7,20 @@ const sectionOrder = ['热门', '商业', '最新'];
 
 export default function KBListPage() {
   const navigate = useNavigate();
-  const sections: Record<string, typeof KNOWLEDGE_BASES[string][]> = {};
+  const [query, setQuery] = useState('');
 
-  Object.values(KNOWLEDGE_BASES).forEach((kb) => {
+  const allKBs = Object.values(KNOWLEDGE_BASES);
+  const filteredKBs = query.trim()
+    ? allKBs.filter(
+        (kb) =>
+          kb.name.includes(query) ||
+          kb.desc.includes(query) ||
+          getUser(kb.authorId).name.includes(query)
+      )
+    : allKBs;
+
+  const sections: Record<string, typeof KNOWLEDGE_BASES[string][]> = {};
+  filteredKBs.forEach((kb) => {
     if (!sections[kb.section]) sections[kb.section] = [];
     sections[kb.section].push(kb);
   });
@@ -28,6 +40,8 @@ export default function KBListPage() {
           className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
         />
         <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="搜索知识库..."
           className="h-11 w-full rounded-lg border border-border bg-bg-subtle pl-10 pr-4 text-sm text-ink outline-none transition-colors focus:border-sage focus:bg-white"
         />
@@ -35,6 +49,12 @@ export default function KBListPage() {
 
       {/* Sections */}
       <div className="space-y-8 pb-20">
+        {filteredKBs.length === 0 && (
+          <div className="py-12 text-center text-ink-muted">
+            <p className="text-sm">未找到相关知识库</p>
+            <p className="mt-1 text-xs">试试其他关键词</p>
+          </div>
+        )}
         {sectionOrder.map(
           (sec) =>
             sections[sec] && (

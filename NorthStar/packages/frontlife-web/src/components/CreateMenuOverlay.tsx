@@ -4,7 +4,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
 
 export default function CreateMenuOverlay() {
-  const isCertified = useAppStore((s) => s.isCertified);
+  const certStatus = useAppStore((s) => s.certStatus);
   const setShowCreateMenu = useAppStore((s) => s.setShowCreateMenu);
   const navigate = useNavigate();
 
@@ -48,7 +48,7 @@ export default function CreateMenuOverlay() {
             </div>
           </button>
 
-          {isCertified ? (
+          {certStatus === 'approved' ? (
             <button
               onClick={() => handleNavigate('/write')}
               className="flex w-full items-center gap-3.5 rounded-lg border border-border p-4 text-left transition-all hover:border-blue-custom hover:bg-blue-light"

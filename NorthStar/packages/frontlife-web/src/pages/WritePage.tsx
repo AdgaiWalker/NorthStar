@@ -1,23 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
+import { Sparkles, Send, BookOpen, ChevronDown } from 'lucide-react';
 import { KNOWLEDGE_BASES } from '@/data/mock';
 import { cn } from '@/lib/utils';
 import { generateWritingReply, type WritingStep } from '@/services/AIService';
 
-const steps = ['选择知识库', 'AI 对话', '调整结构', '确认发布'];
+const GREETING =
+  '你好！我是你的写作助手。你想分享什么内容？随便说，我来帮你整理成一篇文章。';
 
 export default function WritePage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(0);
   const [selectedKb, setSelectedKb] = useState<string | null>(null);
   const [messages, setMessages] = useState<{ role: 'ai' | 'user'; text: string }[]>([]);
   const [writingSteps, setWritingSteps] = useState<WritingStep[]>([]);
   const [input, setInput] = useState('');
-  const [outline, setOutline] = useState<string[]>([]);
-  const [preview, setPreview] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [preview, setPreview] = useState('');
+
+  // Auto-start conversation on mount
+  useEffect(() => {
+    if (messages.length === 0) {
+      setMessages([{ role: 'ai', text: GREETING }]);
+      setWritingSteps([{ role: 'ai', content: GREETING }]);
+    }
+  }, []);
 
   const sendMsg = async () => {
     if (!input.trim() || aiLoading) return;
@@ -28,7 +39,10 @@ export default function WritePage() {
     const newMessages = [...messages, { role: 'user' as const, text: userText }];
     setMessages(newMessages);
 
-    const newSteps: WritingStep[] = [...writingSteps, { role: 'user' as const, content: userText }];
+    const newSteps: WritingStep[] = [
+      ...writingSteps,
+      { role: 'user' as const, content: userText },
+    ];
     setWritingSteps(newSteps);
 
     setAiLoading(true);
@@ -36,6 +50,10 @@ export default function WritePage() {
       const reply = await generateWritingReply(newSteps);
       setMessages((prev) => [...prev, { role: 'ai', text: reply }]);
       setWritingSteps((prev) => [...prev, { role: 'ai', content: reply }]);
+      // Auto-update preview with the latest AI response if it looks like article content
+      if (reply.includes('## ') || reply.includes('# ')) {
+        setPreview(reply);
+      }
     } catch (e) {
       setAiError(e instanceof Error ? e.message : 'AI 服务暂时不可用');
     } finally {
@@ -43,79 +61,62 @@ export default function WritePage() {
     }
   };
 
-  const extractOutline = (text: string): string[] => {
-    const lines = text.split('\n');
-    const headings: string[] = [];
-    for (const line of lines) {
-      const match = line.match(/^##\s+(.+)$/);
-      if (match) headings.push(match[1].trim());
+  const handlePublish = () => {
+    if (!preview.trim()) {
+      alert('请先和 AI 对话生成文章内容');
+      return;
     }
-    return headings;
+    alert('文章已发布！');
+    navigate('/');
   };
 
-  const renderStep = () => {
-    if (step === 0) {
-      return (
-        <div className="rounded-lg border border-border-light bg-surface p-6"
-        >
-          <div className="mb-1 text-[15px] font-semibold"
-          >选择知识库</div>
-          <div className="mb-4 text-[13px] text-ink-muted"
-          >文章将归入所选知识库</div>
-          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3"
-          >
-            {Object.values(KNOWLEDGE_BASES).map((kb) => (
-              <button
-                key={kb.id}
-                onClick={() => setSelectedKb(kb.id)}
-                className={cn(
-                  'rounded-lg border p-4 text-center transition-all',
-                  selectedKb === kb.id
-                    ? 'border-sage bg-sage-light'
-                    : 'border-border hover:border-sage hover:bg-sage-light'
-                )}
-              >
-                <div className="mb-1 text-2xl"
-                >{kb.icon}</div>
-                <div className="text-sm font-medium"
-                >{kb.name}</div>
-              </button>
-            ))}
-          </div>
-          <div className="mt-5 flex justify-end"
-          >
-            <button
-              disabled={!selectedKb}
-              onClick={() => setStep(1)}
-              className="rounded bg-sage px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-sage-dark disabled:opacity-40"
-            >
-              下一步
-            </button>
-          </div>
-        </div>
-      );
-    }
+  return (
+    <div className="mx-auto max-w-[1100px] px-4 py-5">
+      {/* Header + KB Selector */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-2xl font-bold text-ink">写文章</h1>
 
-    if (step === 1) {
-      return (
-        <div>
-          <div className="mb-3 max-h-[400px] min-h-[300px] overflow-y-auto rounded-lg border border-border-light bg-surface p-5"
+        <div className="relative">
+          <select
+            value={selectedKb ?? ''}
+            onChange={(e) => setSelectedKb(e.target.value || null)}
+            className="h-10 appearance-none rounded-lg border border-border bg-white pl-9 pr-8 text-sm text-ink outline-none focus:border-sage"
           >
-            <div className="mb-3.5"
-            >
-              <div className="rounded-lg border-l-[3px] border-sage bg-bg-subtle px-4 py-3 text-[14px] leading-relaxed"
-              >
-                你好！我是你的写作助手。你想分享什么内容？随便说，我来帮你整理。
-              </div>
-            </div>
+            <option value="">选择知识库</option>
+            {Object.values(KNOWLEDGE_BASES).map((kb) => (
+              <option key={kb.id} value={kb.id}>
+                {kb.icon} {kb.name}
+              </option>
+            ))}
+          </select>
+          <BookOpen
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+          />
+          <ChevronDown
+            size={14}
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted"
+          />
+        </div>
+      </div>
+
+      {/* Two columns */}
+      <div className="flex flex-col gap-4 lg:flex-row" style={{ minHeight: '60vh' }}>
+        {/* Left: AI Chat */}
+        <div className="flex w-full flex-col rounded-lg border border-border-light bg-surface lg:w-[400px]">
+          <div className="flex items-center gap-1.5 border-b border-border-light px-4 py-3 text-xs font-medium text-sage">
+            <Sparkles size={13} />
+            AI 写作助手
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4">
             {messages.map((m, i) => (
-              <div key={i} className="mb-3.5"
-              >
+              <div key={i} className="mb-3.5">
                 <div
                   className={cn(
-                    'rounded-lg px-4 py-3 text-[14px] leading-relaxed',
+                    'rounded-lg px-3.5 py-2.5 text-[13px] leading-relaxed',
                     m.role === 'ai'
-                      ? 'border-l-[3px] border-sage bg-bg-subtle'
+                      ? 'border-l-[3px] border-sage bg-bg-subtle text-ink'
                       : 'bg-sage-light text-right font-medium text-sage-dark'
                   )}
                 >
@@ -123,205 +124,93 @@ export default function WritePage() {
                 </div>
               </div>
             ))}
-          </div>
-          {aiLoading && (
-            <div className="mb-2 flex items-center gap-2 text-xs text-ink-muted"
-            >
-              <Sparkles size={13} className="animate-pulse text-sage" />
-              AI 正在思考...
-            </div>
-          )}
-          {aiError && (
-            <div className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600"
-            >
-              {aiError}
-              <button
-                onClick={() => sendMsg()}
-                className="ml-2 font-medium underline hover:text-red-700"
-              >
-                重试
-              </button>
-            </div>
-          )}
-          <div className="flex gap-2"
-          >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMsg()}
-              placeholder="描述你想分享的内容..."
-              disabled={aiLoading}
-              className="h-11 flex-1 rounded-lg border border-border bg-white px-4 text-[14px] outline-none focus:border-sage disabled:opacity-50"
-            />
-            <button
-              onClick={sendMsg}
-              disabled={aiLoading}
-              className="rounded-lg bg-sage px-5 text-[13px] font-medium text-white transition-colors hover:bg-sage-dark disabled:opacity-50"
-            >
-              发送
-            </button>
-          </div>
-          <div className="mt-5 flex justify-between"
-          >
-            <button
-              onClick={() => setStep(0)}
-              className="rounded-lg border border-border bg-white px-4 py-2 text-sm transition-colors hover:bg-bg-subtle"
-            >
-              上一步
-            </button>
-            <button
-              onClick={() => {
-                const lastAi = [...messages].reverse().find((m) => m.role === 'ai');
-                const extracted = lastAi ? extractOutline(lastAi.text) : [];
-                setOutline(extracted.length > 0 ? extracted : ['整体介绍', '具体细节', '总结建议']);
-                setStep(2);
-              }}
-              disabled={aiLoading || messages.length === 0}
-              className="rounded bg-sage px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-sage-dark disabled:opacity-40"
-            >
-              下一步
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    if (step === 2) {
-      return (
-        <div className="rounded-lg border border-border-light bg-surface p-6"
-        >
-          <div className="mb-5 text-[15px] font-semibold"
-          >调整文章结构</div>
-          {outline.map((item, i) => (
-            <div
-              key={i}
-              className="mb-2 flex items-center justify-between rounded-lg border border-border-light bg-bg-subtle px-4 py-2.5 text-[14px]"
-            >
-              <span>
-                {i + 1}. {item}
-              </span>
-              <button
-                onClick={() => setOutline(outline.filter((_, idx) => idx !== i))}
-                className="text-xs text-ink-faint transition-colors hover:text-ink-muted"
-              >
-                删除
-              </button>
-            </div>
-          ))}
-          <input
-            placeholder="添加新章节..."
-            className="mt-3 h-9 w-full rounded-lg border border-border bg-white px-3 text-[13px] outline-none focus:border-sage"
-            onKeyDown={(e) => {
-              const target = e.target as HTMLInputElement;
-              if (e.key === 'Enter' && target.value.trim()) {
-                setOutline([...outline, target.value]);
-                target.value = '';
-              }
-            }}
-          />
-          <div className="mt-5 flex justify-between"
-          >
-            <button
-              onClick={() => setStep(1)}
-              className="rounded-lg border border-border bg-white px-4 py-2 text-sm transition-colors hover:bg-bg-subtle"
-            >
-              上一步
-            </button>
-            <button
-              onClick={() => {
-                const lastAi = [...messages].reverse().find((m) => m.role === 'ai');
-                if (lastAi) {
-                  setPreview(lastAi.text);
-                } else {
-                  setPreview(
-                    outline.map((o) => `## ${o}\n\n（待补充内容）`).join('\n\n')
-                  );
-                }
-                setStep(3);
-              }}
-              className="rounded bg-sage px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-sage-dark"
-            >
-              下一步
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    // Step 3: Preview
-    return (
-      <div>
-        <div className="mb-5 rounded-lg border border-border-light bg-surface p-6 text-[15px] leading-relaxed"
-        >
-          {preview.split('\n\n').map((p, i) => {
-            if (p.startsWith('## ')) {
-              return (
-                <h2 key={i} className="mb-3 mt-5 font-display text-xl font-bold"
-                >
-                  {p.replace('## ', '')}
-                </h2>
-              );
-            }
-            return (
-              <p key={i} className="mb-3"
-              >
-                {p}
-              </p>
-            );
-          })}
-        </div>
-        <div className="flex items-center justify-between"
-        >
-          <button
-            onClick={() => setStep(2)}
-            className="rounded-lg border border-border bg-white px-4 py-2 text-sm transition-colors hover:bg-bg-subtle"
-          >
-            上一步
-          </button>
-          <button
-            onClick={() => {
-              alert('文章已发布！');
-              navigate('/');
-            }}
-            className="rounded bg-sage px-7 py-2.5 text-sm font-medium text-white transition-colors hover:bg-sage-dark"
-          >
-            ✓ 确认发布
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="mx-auto max-w-[720px] px-4 py-5"
-    >
-      <div className="mb-6 flex items-center justify-between"
-      >
-        <h1 className="font-display text-2xl font-bold"
-        >写文章</h1>
-      </div>
-
-      {/* Steps */}
-      <div className="mb-6 flex overflow-hidden rounded-lg border border-border-light"
-      >
-        {steps.map((s, i) => (
-          <div
-            key={i}
-            className={cn(
-              'flex-1 py-2.5 text-center text-xs font-medium transition-all',
-              i === step
-                ? 'bg-sage-light font-semibold text-sage'
-                : i < step
-                  ? 'text-sage'
-                  : 'text-ink-muted'
+            {aiLoading && (
+              <div className="flex items-center gap-2 py-2 text-xs text-ink-muted">
+                <Sparkles size={13} className="animate-pulse text-sage" />
+                AI 正在思考...
+              </div>
             )}
-          >
-            {s}
+            {aiError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+                {aiError}
+                <button
+                  onClick={() => sendMsg()}
+                  className="ml-2 font-medium underline hover:text-red-700"
+                >
+                  重试
+                </button>
+              </div>
+            )}
           </div>
-        ))}
+
+          <div className="border-t border-border-light p-3">
+            <div className="flex gap-2">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMsg()}
+                placeholder="描述你想分享的内容..."
+                disabled={aiLoading}
+                className="h-10 flex-1 rounded-lg border border-border bg-white px-3 text-[13px] outline-none focus:border-sage disabled:opacity-50"
+              />
+              <button
+                onClick={sendMsg}
+                disabled={aiLoading || !input.trim()}
+                className="flex h-10 items-center rounded-lg bg-sage px-4 text-[13px] font-medium text-white transition-colors hover:bg-sage-dark disabled:opacity-50"
+              >
+                <Send size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Preview */}
+        <div className="min-w-0 flex-1 rounded-lg border border-border-light bg-surface">
+          <div className="flex items-center justify-between border-b border-border-light px-5 py-3">
+            <span className="text-xs font-medium text-ink-muted">实时预览</span>
+            {preview && (
+              <span className="text-[11px] text-sage">已生成文章</span>
+            )}
+          </div>
+          <div className="markdown-body p-6 text-[15px] leading-[1.8] text-ink">
+            {preview ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw, rehypeSanitize]}
+              >
+                {preview}
+              </ReactMarkdown>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-ink-muted">
+                <Sparkles size={32} className="mb-3 opacity-30" />
+                <p className="text-sm">和 AI 对话，文章内容会在这里实时预览</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {renderStep()}
+      {/* Publish bar */}
+      <div className="mt-5 flex items-center justify-end gap-3">
+        <button
+          onClick={() => navigate(-1)}
+          className="rounded-lg border border-border bg-white px-5 py-2.5 text-sm transition-colors hover:bg-bg-subtle"
+        >
+          取消
+        </button>
+        <button
+          onClick={handlePublish}
+          disabled={!preview.trim()}
+          className={cn(
+            'rounded-lg px-7 py-2.5 text-sm font-medium text-white transition-colors',
+            preview.trim()
+              ? 'bg-sage hover:bg-sage-dark'
+              : 'cursor-not-allowed bg-ink-faint'
+          )}
+        >
+          发布文章
+        </button>
+      </div>
     </div>
   );
 }

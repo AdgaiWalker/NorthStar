@@ -21,7 +21,6 @@ export default function HomePage() {
 
   const fetchData = useCallback(
     async (page: number) => {
-      await new Promise((r) => setTimeout(r, 400));
       const start = (page - 1) * PAGE_SIZE;
       const end = start + PAGE_SIZE;
       const items = sortedFeed.slice(start, end);
@@ -38,14 +37,16 @@ export default function HomePage() {
       {/* Hero */}
       <div className="py-10 text-center md:py-12">
         <div className="mx-auto max-w-xl">
+          <div className="mb-4 text-[15px] text-ink-secondary">
+            黑河学院学生的一站式校园指南
+          </div>
           <div className="relative">
             <Search
               size={18}
               className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint"
             />
             <input
-              readOnly
-              onClick={() => setShowSearch(true)}
+              onFocus={() => setShowSearch(true)}
               placeholder="图书馆几点关门？食堂哪最好吃？"
               className="h-[52px] w-full cursor-pointer rounded-lg border-[1.5px] border-border bg-white pl-11 pr-5 text-[15px] text-ink outline-none transition-all placeholder:text-ink-faint hover:border-ink-faint focus:border-sage focus:shadow-[0_4px_20px_rgba(74,124,89,0.12)]"
             />
@@ -127,7 +128,8 @@ function PostCard({ post }: { post: FeedPost }) {
         <span className="text-xs text-ink-faint">· {post.time}</span>
       </div>
 
-      <p className="text-[17px] font-medium leading-relaxed text-ink">
+      <p className="line-clamp-3 text-[17px] font-medium leading-relaxed text-ink"
+      >
         {post.content}
       </p>
 

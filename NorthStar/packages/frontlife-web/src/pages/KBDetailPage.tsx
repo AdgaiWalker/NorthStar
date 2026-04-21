@@ -161,28 +161,32 @@ export default function KBDetailPage() {
           {article.title}
         </h1>
 
-        <div className="mb-7 mt-3 flex flex-wrap items-center gap-2.5 border-b border-border-light pb-5 text-[13px] text-ink-muted">
-          <span>{author.name}</span>
-          <span>·</span>
-          <span>更新于 {article.updatedAt}</span>
-          <span>·</span>
-          <span className="flex items-center gap-1">
-            <EyeIcon /> {article.views}
-          </span>
-          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-sage-light px-2.5 py-1 text-[11px] text-sage">
-            <CheckCircle size={11} />
-            确认于{article.confirmedAgo}
-          </span>
-          <button
-            onClick={() => toggleBookmark(article.id)}
-            className={cn(
-              'ml-2 flex items-center gap-1 text-xs transition-colors',
-              isBookmarked ? 'text-sage' : 'text-ink-faint hover:text-sage'
-            )}
-          >
-            <Bookmark size={14} fill={isBookmarked ? 'currentColor' : 'none'} />
-            {isBookmarked ? '已收藏' : '收藏'}
-          </button>
+        <div className="mb-7 mt-3 flex flex-wrap items-center justify-between gap-y-2 border-b border-border-light pb-5 text-[13px] text-ink-muted">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span>{author.name}</span>
+            <span>·</span>
+            <span>更新于 {article.updatedAt}</span>
+            <span>·</span>
+            <span className="flex items-center gap-1">
+              <EyeIcon /> {article.views}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-sage-light px-2.5 py-1 text-[11px] text-sage">
+              <CheckCircle size={11} />
+              确认于{article.confirmedAgo}
+            </span>
+            <button
+              onClick={() => toggleBookmark(article.id)}
+              className={cn(
+                'flex items-center gap-1 text-xs transition-colors',
+                isBookmarked ? 'text-sage' : 'text-ink-faint hover:text-sage'
+              )}
+            >
+              <Bookmark size={14} fill={isBookmarked ? 'currentColor' : 'none'} />
+              {isBookmarked ? '已收藏' : '收藏'}
+            </button>
+          </div>
         </div>
 
         {showAiSummaryBtn && !aiSummary && (

@@ -105,7 +105,7 @@ export default function CreatePostPage() {
               setContent(e.target.value);
             }
           }}
-          placeholder="分享点什么...\n快问快答、短分享、求助、二手交易、活动通知"
+          placeholder="分享点什么？快问快答、短分享、求助、二手交易、活动通知"
           className="h-40 w-full resize-none bg-transparent text-base leading-relaxed text-ink outline-none placeholder:text-ink-faint"
           autoFocus
         />

@@ -6,20 +6,24 @@ import { cn } from '@/lib/utils';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const isCertified = useAppStore((s) => s.isCertified);
+  const certStatus = useAppStore((s) => s.certStatus);
   const userName = useAppStore((s) => s.userName);
-  const setCertified = useAppStore((s) => s.setCertified);
+  const userPosts = useAppStore((s) => s.userPosts);
+  const bookmarks = useAppStore((s) => s.bookmarks);
+  const applyCertification = useAppStore((s) => s.applyCertification);
 
+  const realPostCount = userPosts.length;
+  const realBookmarkCount = Object.keys(bookmarks).length;
   const me = {
     name: userName ?? '张同学',
     school: '黑河学院',
-    level: 3,
-    posts: 5,
-    collections: 12,
-    feedback: 8,
-    helped: 234,
-    readCount: 3200,
-    savedCount: 156,
+    level: certStatus === 'approved' ? 3 : certStatus === 'pending' ? 2 : 1,
+    posts: realPostCount,
+    collections: realBookmarkCount,
+    feedback: 0,
+    helped: 0,
+    readCount: 0,
+    savedCount: 0,
   };
   const u = getUser('zhang');
 
@@ -71,7 +75,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Certification Guide */}
-      {!isCertified && (
+      {certStatus === 'none' && (
         <div className="mt-4 rounded-lg border border-border bg-surface p-6 text-center"
         >
           <div className="font-display text-base font-bold"
@@ -83,7 +87,7 @@ export default function ProfilePage() {
             <div>✓ 查看影响力数据</div>
           </div>
           <button
-            onClick={() => setCertified(true)}
+            onClick={() => applyCertification()}
             className="mt-4 rounded bg-sage px-7 py-2.5 text-sm font-medium text-white transition-colors hover:bg-sage-dark"
           >
             立即申请
@@ -91,8 +95,23 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {/* Pending Review */}
+      {certStatus === 'pending' && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-6 text-center"
+        >
+          <div className="font-display text-base font-bold text-amber-700"
+          >⏳ 认证审核中</div>
+          <div className="mt-2 text-[13px] text-amber-600"
+          >
+            你的申请已提交，团队正在审核中。
+            <br />
+            审核通过后你将获得写文章权限和专属知识库。
+          </div>
+        </div>
+      )}
+
       {/* Influence Panel (certified only) */}
-      {isCertified && (
+      {certStatus === 'approved' && (
         <div className="mt-4 rounded-lg border border-border-light bg-surface p-5"
         >
           <div className="mb-4 font-display text-[15px] font-bold"
@@ -101,6 +120,8 @@ export default function ProfilePage() {
           >
             <div className="text-center"
             >
+              <div className="text-center"
+            >
               <div className="font-display text-xl font-bold text-sage"
               >{me.helped}</div>
               <div className="text-[11px] text-ink-muted"
@@ -108,14 +129,14 @@ export default function ProfilePage() {
             </div>
             <div className="text-center"
             >
-              <div className="font-display text-xl font-bold text-blue-custom"
+              <div className="font-display text-xl font-bold text-sage"
               >{me.readCount}</div>
               <div className="text-[11px] text-ink-muted"
               >阅读量</div>
             </div>
             <div className="text-center"
             >
-              <div className="font-display text-xl font-bold text-amber-custom"
+              <div className="font-display text-xl font-bold text-sage"
               >{me.savedCount}</div>
               <div className="text-[11px] text-ink-muted"
               >收藏数</div>
@@ -125,7 +146,7 @@ export default function ProfilePage() {
       )}
 
       {/* My Knowledge Base */}
-      {isCertified && (
+      {certStatus === 'approved' && (
         <div className="mt-3 overflow-hidden rounded-lg border border-border-light bg-surface"
         >
           <div className="flex items-center justify-between border-b border-border-light px-5 py-3.5 font-display text-[15px] font-bold"
@@ -160,11 +181,11 @@ export default function ProfilePage() {
           我的内容
         </div>
         <MenuItem icon={<FileText size={18} />}
-          iconBg="bg-bg-subtle" title="我的帖子" />
+          iconBg="bg-bg-subtle" title="我的帖子" sub={`${realPostCount} 条`} />
         <MenuItem icon={<Star size={18} />}
-          iconBg="bg-bg-subtle" title="我的收藏" />
+          iconBg="bg-bg-subtle" title="我的收藏" sub={`${realBookmarkCount} 个`} />
         <MenuItem icon={<BookOpen size={18} />}
-          iconBg="bg-bg-subtle" title="我的反馈" />
+          iconBg="bg-bg-subtle" title="我的反馈" sub="0 条" />
       </div>
 
       <div className="mt-3 overflow-hidden rounded-lg border border-border-light bg-surface"
