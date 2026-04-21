@@ -101,11 +101,12 @@ export default function HomePage() {
 
 function PostCard({ post }: { post: FeedPost }) {
   const navigate = useNavigate();
+  const setShowPostPreview = useAppStore((s) => s.setShowPostPreview);
   const u = getUser(post.authorId);
 
   return (
     <button
-      onClick={() => navigate(`/post/${post.id}`)}
+      onClick={() => setShowPostPreview(true, post.id)}
       className="mb-3 w-full rounded-lg border border-border-light bg-surface p-5 text-left transition-all hover:border-border hover:shadow-md hover:-translate-y-0.5"
     >
       <div className="mb-2.5 flex items-center gap-2">

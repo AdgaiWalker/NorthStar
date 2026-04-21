@@ -120,8 +120,6 @@ export default function ProfilePage() {
           >
             <div className="text-center"
             >
-              <div className="text-center"
-            >
               <div className="font-display text-xl font-bold text-sage"
               >{me.helped}</div>
               <div className="text-[11px] text-ink-muted"

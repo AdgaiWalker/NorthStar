@@ -15,6 +15,8 @@ interface AppState {
   // UI
   showSearch: boolean;
   showCreateMenu: boolean;
+  showPostPreview: boolean;
+  previewPostId: string | null;
 
   // Data
   bookmarks: Record<string, boolean>;
@@ -28,6 +30,7 @@ interface AppState {
   toggleBookmark: (id: string) => void;
   setShowSearch: (v: boolean) => void;
   setShowCreateMenu: (v: boolean) => void;
+  setShowPostPreview: (v: boolean, postId?: string | null) => void;
   addPost: (post: FeedPost) => void;
 }
 
@@ -41,6 +44,8 @@ export const useAppStore = create<AppState>()(
       userName: '张同学',
       showSearch: false,
       showCreateMenu: false,
+      showPostPreview: false,
+      previewPostId: null,
       bookmarks: {},
       userPosts: [],
 
@@ -54,6 +59,7 @@ export const useAppStore = create<AppState>()(
         })),
       setShowSearch: (v) => set({ showSearch: v }),
       setShowCreateMenu: (v) => set({ showCreateMenu: v }),
+      setShowPostPreview: (v, postId) => set({ showPostPreview: v, previewPostId: postId ?? null }),
       addPost: (post) =>
         set((state) => ({
           userPosts: [post, ...state.userPosts],

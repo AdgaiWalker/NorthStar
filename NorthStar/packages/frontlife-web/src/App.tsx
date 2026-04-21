@@ -10,6 +10,7 @@ import ProfilePage from './pages/ProfilePage';
 import WritePage from './pages/WritePage';
 import SearchOverlay from './components/SearchOverlay';
 import CreateMenuOverlay from './components/CreateMenuOverlay';
+import PostPreviewModal from './components/PostPreviewModal';
 import { useAppStore } from './store/useAppStore';
 
 function ScrollToTop() {
@@ -23,6 +24,7 @@ function ScrollToTop() {
 export default function App() {
   const showSearch = useAppStore((s) => s.showSearch);
   const showCreateMenu = useAppStore((s) => s.showCreateMenu);
+  const showPostPreview = useAppStore((s) => s.showPostPreview);
 
   return (
     <>
@@ -41,6 +43,7 @@ export default function App() {
       </PageLayout>
       {showSearch && <SearchOverlay />}
       {showCreateMenu && <CreateMenuOverlay />}
+      {showPostPreview && <PostPreviewModal />}
     </>
   );
 }
