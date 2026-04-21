@@ -137,7 +137,7 @@ export interface ContentItem {
   title: string;
   summary: string;
   coverImageUrl: string;
-  domain: Domain;
+  domain: Domain | CampusDomain;
   status: ContentStatus;
   visibility: ContentVisibility;
   schoolId?: string;
@@ -163,7 +163,7 @@ export interface ContentAsset {
 
 export interface FolderMeta {
   path: string;
-  domain?: Domain;
+  domain?: Domain | CampusDomain;
   sortIndex?: number;
   createdAt: string;
 }
