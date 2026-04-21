@@ -1,13 +1,13 @@
 # 盘根 · AI 指南针（PanGen AI Compass）
 
-> 一半生活，一半理想 — AI 时代的熵减器
+> 成为自己 — 校园站帮你站稳脚下，全球站帮你看见远方
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6-646cff.svg)](https://vitejs.dev/)
 
-双前端 + 单后端架构：**校园站**（xyzidea.cn，生活面）+ **全球站**（xyzidea.com，理想面），共享 `@ns/shared` 跨产品代码，各自独立构建。
+双前端 + 单后端架构：**校园站**（xyzidea.cn）+ **全球站**（xyzidea.com），共享 `@ns/shared` 跨产品代码，各自独立构建。
 
 ---
 
@@ -20,23 +20,23 @@
 | 校园 AI 顾问 | 校园站使用"校园生活顾问"角色，回答校园生活问题                   |
 | 工具展览     | 全球站精选工具沉浸式展示（com 站独有）                      |
 | 内容管理     | 管理后台支持文章/专题/工具/资讯的 CRUD + 审核 + 数据分析        |
-| 敏感词管控    | 输入拦截 + 输出过滤，敏感词库共享于 `@ns/shared`          |
+| 敏感词管控    | 输入拦截 + 输出过滤，敏感词库共享于 `@ns/shared`           |
 
 ---
 
 ## 技术栈
 
-| 层级    | 技术                   | 说明                            |
-| ----- | -------------------- | ----------------------------- |
-| 语言    | TypeScript 5.8       | strict mode                   |
-| 前端框架  | React 19             | Concurrent 特性                 |
-| 构建    | Vite 6               | 双站各自独立 Vite 实例                 |
-| 样式    | Tailwind CSS 3       | —                             |
-| 路由    | React Router v7      | —                             |
-| 状态管理  | Zustand 5            | localStorage 持久化（原型阶段）        |
-| AI 模型 | 智谱 GLM-4-Flash       | Vite proxy 转发，生产环境走后端网关       |
-| 后端    | Hono + Drizzle + Zod | 待建                           |
-| 包管理   | pnpm workspace       | monorepo                     |
+| 层级    | 技术                   | 说明                      |
+| ----- | -------------------- | ----------------------- |
+| 语言    | TypeScript 5.8       | strict mode             |
+| 前端框架  | React 19             | Concurrent 特性           |
+| 构建    | Vite 6               | 双站各自独立 Vite 实例          |
+| 样式    | Tailwind CSS 3       | —                       |
+| 路由    | React Router v7      | —                       |
+| 状态管理  | Zustand 5            | localStorage 持久化（原型阶段）  |
+| AI 模型 | 智谱 GLM-4-Flash       | Vite proxy 转发，生产环境走后端网关 |
+| 后端    | Hono + Drizzle + Zod | 待建                      |
+| 包管理   | pnpm workspace       | monorepo                |
 
 ---
 
@@ -98,12 +98,12 @@ NS/
 
 ## 文档索引
 
-| 文档                                                  | 说明                    |
-| --------------------------------------------------- | --------------------- |
-| [PRD v2.0](specs/PRD-盘根AI指南针-标准版.md)                | 产品需求文档，单一事实来源         |
-| [实现规格](specs/implementation/specs.md)               | 数据模型、API 契约、认证流程、部署配置 |
-| [项目宪法](.specify/memory/constitution.md)             | 开发决策的最高约束文件           |
-| [项目现状](STATUS.md)                                   | 全站内容、数据、开发进度总览     |
+| 文档                                      | 说明                    |
+| --------------------------------------- | --------------------- |
+| [PRD v2.0](specs/PRD-盘根AI指南针-标准版.md)    | 产品需求文档，单一事实来源         |
+| [实现规格](specs/implementation/specs.md)   | 数据模型、API 契约、认证流程、部署配置 |
+| [项目宪法](.specify/memory/constitution.md) | 开发决策的最高约束文件           |
+| [项目现状](STATUS.md)                       | 全站内容、数据、开发进度总览        |
 
 ---
 

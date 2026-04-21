@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ContentType, ExperienceTab, Article, ContentItem } from '@/types';
+import { ContentType, ExperienceTab, Article, ContentItem, Domain } from '@/types';
 import { MOCK_ARTICLES, MOCK_TOOLS, MOCK_TOPICS } from '@/constants';
 import { useAppStore } from '@/store/useAppStore';
 import { useContentStore } from '@/store/useContentStore';
@@ -41,7 +41,7 @@ export const HomePage: React.FC = () => {
       title: it.title,
       summary: it.summary,
       content: it.markdown,
-      domain: it.domain,
+      domain: it.domain as Domain,
       author: '站长',
       authorLevel: 'certified',
       date: new Date(it.publishedAt || it.updatedAt).toLocaleDateString(),

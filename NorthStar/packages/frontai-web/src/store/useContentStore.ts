@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ContentItem, ContentAsset, Domain, FolderMeta } from '@/types';
+import { ContentItem, ContentAsset, Domain, CampusDomain, FolderMeta } from '@/types';
 import { STORAGE_KEYS, storageGet, storageSet } from '@/utils/storage';
 import { isContentItemArray, isContentAssetArray, isFolderMetaArray } from '@/utils/guards';
 import { MOCK_ARTICLES } from '@/constants';
@@ -10,7 +10,7 @@ export interface TreeNode {
   path?: string;      // 文件夹路径
   contentId?: string; // 内容ID
   name: string;       // 显示名称
-  domain?: Domain;    // 领域
+  domain?: Domain | CampusDomain;    // 领域
   children: TreeNode[];
 }
 
@@ -22,7 +22,7 @@ interface ContentState {
   storageResetDetected: boolean;
 
   // 内容 Actions
-  createDraft: (opts?: { domain?: Domain; folder?: string }) => string;
+  createDraft: (opts?: { domain?: Domain | CampusDomain; folder?: string }) => string;
   updateDraft: (id: string, patch: Partial<ContentItem>) => void;
   publish: (id: string) => void;
   unpublish: (id: string) => void;
@@ -30,19 +30,19 @@ interface ContentState {
   upsertAsset: (asset: ContentAsset) => void;
 
   // 文件夹 Actions
-  createFolder: (path: string, domain?: Domain) => void;
-  updateFolder: (path: string, patch: { domain?: Domain }) => void;
+  createFolder: (path: string, domain?: Domain | CampusDomain) => void;
+  updateFolder: (path: string, patch: { domain?: Domain | CampusDomain }) => void;
   deleteFolder: (path: string) => void;
   setSelectedFolder: (path: string | null) => void;
   moveContent: (contentId: string, targetFolder: string | null) => void;
   updateSortIndex: (updates: { id: string; sortIndex: number }[]) => void;
 
   // Selectors
-  getPublishedArticlesByDomain: (domain: Domain) => ContentItem[];
+  getPublishedArticlesByDomain: (domain: Domain | CampusDomain) => ContentItem[];
   getArticleById: (id: string) => ContentItem | undefined;
   getContentsByFolder: (folder: string | null) => ContentItem[];
   getFolderTree: () => TreeNode[];
-  getInheritedDomain: (folder: string | null) => Domain | undefined;
+  getInheritedDomain: (folder: string | null) => Domain | CampusDomain | undefined;
 }
 
 const newId = () => `cnt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
@@ -274,7 +274,7 @@ export const useContentStore = create<ContentState>((set, get) => {
           type: 'folder',
           path: f.path,
           name,
-          domain: f.domain,
+          domain: f.domain as Domain | undefined,
           children: [],
         };
         folderMap.set(f.path, node);

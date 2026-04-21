@@ -1,6 +1,7 @@
 // 从 @ns/shared re-export 所有共享类型，保持现有 import 路径兼容
 export type {
   Domain,
+  CampusDomain,
   ExperienceTab,
   Topic,
   Tool,

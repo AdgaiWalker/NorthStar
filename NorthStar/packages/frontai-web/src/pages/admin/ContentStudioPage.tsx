@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Send, Archive, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Domain } from '@/types';
 import { useContentStore } from '@/store/useContentStore';
 import { PropertiesPanel } from '../../components/admin/PropertiesPanel';
 import { DocumentOutline } from '../../components/admin/DocumentOutline';
@@ -147,7 +148,7 @@ export const ContentStudioPage: React.FC = () => {
 
   // 获取继承的领域
   const inheritedDomain = currentItem?.folder
-    ? getInheritedDomain(currentItem.folder)
+    ? (getInheritedDomain(currentItem.folder) as Domain | undefined)
     : undefined;
 
   // 字数统计

@@ -1,8 +1,11 @@
-# 实现规格（Implementation Specs）
+# 实现规格（Implementation Specs）— 仅全球站适用
 
-> 本文档供 AI 代码生成使用。所有规格基于现有代码库结构编写。
+> ⚠️ **适用范围**：本文档仅适用于**全球站**（frontai-web）。
+> 校园站（frontlife-web）已采用全新产品模型（知识库→帖子+文章），
+> 其实现规格见 `specs/校园站重建方案.md` 和 `specs/PRD-盘根校园-v7.md`。
+> 本文档中涉及校园站的内容已过时，请勿参考。
+
 > 全球站前端：`NorthStar/packages/frontai-web/src/`
-> 校园站前端：`NorthStar/packages/frontlife-web/src/`
 > 共享包：`NorthStar/packages/shared/src/`
 > 后端代码路径：`NorthStar/packages/server/`（待建）
 
@@ -164,7 +167,7 @@ type Domain = 'creative' | 'dev' | 'work'
 | News | 信息流卡片 | 时间倒序，支持文字/图片/视频 |
 | Topic | 封面卡片 | 全高封面图 + 渐变遮罩 + 标题 + 描述 + 文章数 |
 
-### 1.2 校园站数据模型（cn 站，已有前端类型）
+### 1.2 校园站数据模型（⚠️ 已过时，见顶部警告）
 
 **CampusCategoryDef**（校园分类定义，数据层 8 分类 + 展示层 3 领域）
 
@@ -438,9 +441,9 @@ type Domain = 'creative' | 'dev' | 'work'
 | `@ns/shared` (sensitive.ts) | SensitiveCheckResult, checkSensitiveWords |
 | `frontai-web/src/types.ts` | Re-export @ns/shared + 本地 ViewState |
 | `frontai-web/src/types/review.ts` | ReviewTask, Reviewer, AuditLog, ReviewTaskStatus |
-| `frontlife-web/src/store.ts` | CampusState（校园站数据），类型从 @ns/shared 导入 |
-| `frontlife-web/src/constants.ts` | CampusCategoryDef, CampusDomain, DOMAIN_MAP |
-| `frontlife-web/src/services/aiService.ts` | CampusAISearchResult |
+| ~~`frontlife-web/src/store.ts`~~ | ⚠️ 已删除，校园站重建后不再适用 |
+| ~~`frontlife-web/src/constants.ts`~~ | ⚠️ 已删除，常量迁移至 @ns/shared |
+| ~~`frontlife-web/src/services/aiService.ts`~~ | ⚠️ 已删除，校园站将新建 AISearchService |
 | `frontai-web/src/store/useAppStore.ts` | AppState（主题、语言、登录态、选中工具、方案、收藏、认证） |
 | `frontai-web/src/store/useContentStore.ts` | ContentState（内容管理）、TreeNode |
 | `frontai-web/src/store/useReviewStore.ts` | ReviewState（审核流程） |
@@ -461,7 +464,10 @@ type Domain = 'creative' | 'dev' | 'work'
 
 **需要补充**：每个领域至少 5 个工具、3 个专题、10 篇文章、5 条资讯。
 
-### 4.2 校园站（cn）种子数据
+### 4.2 校园站（cn）种子数据（⚠️ 已过时）
+
+> 校园站种子数据已迁移至 `@ns/shared/frontlife-seed.ts`，重建时由 `seedMigrate.ts` 转换为新模型。
+> 以下为历史参考。
 
 当前已有种子数据（`frontlife-web/src/store.ts`）：
 
