@@ -1,6 +1,6 @@
 # 盘根校园站 — 研发方案
 
-> 版本：v1.0
+> 版本：v1.1
 > 日期：2026-04-22
 > 研发主导：Pieter Levels
 > 技术顾问：Adam Wathan（前端）、Kent C. Dodds（质量）
@@ -18,6 +18,15 @@
 - 数据驱动下一步，不靠猜
 - AI 写最小可用版本，跑通后再优化
 
+## 优先级定义
+
+| 标记 | 含义 | 触发条件 |
+|------|------|---------|
+| **P0** | 核心路径，不做产品跑不通 | 第一周必须完成 |
+| **P1** | 重要但非阻塞，影响体验质量 | 第二周完成 |
+| **P2** | 加分项，有数据再做 | 第三周或更晚 |
+| **P3** | 不在 MVP 范围 | MVP 后再考虑 |
+
 ---
 
 ## 技术栈（已定）
@@ -33,9 +42,7 @@
 
 ---
 
-## 三周计划
-
-### 第一周：核心路径跑通（mock 数据）
+## 第一周：核心路径跑通（mock 数据）
 
 **目标：** 一个人搜到一篇文章并点了"有帮助"
 
@@ -44,82 +51,115 @@
 学生打开 → 搜"食堂" → 看到"二食堂麻辣烫测评" → 点进去 → 读完 → 点"有帮助"
 ```
 
-#### 做
+### P0 — 核心路径（必须完成）
 
-| 任务 | 说明 |
-|------|------|
-| 首页搜索框 | 输入框 + 提交，跳转搜索结果页 |
-| 搜索结果页 | 仅本地匹配（mock 数据内搜索），搜不到显示"暂时没有内容，你可以来补充" |
-| 文章阅读页 | Markdown 正文渲染 + 底部"有帮助"按钮 |
-| Mock 数据 | 3-5 篇食堂相关文章（三周结束时扩展到 20-30 篇） |
+| # | 任务 | 涉及文件 | 说明 | 验收标准 |
+|---|------|---------|------|---------|
+| 1.1 | 首页搜索框 | `pages/HomePage.tsx` | 输入框 + 提交跳转搜索结果页。移除现有 Feed 流和 SpotlightBar 相关内容 | 输入"食堂"回车，跳转到搜索结果页 |
+| 1.2 | 搜索结果页 | `pages/SearchResultPage.tsx`（新建） | 在 mock 文章内做关键词匹配。匹配到显示文章卡片列表，未匹配显示"暂时没有内容，你可以来补充" | 搜"食堂"显示 ≥1 条结果；搜"不存在"显示空状态 |
+| 1.3 | 文章阅读页 | `pages/KBDetailPage.tsx`（改造） | 复用现有文章渲染逻辑（react-markdown + CodeBlock + Callout + ImageRenderer）。底部加"有帮助"按钮。点击后确认数 +1（前端 state 内） | 从搜索结果点进去，能看到完整文章内容，能点"有帮助" |
+| 1.4 | Mock 数据精简 | `data/mock.ts` | 现有 mock 有 8 个空间 + 6 篇文章 + 6 个帖子。精简到 3-5 个空间、每空间 1-2 篇文章（聚焦食堂场景），删掉不相关内容 | 搜"食堂"能命中，搜"吉他"也能命中（吉他作为非食堂场景验证） |
+| 1.5 | 路由清理 | `App.tsx` | 删掉 `/kb`（探索页）、`/post/create`（创作页）、`/write`（写作页）、`/post/:postId`（帖子详情）的路由。删掉 SearchOverlay、CreateMenuOverlay、PostPreviewModal 的条件渲染和 SpotlightBar | 应用启动无报错，只剩 3 条路由：`/`、`/kb/:kbId/:articleId`、`/profile` |
 
-#### 不做
+### P1 — 体验保障（尽量完成）
 
-推荐卡片、信息流、帖子系统、AI 回答、后端、空间页、个人页、桌面端、Store 拆分
+| # | 任务 | 涉及文件 | 说明 | 验收标准 |
+|---|------|---------|------|---------|
+| 1.6 | 移动端适配 | 搜索结果页 + 文章阅读页 | 搜索结果卡片、文章正文在 375px 宽度下正常显示。字号 ≥ 16px | iPhone SE 模拟器下无横向滚动、文字可读 |
+| 1.7 | 底部导航简化 | `components/layout/BottomNav.tsx` | 只保留 [首页] [探索(禁用)] [我的(禁用)]，探索和我的灰显不可点。PRD 说移动端底部 Tab 始终可见，但 MVP 只做首页 | 三个 Tab 可见，只有首页可点 |
+| 1.8 | 文章返回导航 | 搜索结果页 → 文章页 | 文章页顶栏有返回按钮，回到搜索结果页并保留搜索词 | 点返回回到搜索结果，搜索词还在 |
 
-#### 验证
+### P2 — 加分项
 
-找一个同学，让他用手机搜"食堂"。看他能不能走完全程（搜到→点进去→读完→点"有帮助"）。记录他卡在哪里。
+| # | 任务 | 涉及文件 | 说明 | 验收标准 |
+|---|------|---------|------|---------|
+| 1.9 | 搜索结果高亮 | `SearchResultPage.tsx` | 在搜索结果的标题和摘要中高亮匹配的关键词 | 搜"麻辣"，"麻辣"两字高亮 |
+| 1.10 | 搜索历史 | localStorage | 记录最近 5 条搜索，点击可重新搜索 | 搜索框聚焦时显示历史记录 |
+
+### 不做
+
+推荐卡片、信息流、帖子系统、AI 回答、后端、空间页、个人页、桌面端、Store 拆分、SpotlightBar
+
+### 周末验证
+
+找一个同学用手机打开（localhost 局域网或 ngrok），让他搜"食堂"。看他能不能走完全程。记录他卡在哪里。
 
 ---
 
-### 第二周：接后端 + 开 AI 回答
+## 第二周：接后端 + 开 AI 回答
 
 **目标：** 10 个人用，数据从数据库来，AI 能兜底
 
-#### 做
+### P0 — 后端可用
 
-| 任务 | 说明 |
-|------|------|
-| 后端骨架 | Hono 入口 + 5 个 API 端点（见下方） |
-| 逐个替换 mock | 空间列表 → 文章详情 → 帖子。用 `VITE_USE_MOCK=true` 切换，每次替换独立 |
-| 开启 AI 搜索兜底 | 搜不到时后端调智谱 AI 返回回答，标注"由 AI 生成" |
-| Store 拆分 | 单 store 拆为 useSearchStore / useSpaceStore / useUserStore |
-| 核心路径测试 | Vitest 端到端测试：搜索→文章→确认 |
-| 内容扩展 | 20 篇（团队手写 + `@ns/shared` 种子数据导入） |
+| # | 任务 | 涉及文件 | 说明 | 验收标准 |
+|---|------|---------|------|---------|
+| 2.1 | Server 初始化 | `server/package.json`、`server/tsconfig.json`、`server/src/index.ts`（均新建） | 安装 hono、drizzle-orm、dotenv、pg。创建 Hono 入口，监听端口 4000。配置 CORS 允许 localhost:3001 | `pnpm dev` 启动，`GET /api/health` 返回 200 |
+| 2.2 | Drizzle 配置 | `server/drizzle.config.ts`（新建） | 连接 PostgreSQL，指向现有 schema（`src/db/schema.ts`） | `npx drizzle-kit push` 能建表 |
+| 2.3 | 空间列表 API | `server/src/routes/spaces.ts`（新建） | `GET /api/spaces` 返回空间列表（含文章数、确认数） | curl 返回 JSON 数组 |
+| 2.4 | 文章详情 API | `server/src/routes/articles.ts`（新建） | `GET /api/articles/:id` 返回文章正文 + 元数据 | curl 返回完整文章 |
+| 2.5 | 前端 API 客户端 | `frontlife-web/src/services/api.ts`（新建） | 封装 fetch，baseURL 可配置（localhost:4000）。`VITE_USE_MOCK=true` 时跳过 API 调用 | 环境变量切换正常 |
+| 2.6 | Mock→API 替换：空间 | `SearchResultPage.tsx` | 搜索结果中的空间/文章数据从 API 获取，不再从 mock.ts 读 | `VITE_USE_MOCK=false` 时数据从后端来 |
+| 2.7 | Mock→API 替换：文章 | `KBDetailPage.tsx` | 文章详情从 API 获取。markdown 正文、元数据均从后端返回 | 同上 |
+| 2.8 | "有帮助"持久化 | `server/src/routes/articles.ts` | `POST /api/articles/:id/helpful`。前端点"有帮助"调 API，后端写入 feedbacks 表并更新确认数 | 点完刷新，确认数不变（已存库） |
 
-#### API 端点（第七次会议确定）
+### P1 — AI 兜底 + 质量
 
-```
-GET    /api/spaces          — 空间列表
-GET    /api/spaces/:id      — 空间详情 + 文章列表
-GET    /api/articles/:id    — 文章详情
-POST   /api/posts           — 发帖
-GET    /api/me/permissions  — 当前用户权限
-```
+| # | 任务 | 涉及文件 | 说明 | 验收标准 |
+|---|------|---------|------|---------|
+| 2.9 | AI 搜索路由 | `server/src/routes/ai.ts`（新建） | `POST /api/ai/search`。接收 query，后端组装 prompt + 上下文，调智谱 SSE 流式返回。返回内容标注"由 AI 生成" | 搜"三食堂几点关门"（无文章命中），AI 流式返回答案 |
+| 2.10 | 前端 AI 展示 | `SearchResultPage.tsx` | 搜索无结果时，调 AI 端点，流式显示回答。回答上方有 Sparkles 图标 + "由 AI 生成，仅供参考" | 无匹配时 AI 回答平滑出现 |
+| 2.11 | Store 拆分 | `store/useSearchStore.ts`、`useSpaceStore.ts`、`useUserStore.ts`（新建） | 从 useAppStore 提取：搜索状态→useSearchStore，空间/文章数据→useSpaceStore，用户信息→useUserStore。原 useAppStore 只留 UI 开关 | 现有功能不变，但三个 store 各自独立 |
+| 2.12 | 核心路径测试 | `tests/search-to-confirm.test.ts`（新建）、`vitest.config.ts`（新建） | Vitest 测试：渲染首页 → 输入搜索 → 查看结果 → 点进文章 → 点"有帮助"。验证全流程无报错 | `pnpm test` 通过 |
+| 2.13 | 种子数据入库 | `server/src/routes/seed.ts`（新建） | 将 `@ns/shared` 的 SEED_ARTICLES 和 mock.ts 中的文章写入数据库（一次性脚本） | 数据库中有 20 篇文章 |
+| 2.14 | Vite proxy 改后端 | `frontlife-web/vite.config.ts` | `/api` 代理到 localhost:4000，删掉智谱 AI 直连代理 | 前端 `/api/*` 请求到后端 |
 
-#### Mock 替换顺序
+### P2 — 加分项
 
-```
-空间列表（GET /api/spaces）
-  ↓ 跑通确认
-文章详情（GET /api/articles/:id）
-  ↓ 跑通确认
-帖子（POST /api/posts）
-```
+| # | 任务 | 涉及文件 | 说明 | 验收标准 |
+|---|------|---------|------|---------|
+| 2.15 | 发帖 API | `server/src/routes/posts.ts`（新建） | `POST /api/posts`。前端发帖存库 | 能发帖，刷新帖子还在 |
+| 2.16 | 权限 API | `server/src/routes/me.ts`（新建） | `GET /api/me/permissions`。返回 `{ canPost: true, canWrite: false, canCreateSpace: false }` | 前端根据权限显示/隐藏创作入口 |
 
-每次替换后验证功能正常。出问题回退到 mock（`VITE_USE_MOCK=true`）。
+### 周末验证
 
-#### 验证
-
-10 个同学试用。记录搜索 query 和点击行为。核心路径测试 CI 跑着。
+10 个同学试用。记录：每个人搜了什么、点开了哪篇文章、有没有点"有帮助"、有没有搜到无结果触发 AI。核心路径测试 CI 绿。
 
 ---
 
-### 第三周：数据驱动迭代
+## 第三周：数据驱动迭代
 
 **目标：** 有人第二次回来用
 
-#### 做
+第三周的任务取决于第二周收集的数据。以下是预设任务，按实际数据决定执行哪些。
 
-| 任务 | 触发条件 |
-|------|---------|
-| 补内容 | 第二周数据中高频无结果 query → 写对应文章 |
-| 调搜索 | 第二周数据中搜到了但没点击 → 改搜索匹配/展示 |
-| 加推荐卡片 | 有真实点击数据后，从"编辑精选"切换到基于数据的推荐 |
-| 修交互 | 第二周用户反馈的体验问题 |
+### P1 — 数据驱动
 
-#### 验证
+| # | 任务 | 触发条件 | 说明 |
+|---|------|---------|------|
+| 3.1 | 补内容 | 第二周高频无结果 query ≥ 3 个 | 针对高频 query 写文章，优先覆盖搜不到的领域 |
+| 3.2 | 调搜索排序 | 搜到了但没点击 > 50% | 改搜索匹配算法或卡片展示，可能需要加摘要片段 |
+| 3.3 | 加推荐卡片 | 有 ≥ 50 条点击数据 | 首页搜索框下方 4 张卡片，基于点击热度排序 |
+
+### P2 — 体验优化
+
+| # | 任务 | 触发条件 | 说明 |
+|---|------|---------|------|
+| 3.4 | 空间页 | 用户主动问"能不能看某个空间的所有文章" | 空间页：空间头 + 文章列表。从搜索结果或首页卡片进入 |
+| 3.5 | 桌面端基础适配 | 有用户在电脑上打开 | 搜索结果双栏、文章阅读页侧边目录。不追求三栏 |
+| 3.6 | 交互修复 | 用户反馈的体验问题 | 跟随反馈修。可能包括加载状态、错误提示、返回位置记忆等 |
+
+### P3 — MVP 后
+
+| # | 任务 | 说明 |
+|---|------|------|
+| 3.7 | 信息流（Feed） | 首页展示文章更新、帖子、变动提醒 |
+| 3.8 | 帖子系统 | 空间页底部输入框 + 帖子展示 |
+| 3.9 | 个人页 | 贡献数据、收藏、设置 |
+| 3.10 | 通知系统 | 认证邀请、内容反馈、变动提醒 |
+| 3.11 | 全球站对接 | 后端 AI 网关第二端点 `POST /api/ai/tools` |
+
+### 周末验证
 
 第二周试用过的同学中，有没有人第二次回来用。回来 = 方向对了。
 
@@ -145,52 +185,53 @@ GET    /api/me/permissions  — 当前用户权限
 
 - 核心路径写端到端测试（Vitest：搜索→文章→确认），CI 跑着
 - TypeScript 类型先于实现——给 Claude 的 prompt 里先附上类型定义，再让它写实现代码
-- Store 按领域拆分（第二周执行）
+- Store 按领域拆分（第二周 2.11 执行）
 - 后端权限 API 返回具体能力（canPost / canWrite / canCreateSpace），前端不查等级数字
 
 ---
 
-## 文件变更预估
+## 任务总览
 
-### 第一周
+```
+第一周（P0 5 项 + P1 3 项）
+  1.1 搜索框 ─────┐
+  1.2 搜索结果页 ──┼─→ 核心路径：搜到文章
+  1.3 文章阅读页 ──┤
+  1.4 Mock 精简 ───┘
+  1.5 路由清理
+  1.6 移动端适配 ──→ 体验保障
+  1.7 底部导航简化
+  1.8 返回导航
 
-| 文件 | 操作 |
-|------|------|
-| `frontlife-web/src/pages/HomePage.tsx` | 修改（搜索框） |
-| `frontlife-web/src/pages/SearchResultPage.tsx` | 新建 |
-| `frontlife-web/src/pages/ArticleReadPage.tsx` | 修改（阅读页 + 有帮助按钮） |
-| `frontlife-web/src/data/mock.ts` | 修改（精简到 3-5 篇） |
+第二周（P0 8 项 + P1 6 项）
+  2.1 Server 初始化 ┐
+  2.2 Drizzle 配置 ─┤
+  2.3 空间列表 API ─┼─→ 后端可用
+  2.4 文章详情 API ─┤
+  2.5 前端 API 层 ──┤
+  2.6 Mock→空间 ────┤
+  2.7 Mock→文章 ────┤
+  2.8 有帮助持久化 ─┘
+  2.9 AI 搜索路由 ──┐
+  2.10 AI 展示 ─────┼─→ AI 兜底
+  2.11 Store 拆分 ──┤
+  2.12 核心路径测试 ┤──→ 质量
+  2.13 种子数据入库 ┤
+  2.14 Vite proxy ──┘
 
-### 第二周
-
-| 文件 | 操作 |
-|------|------|
-| `server/src/index.ts` | 新建（Hono 入口） |
-| `server/src/routes/*.ts` | 新建（5 个路由文件） |
-| `server/drizzle.config.ts` | 新建 |
-| `server/package.json` | 修改（加依赖） |
-| `server/tsconfig.json` | 新建 |
-| `frontlife-web/src/services/api.ts` | 新建（薄 HTTP 客户端） |
-| `frontlife-web/src/store/useSearchStore.ts` | 新建 |
-| `frontlife-web/src/store/useSpaceStore.ts` | 新建 |
-| `frontlife-web/src/store/useUserStore.ts` | 新建 |
-| `frontlife-web/src/store/useAppStore.ts` | 修改（拆分后精简） |
-| `frontlife-web/vite.config.ts` | 修改（proxy 到后端） |
-| `frontlife-web/vitest.config.ts` | 新建 |
-| `frontlife-web/tests/search-to-confirm.test.ts` | 新建 |
-
-### 第三周
-
-视第二周数据决定，无法预估。
+第三周（P1 3 项 + P2 3 项）
+  数据驱动，按第二周数据决定
+```
 
 ---
 
 ## 与架构决策的关系
 
-| 来源 | 内容 | 本方案如何落实 |
-|------|------|--------------|
-| 第七次·后端先行 | 5 个 API 端点 | 第二周执行 |
-| 第七次·信任等级简化 | 前端只查权限 | 第二周 `GET /api/me/permissions` |
-| 第七次·AI 网关统一 | 后端代理 AI | 第二周后端 AI 路由 |
-| 第七次·内容层级限两层 | 文章最多嵌套一层 | 第一周文章页实现时遵循 |
-| 第七次·Mock 共存 | `VITE_USE_MOCK` 切换 | 第二周逐个替换时使用 |
+| 来源 | 内容 | 本方案落实 |
+|------|------|-----------|
+| 第七次·后端先行 | 5 个 API 端点 | 2.3 / 2.4 / 2.8 / 2.15 / 2.16 |
+| 第七次·信任等级简化 | 前端只查权限 | 2.16 |
+| 第七次·AI 网关统一 | 后端代理 AI | 2.9 |
+| 第七次·内容层级限两层 | 文章最多嵌套一层 | 1.3 实现时遵循 |
+| 第七次·Mock 共存 | `VITE_USE_MOCK` 切换 | 2.5 / 2.6 / 2.7 |
+| 第七次·搜索日志预留 | 简单四字段，DAU>100 扩展 | 后端搜索路由预留 hook |
