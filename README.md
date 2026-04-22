@@ -1,69 +1,45 @@
-# 盘根 · AI 指南针（PanGen AI Compass）
+# 盘根（PanGen）
 
-> 成为自己 — 校园站帮你站稳脚下，全球站帮你看见远方
+> 一半生活，一半理想。校园站帮你站稳脚下，全球站帮你看见远方。
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6-646cff.svg)](https://vitejs.dev/)
 
-双前端 + 单后端架构：**校园站**（xyzidea.cn）+ **全球站**（xyzidea.com），共享 `@ns/shared` 跨产品代码，各自独立构建。
-
----
-
-## 功能亮点
-
-| 功能       | 说明                                         |
-| -------- | ------------------------------------------ |
-| AI 智能搜索  | 智谱 GLM-4-Flash，输入问题返回摘要 + 推荐工具 + 推荐文章      |
-| 方案生成     | 选工具 → 描述目标 → AI 生成操作步骤 → 保存/导出（md/txt/csv） |
-| 校园 AI 顾问 | 校园站使用"校园生活顾问"角色，回答校园生活问题                   |
-| 工具展览     | 全球站精选工具沉浸式展示（com 站独有）                      |
-| 内容管理     | 管理后台支持文章/专题/工具/资讯的 CRUD + 审核 + 数据分析        |
-| 敏感词管控    | 输入拦截 + 输出过滤，敏感词库共享于 `@ns/shared`           |
+双前端 + 单后端：**校园站**（xyzidea.cn）+ **全球站**（xyzidea.com），共享 `@ns/shared`，各自独立构建。
 
 ---
 
 ## 技术栈
 
-| 层级    | 技术                       | 说明                      |
-| ----- | ------------------------ | ----------------------- |
-| 语言    | TypeScript               | 全栈统一，strict mode       |
-| 前端    | React + Tailwind CSS     | 双站各自独立构建              |
-| 后端    | Node.js + PostgreSQL     | 待建                      |
-| 包管理   | pnpm workspace           | monorepo                |
+| 层级 | 技术 | 说明 |
+|------|------|------|
+| 前端 | React 19 + Tailwind CSS 3 + Zustand 5 | 双站独立构建 |
+| 后端 | Hono + Drizzle ORM + PostgreSQL | 待建（schema 已就绪） |
+| AI | 智谱 GLM-4-Flash | 后端代理，前端不持有 key |
+| 开发 | Claude Code（AI 辅助） | |
+| 测试 | Vitest | |
+| 包管理 | pnpm workspace | monorepo |
 
 ---
 
 ## 快速开始
 
-### 前置条件
-
-- Node.js >= 18
-- pnpm >= 9
-
-### 安装
-
 ```bash
 cd NorthStar && pnpm install
-```
-
-### 开发
-
-```bash
-# 全球站
-cd NorthStar/packages/frontai-web && pnpm dev     # http://localhost:3000
 
 # 校园站
 cd NorthStar/packages/frontlife-web && pnpm dev   # http://localhost:3001
+
+# 全球站
+cd NorthStar/packages/frontai-web && pnpm dev     # http://localhost:3000
 ```
 
-### 配置 AI（可选）
-
-本地演示模式下 AI 功能对游客开放。在 workspace 根目录创建共享配置：
+### AI 本地配置
 
 ```bash
-echo '{"api_key": "your-key", "base_url": "https://open.bigmodel.cn"}' > NorthStar/.zhipu.local.json
+echo '{"api_key":"your-key","base_url":"https://open.bigmodel.cn"}' > NorthStar/.zhipu.local.json
 ```
 
 ---
@@ -72,42 +48,49 @@ echo '{"api_key": "your-key", "base_url": "https://open.bigmodel.cn"}' > NorthSt
 
 ```
 NS/
-├── CLAUDE.md                    # AI 开发指南
-├── specs/                       # 规格文档
-│   ├── MISSION.md               # 使命文档
-│   ├── PRD-盘根校园-v8.md        # 校园站 PRD
-│   ├── PRD-盘根AI指南针-标准版.md  # 全球站 PRD
-│   └── implementation/specs.md  # 全球站实现规格
+├── CLAUDE.md                        # AI 开发指南（权威）
+├── specs/                           # 规格文档
+│   ├── MISSION.md                   # 使命
+│   ├── PRD-盘根校园-v9.md            # 校园站 PRD（v9.0）
+│   ├── PRD-盘根AI指南针-标准版.md     # 全球站 PRD
+│   ├── dev-plan.md                  # 研发方案（五层 58 项任务）
+│   ├── implementation/specs.md      # 全球站实现规格
+│   └── meetings/                    # 产品委员会会议纪要
 │
-└── NorthStar/                   # 所有代码
+└── NorthStar/                       # 所有代码
     ├── pnpm-workspace.yaml
-    ├── tsconfig.base.json
     └── packages/
-        ├── shared/              # @ns/shared — 跨产品共享（纯 TS）
-        ├── frontai-web/         # 全球站（xyzidea.com）→ localhost:3000
-        ├── frontlife-web/       # 校园站（xyzidea.cn）→ localhost:3001
-        └── server/              # @ns/server — 后端（待建）
+        ├── shared/                  # @ns/shared — 纯 TS 共享包
+        ├── frontlife-web/           # 校园站 → localhost:3001
+        ├── frontai-web/             # 全球站 → localhost:3000
+        └── server/                  # @ns/server — 后端（schema 已就绪，路由待建）
 ```
 
 ---
 
 ## 文档索引
 
-| 文档                                      | 说明                    |
-| --------------------------------------- | --------------------- |
-| [使命文档](specs/MISSION.md)               | 使命和方向，两份 PRD 的上层约束    |
-| [校园站 PRD v8](specs/PRD-盘根校园-v8.md)     | 校园站产品需求文档             |
-| [全球站 PRD v2.0](specs/PRD-盘根AI指南针-标准版.md) | 全球站产品需求文档             |
-| [实现规格](specs/implementation/specs.md)   | 全球站数据模型、API 契约、认证流程   |
-| [项目宪法](.specify/memory/constitution.md) | 开发决策的最高约束文件           |
+| 文档 | 说明 |
+|------|------|
+| [宪法](.specify/memory/constitution.md) | 最高约束（五条公理） |
+| [使命](specs/MISSION.md) | 使命和方向 |
+| [校园站 PRD v9](specs/PRD-盘根校园-v9.md) | 校园站完整产品需求 |
+| [全球站 PRD](specs/PRD-盘根AI指南针-标准版.md) | 全球站产品需求 |
+| [研发方案](specs/dev-plan.md) | 五层递进，58 项任务，6-8 周排期 |
+| [全球站实现规格](specs/implementation/specs.md) | 数据模型、API 契约、认证流程 |
+| [第七次会议](specs/meetings/meeting-07-architecture.md) | 架构设计（Evan You 主导） |
+| [第八次会议](specs/meetings/meeting-08-dev-plan.md) | 研发方案（Pieter Levels 主导） |
+
+文档层级：**宪法 → 使命 → PRD → 实现规格**。冲突时以上层为准。
 
 ---
 
-## 安全说明
+## 安全
 
-- 本项目仅用于本地开发/演示
-- 生产部署**必须**由后端网关持有并转发 API Key
-- `.zhipu.local.json`（workspace 根目录共享）、`.env.*.local` 已在 `.gitignore`，勿提交密钥
+- 生产部署必须由后端网关持有并转发 API Key
+- `.zhipu.local.json`、`.env.*.local` 已在 `.gitignore`，勿提交密钥
+- cn 用户数据不流向海外；com 站禁止收集中国敏感个人信息
+- 两站账号体系完全独立
 
 ---
 

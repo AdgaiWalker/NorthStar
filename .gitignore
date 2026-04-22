@@ -6,3 +6,7 @@ dist/
 *.log
 .vscode/
 .playwright-mcp/
+.omx/
+*.heapsnapshot
+.claude/plans/
+.agents/
