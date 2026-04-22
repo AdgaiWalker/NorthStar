@@ -13,20 +13,27 @@ export function useInfiniteFeed<T>(options: UseInfiniteFeedOptions<T>) {
   const [hasMore, setHasMore] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
   const loaderRef = useRef<HTMLDivElement | null>(null);
+  const fetchingRef = useRef(false);
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(true);
 
   const loadMore = useCallback(async () => {
-    if (loading || !hasMore) return;
+    if (fetchingRef.current || !hasMoreRef.current) return;
+    fetchingRef.current = true;
     setLoading(true);
     try {
-      const result = await fetchData(page);
+      const result = await fetchData(pageRef.current);
       setItems((prev) => [...prev, ...result.items]);
+      hasMoreRef.current = result.hasMore;
       setHasMore(result.hasMore);
+      pageRef.current += 1;
       setPage((p) => p + 1);
     } finally {
+      fetchingRef.current = false;
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [fetchData, page, loading, hasMore]);
+  }, [fetchData]);
 
   useEffect(() => {
     loadMore();

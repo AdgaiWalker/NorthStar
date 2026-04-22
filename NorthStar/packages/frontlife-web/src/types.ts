@@ -50,7 +50,7 @@ export type FeedItem =
 
 export interface KnowledgeBase {
   id: string;
-  icon: string;
+  iconName: string;
   name: string;
   desc: string;
   authorId: string;

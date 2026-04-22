@@ -9,26 +9,28 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, '');
 
-  const readAiJson = (): { apiKey: string; baseUrl: string; model: string } => {
+  const readZhipuJson = (): { apiKey: string; baseUrl: string; model: string } => {
+    const candidates = [
+      path.resolve(__dirname, '../../.zhipu.local.json'), // workspace 根目录（共享）
+      path.resolve(__dirname, '.zhipu.local.json'),        // 本地覆盖
+    ];
     try {
-      const p = path.resolve(__dirname, '.ai.local.json');
-      if (!fs.existsSync(p)) return { apiKey: '', baseUrl: '', model: '' };
-
-      const raw = fs.readFileSync(p, 'utf8').replace(/^﻿/, '');
-      const json = JSON.parse(raw) as {
-        api_key?: unknown;
-        base_url?: unknown;
-        model?: unknown;
-      };
-
-      return {
-        apiKey: typeof json.api_key === 'string' ? json.api_key : '',
-        baseUrl: typeof json.base_url === 'string' ? json.base_url : '',
-        model: typeof json.model === 'string' ? json.model : '',
-      };
-    } catch {
-      return { apiKey: '', baseUrl: '', model: '' };
-    }
+      for (const p of candidates) {
+        if (!fs.existsSync(p)) continue;
+        const raw = fs.readFileSync(p, 'utf8').replace(/^﻿/, '');
+        const json = JSON.parse(raw) as {
+          api_key?: unknown;
+          base_url?: unknown;
+          model?: unknown;
+        };
+        return {
+          apiKey: typeof json.api_key === 'string' ? json.api_key : '',
+          baseUrl: typeof json.base_url === 'string' ? json.base_url : '',
+          model: typeof json.model === 'string' ? json.model : '',
+        };
+      }
+    } catch { /* fall through */ }
+    return { apiKey: '', baseUrl: '', model: '' };
   };
 
   const readEnvLocal = (key: string): string => {
@@ -54,14 +56,14 @@ export default defineConfig(({ mode }) => {
     }
   };
 
-  const aiJson = readAiJson();
+  const zhipuJson = readZhipuJson();
 
   const aiBaseUrl =
     env.AI_BASE_URL ||
     env.VITE_AI_BASE_URL ||
     (env as any)['﻿AI_BASE_URL'] ||
     readEnvLocal('AI_BASE_URL') ||
-    aiJson.baseUrl ||
+    zhipuJson.baseUrl ||
     '';
 
   const aiApiKey =
@@ -69,15 +71,15 @@ export default defineConfig(({ mode }) => {
     env.VITE_AI_API_KEY ||
     (env as any)['﻿AI_API_KEY'] ||
     readEnvLocal('AI_API_KEY') ||
-    aiJson.apiKey ||
+    zhipuJson.apiKey ||
     '';
 
   console.log('[ai-proxy]', {
     mode,
     baseUrl: aiBaseUrl || '(未配置)',
     hasKey: Boolean(aiApiKey),
-    hasJson: Boolean(aiJson.apiKey) || Boolean(aiJson.baseUrl),
-    jsonHasModel: Boolean(aiJson.model),
+    hasJson: Boolean(zhipuJson.apiKey) || Boolean(zhipuJson.baseUrl),
+    jsonHasModel: Boolean(zhipuJson.model),
   });
 
   const proxyConfig: Record<string, any> = {};

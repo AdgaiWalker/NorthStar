@@ -58,7 +58,7 @@ ${articleContext}
       },
     ];
  
-    const response = await fetch(API_ENDPOINTS.ZHIPU_CHAT, {
+    const response = await fetch(API_ENDPOINTS.AI_CHAT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -205,7 +205,7 @@ ${toolContext}
       },
     ];
 
-    const response = await fetch(API_ENDPOINTS.ZHIPU_CHAT, {
+    const response = await fetch(API_ENDPOINTS.AI_CHAT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

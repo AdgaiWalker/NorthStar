@@ -20,6 +20,7 @@ import { generateSummary } from '@/services/AIService';
 import CodeBlock from '@/components/CodeBlock';
 import ImageRenderer from '@/components/ImageRenderer';
 import Callout, { extractCalloutFromBlockquote } from '@/components/Callout';
+import KBIcon from '@/components/KBIcon';
 
 export default function KBDetailPage() {
   const { kbId, articleId } = useParams<{ kbId: string; articleId?: string }>();
@@ -48,9 +49,7 @@ export default function KBDetailPage() {
   }, [articleId]);
 
   // Extract headings for TOC
-  const headings = article
-    ? extractHeadings(article.content)
-    : [];
+  const headings = article ? extractHeadings(article.content) : [];
 
   const currentIdx = kb?.articles.indexOf(currentArticleId!) ?? -1;
   const prevArticle = currentIdx > 0 ? kb!.articles[currentIdx - 1] : null;
@@ -106,7 +105,7 @@ export default function KBDetailPage() {
       {/* Left Sidebar - Article Tree */}
       <aside className="sticky top-nav-h hidden h-[calc(100vh-var(--nav-h))] w-[240px] shrink-0 overflow-y-auto border-r border-border-light bg-bg-subtle lg:block">
         <div className="border-b border-border-light px-4 pb-4 pt-5">
-          <div className="mb-1.5 text-2xl">{kb.icon}</div>
+          <div className="mb-1.5"><KBIcon iconName={kb.iconName} size={24} withBg /></div>
           <div className="font-display text-[17px] font-bold leading-snug text-ink">
             {kb.name}
           </div>
@@ -405,6 +404,15 @@ export default function KBDetailPage() {
       </>
     )}
 
+    {activeTab === 'articles' && !article && (
+      <div className="py-20 text-center text-ink-muted">
+        <p className="text-sm">该文章不存在或已被移除</p>
+        {kb.articles.length > 0 && (
+          <p className="mt-2 text-xs">请从左侧目录选择其他文章</p>
+        )}
+      </div>
+    )}
+
     {activeTab === 'discussions' && (
       <div className="space-y-4">
         {kbPosts.length === 0 && (
@@ -466,11 +474,18 @@ export default function KBDetailPage() {
 function extractHeadings(content: string): { id: string; text: string }[] {
   const lines = content.split('\n');
   const headings: { id: string; text: string }[] = [];
+  const seen = new Map<string, number>();
   lines.forEach((line) => {
     const match = line.match(/^##\s+(.+)$/);
     if (match) {
       const text = match[1];
-      headings.push({ id: slugify(text), text });
+      let id = slugify(text);
+      const count = seen.get(id) || 0;
+      if (count > 0) {
+        id = `${id}-${count}`;
+      }
+      seen.set(slugify(text), count + 1);
+      headings.push({ id, text });
     }
   });
   return headings;

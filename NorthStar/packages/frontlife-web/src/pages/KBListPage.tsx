@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, BookOpen, Star } from 'lucide-react';
 import { KNOWLEDGE_BASES, getUser } from '@/data/mock';
+import KBSheet from '@/components/KBSheet';
+import KBIcon from '@/components/KBIcon';
 
 const sectionOrder = ['热门', '商业', '最新'];
 
 export default function KBListPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
+  const [activeKbId, setActiveKbId] = useState<string | null>(null);
 
   const allKBs = Object.values(KNOWLEDGE_BASES);
   const filteredKBs = query.trim()
@@ -67,10 +70,12 @@ export default function KBListPage() {
                   {sections[sec].map((kb) => (
                     <button
                       key={kb.id}
-                      onClick={() => navigate(`/kb/${kb.id}`)}
+                      onClick={() => setActiveKbId(kb.id)}
                       className="relative overflow-hidden rounded-lg border border-border-light bg-surface p-5 text-left transition-all hover:border-border hover:shadow-md hover:-translate-y-0.5"
                     >
-                      <div className="mb-2.5 text-[28px]">{kb.icon}</div>
+                      <div className="mb-2.5">
+                        <KBIcon iconName={kb.iconName} size={28} withBg />
+                      </div>
                       <div className="font-display text-base font-bold text-ink">
                         {kb.name}
                       </div>
@@ -95,6 +100,11 @@ export default function KBListPage() {
             )
         )}
       </div>
+
+      {/* KB Sheet Overlay */}
+      {activeKbId && (
+        <KBSheet kbId={activeKbId} onClose={() => setActiveKbId(null)} />
+      )}
     </div>
   );
 }

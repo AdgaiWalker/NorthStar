@@ -26,17 +26,12 @@
 
 ## 技术栈
 
-| 层级    | 技术                   | 说明                      |
-| ----- | -------------------- | ----------------------- |
-| 语言    | TypeScript 5.8       | strict mode             |
-| 前端框架  | React 19             | Concurrent 特性           |
-| 构建    | Vite 6               | 双站各自独立 Vite 实例          |
-| 样式    | Tailwind CSS 3       | —                       |
-| 路由    | React Router v7      | —                       |
-| 状态管理  | Zustand 5            | localStorage 持久化（原型阶段）  |
-| AI 模型 | 智谱 GLM-4-Flash       | Vite proxy 转发，生产环境走后端网关 |
-| 后端    | Hono + Drizzle + Zod | 待建                      |
-| 包管理   | pnpm workspace       | monorepo                |
+| 层级    | 技术                       | 说明                      |
+| ----- | ------------------------ | ----------------------- |
+| 语言    | TypeScript               | 全栈统一，strict mode       |
+| 前端    | React + Tailwind CSS     | 双站各自独立构建              |
+| 后端    | Node.js + PostgreSQL     | 待建                      |
+| 包管理   | pnpm workspace           | monorepo                |
 
 ---
 
@@ -59,17 +54,16 @@ cd NorthStar && pnpm install
 # 全球站
 cd NorthStar/packages/frontai-web && pnpm dev     # http://localhost:3000
 
-# 校园站（待重建）
-# cd NorthStar/packages/frontlife-web && pnpm dev  # http://localhost:3001
+# 校园站
+cd NorthStar/packages/frontlife-web && pnpm dev   # http://localhost:3001
 ```
 
 ### 配置 AI（可选）
 
-本地演示模式下 AI 功能对游客开放。在对应 web 包目录下创建：
+本地演示模式下 AI 功能对游客开放。在 workspace 根目录创建共享配置：
 
 ```bash
-# frontai-web/.zhipu.local.json
-echo '{"api_key": "your-key", "base_url": "https://open.bigmodel.cn"}' > NorthStar/packages/frontai-web/.zhipu.local.json
+echo '{"api_key": "your-key", "base_url": "https://open.bigmodel.cn"}' > NorthStar/.zhipu.local.json
 ```
 
 ---
@@ -80,9 +74,10 @@ echo '{"api_key": "your-key", "base_url": "https://open.bigmodel.cn"}' > NorthSt
 NS/
 ├── CLAUDE.md                    # AI 开发指南
 ├── specs/                       # 规格文档
-│   ├── PRD-盘根AI指南针-标准版.md
-│   ├── implementation/specs.md
-│   └── ui-prompts.md
+│   ├── MISSION.md               # 使命文档
+│   ├── PRD-盘根校园-v8.md        # 校园站 PRD
+│   ├── PRD-盘根AI指南针-标准版.md  # 全球站 PRD
+│   └── implementation/specs.md  # 全球站实现规格
 │
 └── NorthStar/                   # 所有代码
     ├── pnpm-workspace.yaml
@@ -90,7 +85,7 @@ NS/
     └── packages/
         ├── shared/              # @ns/shared — 跨产品共享（纯 TS）
         ├── frontai-web/         # 全球站（xyzidea.com）→ localhost:3000
-        ├── frontlife-web/       # 校园站（xyzidea.cn）→ localhost:3001（待重建）
+        ├── frontlife-web/       # 校园站（xyzidea.cn）→ localhost:3001
         └── server/              # @ns/server — 后端（待建）
 ```
 
@@ -100,10 +95,11 @@ NS/
 
 | 文档                                      | 说明                    |
 | --------------------------------------- | --------------------- |
-| [PRD v2.0](specs/PRD-盘根AI指南针-标准版.md)    | 产品需求文档，单一事实来源         |
-| [实现规格](specs/implementation/specs.md)   | 数据模型、API 契约、认证流程、部署配置 |
+| [使命文档](specs/MISSION.md)               | 使命和方向，两份 PRD 的上层约束    |
+| [校园站 PRD v8](specs/PRD-盘根校园-v8.md)     | 校园站产品需求文档             |
+| [全球站 PRD v2.0](specs/PRD-盘根AI指南针-标准版.md) | 全球站产品需求文档             |
+| [实现规格](specs/implementation/specs.md)   | 全球站数据模型、API 契约、认证流程   |
 | [项目宪法](.specify/memory/constitution.md) | 开发决策的最高约束文件           |
-| [项目现状](STATUS.md)                       | 全站内容、数据、开发进度总览        |
 
 ---
 
@@ -111,7 +107,7 @@ NS/
 
 - 本项目仅用于本地开发/演示
 - 生产部署**必须**由后端网关持有并转发 API Key
-- `.zhipu.local.json`、`.env.*.local` 已在 `.gitignore`，勿提交密钥
+- `.zhipu.local.json`（workspace 根目录共享）、`.env.*.local` 已在 `.gitignore`，勿提交密钥
 
 ---
 

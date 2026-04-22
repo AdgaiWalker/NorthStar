@@ -10,7 +10,7 @@
 | 最后更新 | 2026-04-12                  |
 | 产品阶段 | 原型演示期（前端可运行，数据为 mock，后端未搭建） |
 
-> **配套文档**：宪法（`.specify/memory/constitution.md`）管"不能做什么"和双站关系；校园站 PRD 见 `specs/PRD-盘根校园-v7.md`。
+> **配套文档**：宪法（`.specify/memory/constitution.md`）管"不能做什么"和双站关系；使命（`specs/MISSION.md`）管"要做什么"；校园站 PRD 见 `specs/PRD-盘根校园-v8.md`。
 
 ---
 
@@ -87,7 +87,7 @@
 
 ### 校园内容领域（cn 站）
 
-> 校园站已有独立 PRD（`specs/PRD-盘根校园-v7.md`），此处不再描述。
+> 校园站已有独立 PRD（`specs/PRD-盘根校园-v8.md`），此处不再描述。
 
 ### 后台（管理端）
 

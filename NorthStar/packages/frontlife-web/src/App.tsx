@@ -11,6 +11,7 @@ import WritePage from './pages/WritePage';
 import SearchOverlay from './components/SearchOverlay';
 import CreateMenuOverlay from './components/CreateMenuOverlay';
 import PostPreviewModal from './components/PostPreviewModal';
+import SpotlightBar from './components/SpotlightBar';
 import { useAppStore } from './store/useAppStore';
 
 function ScrollToTop() {
@@ -44,6 +45,7 @@ export default function App() {
       {showSearch && <SearchOverlay />}
       {showCreateMenu && <CreateMenuOverlay />}
       {showPostPreview && <PostPreviewModal />}
+      <SpotlightBar />
     </>
   );
 }

@@ -10,32 +10,34 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, '');
 
   const readZhipuJson = (): { apiKey: string; baseUrl: string; model: string } => {
+    const candidates = [
+      path.resolve(__dirname, '../../.zhipu.local.json'), // workspace 根目录（共享）
+      path.resolve(__dirname, '.zhipu.local.json'),        // 本地覆盖
+    ];
     try {
-      const p = path.resolve(__dirname, '.zhipu.local.json');
-      if (!fs.existsSync(p)) return { apiKey: '', baseUrl: '', model: '' };
-
-      const raw = fs.readFileSync(p, 'utf8').replace(/^\ufeff/, '');
-      const json = JSON.parse(raw) as {
-        api_key?: unknown;
-        base_url?: unknown;
-        model?: unknown;
-      };
-
-      return {
-        apiKey: typeof json.api_key === 'string' ? json.api_key : '',
-        baseUrl: typeof json.base_url === 'string' ? json.base_url : '',
-        model: typeof json.model === 'string' ? json.model : '',
-      };
-    } catch {
-      return { apiKey: '', baseUrl: '', model: '' };
-    }
+      for (const p of candidates) {
+        if (!fs.existsSync(p)) continue;
+        const raw = fs.readFileSync(p, 'utf8').replace(/^﻿/, '');
+        const json = JSON.parse(raw) as {
+          api_key?: unknown;
+          base_url?: unknown;
+          model?: unknown;
+        };
+        return {
+          apiKey: typeof json.api_key === 'string' ? json.api_key : '',
+          baseUrl: typeof json.base_url === 'string' ? json.base_url : '',
+          model: typeof json.model === 'string' ? json.model : '',
+        };
+      }
+    } catch { /* fall through */ }
+    return { apiKey: '', baseUrl: '', model: '' };
   };
 
   const readEnvLocal = (key: string): string => {
     try {
       const p = path.resolve(__dirname, `.env.${mode}.local`);
       if (!fs.existsSync(p)) return '';
-      const raw = fs.readFileSync(p, 'utf8').replace(/^\ufeff/, '');
+      const raw = fs.readFileSync(p, 'utf8').replace(/^﻿/, '');
 
       for (const line of raw.split(/\r?\n/)) {
         const trimmed = line.trim();
@@ -56,59 +58,61 @@ export default defineConfig(({ mode }) => {
 
   const zhipuJson = readZhipuJson();
 
-  const zhipuBaseUrl =
-    env.ZHIPU_BASE_URL ||
-    env.VITE_ZHIPU_BASE_URL ||
-    (env as any)['\ufeffZHIPU_BASE_URL'] ||
-    readEnvLocal('ZHIPU_BASE_URL') ||
+  const aiBaseUrl =
+    env.AI_BASE_URL ||
+    env.VITE_AI_BASE_URL ||
+    (env as any)['﻿AI_BASE_URL'] ||
+    readEnvLocal('AI_BASE_URL') ||
     zhipuJson.baseUrl ||
-    'https://open.bigmodel.cn/api/coding/paas/v4';
-  const zhipuApiKey =
-    env.ZHIPU_API_KEY ||
-    env.VITE_ZHIPU_API_KEY ||
-    (env as any)['\ufeffZHIPU_API_KEY'] ||
-    readEnvLocal('ZHIPU_API_KEY') ||
+    '';
+
+  const aiApiKey =
+    env.AI_API_KEY ||
+    env.VITE_AI_API_KEY ||
+    (env as any)['﻿AI_API_KEY'] ||
+    readEnvLocal('AI_API_KEY') ||
     zhipuJson.apiKey ||
     '';
 
-  console.log('[zhipu-proxy]', {
+  console.log('[ai-proxy]', {
     mode,
-    baseUrl: zhipuBaseUrl,
-    hasKey: Boolean(zhipuApiKey),
+    baseUrl: aiBaseUrl || '(未配置)',
+    hasKey: Boolean(aiApiKey),
     hasJson: Boolean(zhipuJson.apiKey) || Boolean(zhipuJson.baseUrl),
     jsonHasModel: Boolean(zhipuJson.model),
-    loadedKeys: Object.keys(env).filter((k) => k.includes('ZHIPU') || k.includes('GLM')),
   });
+
+  const proxyConfig: Record<string, any> = {};
+
+  if (aiBaseUrl) {
+    proxyConfig['/__ai'] = {
+      target: aiBaseUrl,
+      changeOrigin: true,
+      rewrite: (p: string) => p.replace(/^\/__ai/, ''),
+      headers: aiApiKey
+        ? {
+            Authorization: `Bearer ${aiApiKey}`,
+          }
+        : {},
+    };
+  }
 
   return {
     envDir: __dirname,
     server: {
       port: 3000,
       host: '0.0.0.0',
-      proxy: {
-        '/__zhipu': {
-          target: zhipuBaseUrl,
-          changeOrigin: true,
-          rewrite: (p) => p.replace(/^\/__zhipu/, ''),
-          headers: zhipuApiKey
-            ? {
-                Authorization: `Bearer ${zhipuApiKey}`,
-              }
-            : {},
-        },
-      },
+      proxy: proxyConfig,
     },
     plugins: [react()],
     resolve: {
-      // pnpm + peerDependencies 可能导致 React 被解析为多个实例，触发 Invalid hook call。
-      // 这里强制去重，确保所有依赖引用同一份 react/react-dom。
       dedupe: ['react', 'react-dom'],
       alias: {
         '@': path.resolve(__dirname, 'src'),
       },
     },
     build: {
-      minify: false, // 避免 Windows/Node 25 下 esbuild 压缩异常
+      minify: false,
       rollupOptions: {
         input: path.resolve(__dirname, 'index.html'),
       },

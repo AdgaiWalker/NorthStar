@@ -1,5 +1,4 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -12,7 +11,6 @@ const tabs = [
 export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
-  const setShowSearch = useAppStore((s) => s.setShowSearch);
   const userName = useAppStore((s) => s.userName);
 
   const currentRoute =
@@ -54,12 +52,6 @@ export default function Header() {
 
       {/* Right */}
       <div className="flex items-center gap-2.5">
-        <button
-          onClick={() => setShowSearch(true)}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-bg-subtle hover:text-ink md:hidden"
-        >
-          <Search size={18} />
-        </button>
         <div
           onClick={() => navigate('/profile')}
           className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-xs font-semibold text-white"

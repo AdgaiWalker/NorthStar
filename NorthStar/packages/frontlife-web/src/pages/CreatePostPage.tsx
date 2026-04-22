@@ -186,7 +186,7 @@ export default function CreatePostPage() {
           >
             {Object.values(KNOWLEDGE_BASES).map((kb) => (
               <option key={kb.id} value={kb.id}>
-                {kb.icon} {kb.name}
+                {kb.name}
               </option>
             ))}
           </select>

@@ -1,8 +1,7 @@
 # 实现规格（Implementation Specs）— 仅全球站适用
 
 > ⚠️ **适用范围**：本文档仅适用于**全球站**（frontai-web）。
-> 校园站（frontlife-web）已采用全新产品模型（知识库→帖子+文章），
-> 其实现规格见 `specs/校园站重建方案.md` 和 `specs/PRD-盘根校园-v7.md`。
+> 校园站（frontlife-web）的产品模型和实现规格见 `specs/PRD-盘根校园-v8.md`。
 > 本文档中涉及校园站的内容已过时，请勿参考。
 
 > 全球站前端：`NorthStar/packages/frontai-web/src/`

@@ -11,7 +11,7 @@ const bottomNavRoutes = ['/', '/kb', '/profile'];
 
 export default function PageLayout({ children }: PageLayoutProps) {
   const location = useLocation();
-  const showBottomNav = bottomNavRoutes.includes(location.pathname);
+  const showBottomNav = bottomNavRoutes.includes(location.pathname) && location.pathname !== '/';
 
   return (
     <div className="min-h-screen bg-bg">

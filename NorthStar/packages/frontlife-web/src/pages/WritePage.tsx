@@ -85,7 +85,7 @@ export default function WritePage() {
             <option value="">选择知识库</option>
             {Object.values(KNOWLEDGE_BASES).map((kb) => (
               <option key={kb.id} value={kb.id}>
-                {kb.icon} {kb.name}
+                {kb.name}
               </option>
             ))}
           </select>

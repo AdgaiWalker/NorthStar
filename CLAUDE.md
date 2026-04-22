@@ -1,96 +1,106 @@
-# NS Development Guidelines
+# CLAUDE.md
 
-> Last updated: 2026-04-18
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Architecture
 
-pnpm workspace monorepo：代码位于 `NorthStar/`，`@ns/shared` 提供跨产品共享代码。
+pnpm workspace monorepo at `NorthStar/`，全栈 TypeScript：
 
-- **双前端 + 单后端**：校园站（xyzidea.cn）和全球站（xyzidea.com）各自独立前端，共享一个 Hono 后端
-- 后端通过 `SITE=cn|com` 环境变量切换站点行为
-- 原型阶段：单后端实例 + 单数据库，两前端通过 Vite proxy 连接
-- 上线阶段：同一套代码部署两份，各自连各自的数据库
+- **前端**：React + Tailwind CSS + TypeScript
+- **后端**：Node.js + TypeScript + PostgreSQL
+- **包管理**：pnpm
 
-## Active Technologies
+双前端 + 单后端：
 
-- **前端**：TypeScript 5.8 + React 19 + Zustand 5 + React Router v7 + Tailwind CSS 3 + lucide-react + react-markdown
-- **后端**：Node.js + Hono + Drizzle + Zod + PostgreSQL + pnpm
-- **AI**：智谱 GLM-4-Flash（通过后端 AI 网关代理调用，原型阶段通过 Vite proxy）
-- **存储**：原型阶段 localStorage（Zustand persist）；后端搭建后迁移至 PostgreSQL
+- **校园站** `frontlife-web`（xyzidea.cn）→ localhost:3001
+- **全球站** `frontai-web`（xyzidea.com）→ localhost:3000
+- **共享包** `shared`（`@ns/shared`）— 纯 TS，无 React/UI 依赖
+- **后端** `server`（`@ns/server`）— 已有 Drizzle schema（10 表），无路由
 
-## Project Structure
+后端通过 `SITE=cn|com` 环境变量切换站点行为。原型阶段两前端通过 Vite proxy 连接，上线后各自独立部署。
 
-```text
-NS/
-├── CLAUDE.md                   # AI 开发指南（本文件）
-├── AGENTS.md                   # Agent 指南
-├── specs/                      # 规格文档
-│   ├── PRD-盘根AI指南针-标准版.md
-│   └── implementation/specs.md
-│
-└── NorthStar/                  # 所有代码
-    ├── pnpm-workspace.yaml
-    ├── tsconfig.base.json
-    └── packages/
-        ├── shared/             # @ns/shared — 跨产品共享（纯 TS）
-        │   └── src/
-        │       ├── types.ts    # Article, Tool, User, CampusArticle, CampusTopic...
-        │       ├── api.ts      # API_ENDPOINTS
-        │       ├── ai-contract.ts
-        │       ├── ai-utils.ts
-        │       ├── sensitive.ts # 敏感词管控
-        │       ├── frontlife-seed.ts      # 校园站种子文章数据（67 篇文章 + 8 专题）
-        │       ├── frontlife-constants.ts  # 校园站 8 分类 + 3 领域 DOMAIN_MAP
-        │       └── index.ts
-        ├── frontai-web/        # 全球站（xyzidea.com）→ localhost:3000
-        │   └── src/
-        │       ├── components/ # 全球站组件（含 admin/）
-        │       ├── pages/      # 路由页面
-        │       ├── services/   # AIService（引用 @ns/shared）
-        │       ├── store/      # Zustand stores
-        │       └── ...
-        └── server/             # @ns/server — 后端（待建）
+## Document Hierarchy
+
+```
+宪法（五条公理）→ 使命（specs/MISSION.md）→ PRD → 实现规格
 ```
 
-## Current Status (v0.1.0)
-
-- **frontai-web**（全球站）：可运行，localhost:3000
-- **frontlife-web**（校园站）：**已删除**，等待重建。种子数据和分类定义已提取到 `@ns/shared`
-- **server**（后端）：空壳，待建
-
-### 校园站数据说明
-
-校园站代码已删除，但以下数据保存在 `@ns/shared` 中，供未来重建使用：
-
-- **`shared/src/frontlife-seed.ts`**：种子数据（SEED_TOPICS: 8 个专题，SEED_ARTICLES: ~67 篇文章，含标题/摘要/正文 markdown）
-- **`shared/src/frontlife-constants.ts`**：8 个生活分类（arrival/food/shopping/transport/admin/activity/secondhand/pitfalls）+ 3 个展示领域（daily/growth/deal）+ DOMAIN_MAP 映射
-- 数据层 8 分类，展示层 3 领域，映射关系见 `frontlife-constants.ts` 中的 `DOMAIN_MAP`
+- 宪法：`.specify/memory/constitution.md`（最高约束）
+- 校园站 PRD：`specs/PRD-盘根校园-v8.md`
+- 全球站 PRD：`specs/PRD-盘根AI指南针-标准版.md`
+- 全球站实现规格：`specs/implementation/specs.md`
+- 冲突时以上层为准
 
 ## Commands
 
 ```bash
-# 根目录安装
-cd NorthStar && pnpm install
+cd NorthStar && pnpm install                    # 安装依赖
+
+# 校园站
+cd NorthStar/packages/frontlife-web && pnpm dev  # localhost:3001
 
 # 全球站
 cd NorthStar/packages/frontai-web && pnpm dev    # localhost:3000
 
-# 编译检查
+# 类型检查
+cd NorthStar/packages/frontlife-web && npx tsc --noEmit
 cd NorthStar/packages/frontai-web && npx tsc --noEmit
+
+# 缓存清理（修改 Vite 配置或安装新依赖后）
+rm -rf NorthStar/packages/frontlife-web/node_modules/.vite
+rm -rf NorthStar/packages/frontai-web/node_modules/.vite
 ```
 
-## Code Style
+### AI Local Config
 
-- 语言：文档/注释中文，变量/函数/类型英文驼峰
-- 宪法为最高约束：`.specify/memory/constitution.md`
-- PRD 为单一事实来源：`specs/PRD-盘根AI指南针-标准版.md`
-- 实现规格：`specs/implementation/specs.md`
+原型阶段 AI 通过 Vite proxy 转发到智谱 API，两站共享同一配置文件：
 
-## Key Constraints
+```bash
+# 在 workspace 根目录创建（两站共享）
+echo '{"api_key":"your-key","base_url":"https://open.bigmodel.cn"}' > NorthStar/.zhipu.local.json
+```
+
+也可在各站目录下创建 `.zhipu.local.json` 作为本地覆盖（优先级更高）。两站统一代理 `/__ai` 路径。配置文件已在 `.gitignore`，勿提交。
+
+## Key Patterns
+
+### 校园站（frontlife-web）
+
+- **单 Zustand store**（`store/useAppStore.ts`），persist 到 localStorage key `frontlife-storage`
+- **全局 overlay 模式**：SearchOverlay / CreateMenuOverlay / PostPreviewModal / SpotlightBar 在 App.tsx 根层渲染，由 store 中的 toggle 控制
+- **移动端优先**：BottomNav 是 `md:hidden`，Header tabs 是 `hidden md:flex`，SpotlightBar 仅移动端
+- **路径别名**：`@/` → `src/`
+- **Tailwind 自定义 token**：颜色（sage 主色、ink 文字、amber 警告、rose）、间距（nav-h 56px、bottom-nav-h 60px、content-max 960px、reader-max 720px）
+- **内容渲染**：react-markdown + rehype，自定义 CodeBlock / ImageRenderer / Callout 组件
+- **Mock 数据**：`src/data/mock.ts`（用户、知识库、文章、帖子、Feed），当前所有数据走 mock
+
+### 全球站（frontai-web）
+
+- **三个 Zustand store**：useAppStore（全局状态 + 认证）、useReviewStore（审核流程）、useContentStore（内容管理）
+- **Admin 路由**：`/admin/*` 包裹在 `<RequireAuth>` + `<AdminLayout>` 中
+- **AI 服务**：`services/AIService.ts` 调用智谱 Chat API，支持 function calling；失败时回退到 `aiFallback.ts` 的关键词匹配
+- **返回结构**：所有 AI 调用返回 `mode: 'ai' | 'demo'` + `fallbackReason`
+
+### 共享包（@ns/shared）
+
+关键导出：
+- `types.ts`：Domain / CampusDomain / Tool / Article / Topic / CampusArticle / CampusTopic / User / ContentType 等
+- `frontlife-constants.ts`：8 分类（arrival/food/…/pitfalls）+ 3 展示领域（daily/growth/deal）+ DOMAIN_MAP 映射
+- `frontlife-seed.ts`：校园站种子数据（8 专题 + ~67 篇文章）
+- `sensitive.ts`：6 类敏感词（政治/色情/暴力/赌博/违禁/辱骂），输入拦截 + 输出过滤
+- `ai-contract.ts`：AI 搜索/方案生成的请求响应类型
+
+### 服务端（server）
+
+已有 `src/db/schema.ts`：Drizzle ORM + PostgreSQL，定义 10 张表（cities / users / knowledge_bases / articles / posts / post_replies / feedbacks / activities / auth_requests / favorites / notifications）。无路由和入口文件。
+
+## Constraints
 
 - 前端构建产物不得包含任何 API Key
 - cn 用户数据绝不流向海外；com 站禁止收集中国敏感个人信息
 - 两站账号体系完全独立，跳转不传递登录态
-- 校园站数据层 8 分类，展示层 3 领域（映射见 `shared/src/frontlife-constants.ts` DOMAIN_MAP）
-- 敏感词管控：输入拦截 + 输出过滤，词库位于 `shared/src/sensitive.ts`
-- 文档优先级：宪法 > PRD > specs.md > 其他（product_planning.md 仅参考策略，技术细节以 specs.md 为准）
+- `@ns/shared` 必须保持纯 TS，不得引入 React 或任何 UI 依赖
+- 敏感词管控：`shared/src/sensitive.ts`，输入拦截 + 输出过滤
+- UI 图标统一使用 Lucide（SVG），禁止 emoji 做 UI 图标。emoji 只出现在用户输入的文本中
+- 文档/注释中文，变量/函数/类型英文驼峰
+- 校园站数据层 8 分类 → 展示层 3 领域（映射见 `frontlife-constants.ts` DOMAIN_MAP）
