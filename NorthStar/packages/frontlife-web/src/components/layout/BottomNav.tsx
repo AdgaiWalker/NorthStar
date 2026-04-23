@@ -4,8 +4,8 @@ import { cn } from '@/lib/utils';
 
 const items = [
   { id: 'home', label: '首页', icon: Home, path: '/' },
-  { id: 'kb', label: '知识库', icon: BookOpen, path: '/kb' },
-  { id: 'profile', label: '我的', icon: User, path: '/profile' },
+  { id: 'explore', label: '探索', icon: BookOpen, path: '/explore' },
+  { id: 'me', label: '我的', icon: User, path: '/me' },
 ];
 
 export default function BottomNav() {
@@ -15,10 +15,10 @@ export default function BottomNav() {
   const currentRoute =
     location.pathname === '/'
       ? 'home'
-      : location.pathname.startsWith('/kb')
-        ? 'kb'
-        : location.pathname === '/profile'
-          ? 'profile'
+      : location.pathname.startsWith('/explore') || location.pathname.startsWith('/space')
+        ? 'explore'
+        : location.pathname === '/me'
+          ? 'me'
           : 'home';
 
   return (

@@ -1,3 +1,4 @@
 export const API_ENDPOINTS = {
-  AI_CHAT: '/__ai/chat/completions',
+  AI_CHAT: '/api/ai/tools',
+  AI_TOOLS: '/api/ai/tools',
 } as const;

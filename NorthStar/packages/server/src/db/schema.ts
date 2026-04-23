@@ -51,10 +51,13 @@ export const activityActionEnum = pgEnum("activity_action", [
 ]);
 
 export const notifyTypeEnum = pgEnum("notify_type", [
-  "feedback_changed",
-  "low_activity",
-  "auth_result",
-  "claim_request",
+  "auth_invite",
+  "feedback",
+  "changed",
+  "expiry",
+  "claim",
+  "reply",
+  "trust",
 ]);
 
 // ─── Cities / Sites（多城市预留）───
@@ -74,9 +77,11 @@ export const users = pgTable(
   "users",
   {
     id: serial("id").primaryKey(),
+    username: varchar("username", { length: 50 }).notNull(),
     phone: varchar("phone", { length: 20 }),
     wxOpenId: varchar("wx_open_id", { length: 255 }),
     nickname: varchar("nickname", { length: 50 }).notNull(),
+    passwordHash: text("password_hash"),
     avatar: text("avatar"),
     school: varchar("school", { length: 100 }),
     cityId: integer("city_id").references(() => cities.id),
@@ -89,6 +94,7 @@ export const users = pgTable(
   },
   (table) => [
     uniqueIndex("users_phone_idx").on(table.phone),
+    uniqueIndex("users_username_idx").on(table.username),
     uniqueIndex("users_wx_open_id_idx").on(table.wxOpenId),
     index("users_trust_level_idx").on(table.trustLevel),
     index("users_city_id_idx").on(table.cityId),
@@ -173,6 +179,7 @@ export const posts = pgTable(
       .references(() => users.id)
       .notNull(),
     replyCount: integer("reply_count").default(0).notNull(),
+    solved: boolean("solved").default(false).notNull(),
     readCount: integer("read_count").default(0).notNull(),
     favoriteCount: integer("favorite_count").default(0).notNull(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -198,6 +205,7 @@ export const postReplies = pgTable(
     authorId: integer("author_id")
       .references(() => users.id)
       .notNull(),
+    starCount: integer("star_count").default(0).notNull(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [
@@ -314,6 +322,66 @@ export const notifications = pgTable(
   ]
 );
 
+// ─── Search Logs（搜索日志）───
+
+export const searchLogs = pgTable(
+  "search_logs",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id),
+    query: text("query").notNull(),
+    resultCount: integer("result_count").default(0).notNull(),
+    usedAi: boolean("used_ai").default(false).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("search_log_query_idx").on(table.query),
+    index("search_log_created_at_idx").on(table.createdAt),
+    index("search_log_user_id_idx").on(table.userId),
+  ]
+);
+
+// ─── Reports（举报）───
+
+export const reports = pgTable(
+  "reports",
+  {
+    id: serial("id").primaryKey(),
+    reporterId: integer("reporter_id").references(() => users.id),
+    targetType: varchar("target_type", { length: 20 }).notNull(), // 'article' | 'post'
+    targetId: integer("target_id").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("report_target_idx").on(table.targetType, table.targetId),
+    index("report_reporter_id_idx").on(table.reporterId),
+    index("report_created_at_idx").on(table.createdAt),
+  ]
+);
+
+// ─── Trust Events（信任事件）───
+
+export const trustEvents = pgTable(
+  "trust_events",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .references(() => users.id)
+      .notNull(),
+    action: varchar("action", { length: 50 }).notNull(),
+    points: integer("points").notNull(),
+    relatedType: varchar("related_type", { length: 20 }),
+    relatedId: integer("related_id"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("trust_event_user_id_idx").on(table.userId),
+    index("trust_event_action_idx").on(table.action),
+    index("trust_event_related_idx").on(table.relatedType, table.relatedId),
+  ]
+);
+
 // ─── Relations ───
 
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -324,6 +392,9 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   feedbacks: many(feedbacks),
   favorites: many(favorites),
   notifications: many(notifications),
+  searchLogs: many(searchLogs),
+  reports: many(reports),
+  trustEvents: many(trustEvents),
   city: one(cities, { fields: [users.cityId], references: [cities.id] }),
   authRequest: one(authRequests, { fields: [users.id], references: [authRequests.userId] }),
 }));
@@ -379,4 +450,16 @@ export const favoritesRelations = relations(favorites, ({ one }) => ({
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, { fields: [notifications.userId], references: [users.id] }),
+}));
+
+export const searchLogsRelations = relations(searchLogs, ({ one }) => ({
+  user: one(users, { fields: [searchLogs.userId], references: [users.id] }),
+}));
+
+export const reportsRelations = relations(reports, ({ one }) => ({
+  reporter: one(users, { fields: [reports.reporterId], references: [users.id] }),
+}));
+
+export const trustEventsRelations = relations(trustEvents, ({ one }) => ({
+  user: one(users, { fields: [trustEvents.userId], references: [users.id] }),
 }));

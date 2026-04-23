@@ -8,7 +8,6 @@ interface UseInfiniteFeedOptions<T> {
 export function useInfiniteFeed<T>(options: UseInfiniteFeedOptions<T>) {
   const { fetchData } = options;
   const [items, setItems] = useState<T[]>([]);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -27,7 +26,6 @@ export function useInfiniteFeed<T>(options: UseInfiniteFeedOptions<T>) {
       hasMoreRef.current = result.hasMore;
       setHasMore(result.hasMore);
       pageRef.current += 1;
-      setPage((p) => p + 1);
     } finally {
       fetchingRef.current = false;
       setLoading(false);
@@ -37,8 +35,7 @@ export function useInfiniteFeed<T>(options: UseInfiniteFeedOptions<T>) {
 
   useEffect(() => {
     loadMore();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadMore]);
 
   useEffect(() => {
     const el = loaderRef.current;

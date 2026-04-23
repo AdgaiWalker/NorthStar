@@ -7,14 +7,14 @@ interface PageLayoutProps {
   children: React.ReactNode;
 }
 
-const bottomNavRoutes = ['/', '/kb', '/profile'];
+const bottomNavRoutes = ['/', '/explore', '/me'];
 
 export default function PageLayout({ children }: PageLayoutProps) {
   const location = useLocation();
-  const showBottomNav = bottomNavRoutes.includes(location.pathname) && location.pathname !== '/';
+  const showBottomNav = bottomNavRoutes.includes(location.pathname);
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen overflow-x-hidden bg-bg">
       <Header />
       <main
         className={cn(

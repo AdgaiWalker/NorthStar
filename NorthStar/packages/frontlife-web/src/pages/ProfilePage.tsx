@@ -1,247 +1,158 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, BookOpen, FileText, Star, Settings, Bell } from 'lucide-react';
-import { useAppStore } from '@/store/useAppStore';
-import { getUser, LEVELS } from '@/data/mock';
-import { cn } from '@/lib/utils';
+import { Bell, Bookmark, FileText, Settings } from 'lucide-react';
+import type { ProfileResponse } from '@ns/shared';
+import { ErrorState, LoadingState } from '@/components/LoadingState';
+import { api } from '@/services/api';
+import { useUIStore } from '@/store/useUIStore';
+import { useUserStore } from '@/store/useUserStore';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const certStatus = useAppStore((s) => s.certStatus);
-  const userName = useAppStore((s) => s.userName);
-  const userPosts = useAppStore((s) => s.userPosts);
-  const bookmarks = useAppStore((s) => s.bookmarks);
-  const applyCertification = useAppStore((s) => s.applyCertification);
+  const token = useUserStore((state) => state.token);
+  const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const notifications = useUIStore((state) => state.notifications);
+  const setNotifications = useUIStore((state) => state.setNotifications);
+  const markNotificationRead = useUIStore((state) => state.markNotificationRead);
+  const [loading, setLoading] = useState(Boolean(token));
+  const [error, setError] = useState('');
 
-  const realPostCount = userPosts.length;
-  const realBookmarkCount = Object.keys(bookmarks).length;
-  const me = {
-    name: userName ?? '张同学',
-    school: '黑河学院',
-    level: certStatus === 'approved' ? 3 : certStatus === 'pending' ? 2 : 1,
-    posts: realPostCount,
-    collections: realBookmarkCount,
-    feedback: 0,
-    helped: 0,
-    readCount: 0,
-    savedCount: 0,
-  };
-  const u = getUser('zhang');
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    Promise.all([api.getProfile(), api.getNotifications()])
+      .then(([profileResult, notificationResult]) => {
+        setProfile(profileResult);
+        setNotifications(notificationResult.notifications);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : '个人页加载失败'))
+      .finally(() => setLoading(false));
+  }, [setNotifications, token]);
+
+  if (!token) {
+    return (
+      <div className="mx-auto max-w-[640px] px-4 py-10">
+        <div className="rounded-2xl border border-border-light bg-surface p-7 text-center">
+          <h1 className="font-display text-[24px] font-bold text-ink">登录后查看我的盘根</h1>
+          <p className="mt-2 text-sm text-ink-muted">登录后可以查看通知、收藏、贡献数据和个人内容。</p>
+          <button onClick={() => navigate('/login')} className="mt-5 rounded-lg bg-sage px-5 py-2.5 text-sm font-semibold text-white">
+            去登录
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) return <div className="mx-auto max-w-[640px] px-4 py-6"><LoadingState label="正在加载个人页..." /></div>;
+  if (error || !profile) return <div className="mx-auto max-w-[640px] px-4 py-6"><ErrorState message={error} /></div>;
+
+  const unreadCount = notifications.filter((item) => !item.isRead).length;
 
   return (
-    <div className="mx-auto max-w-[640px] px-4 py-5"
-    >
-      {/* Profile Card */}
-      <div className="rounded-lg border border-border-light bg-surface p-7 text-center"
-      >
-        <div
-          className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full text-2xl font-bold text-white"
-          style={{ background: u.color }}
-        >
-          {me.name[0]}
-        </div>
-        <div className="font-display text-[22px] font-bold"
-        >{me.name}</div>
-        <div className="mt-1 text-[13px] text-ink-muted"
-        >{me.school}</div>
-        <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-sage-light px-3 py-1 text-[11px] font-semibold text-sage"
-        >
-          {LEVELS[me.level]}
-        </div>
-
-        <div className="mt-5 flex justify-center gap-8 border-t border-border-light pt-5"
-        >
-          <div className="text-center"
-          >
-            <div className="font-display text-[22px] font-bold"
-            >{me.posts}</div>
-            <div className="text-xs text-ink-muted"
-            >帖子</div>
-          </div>
-          <div className="text-center"
-          >
-            <div className="font-display text-[22px] font-bold"
-            >{me.collections}</div>
-            <div className="text-xs text-ink-muted"
-            >收藏</div>
-          </div>
-          <div className="text-center"
-          >
-            <div className="font-display text-[22px] font-bold"
-            >{me.feedback}</div>
-            <div className="text-xs text-ink-muted"
-            >反馈</div>
-          </div>
+    <div className="mx-auto max-w-[640px] px-4 py-6">
+      <div className="mb-4 rounded-2xl border border-border-light bg-surface p-4 md:hidden">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <Bell size={16} className="text-sage" />
+            通知
+          </span>
+          <span className="text-xs text-ink-muted">{unreadCount} 条未读</span>
         </div>
       </div>
 
-      {/* Certification Guide */}
-      {certStatus === 'none' && (
-        <div className="mt-4 rounded-lg border border-border bg-surface p-6 text-center"
-        >
-          <div className="font-display text-base font-bold"
-          >🎓 申请认证作者</div>
-          <div className="mx-auto mt-3 max-w-[280px] text-left text-[13px] leading-8 text-ink-secondary"
-          >
-            <div>✓ 解锁写文章权限</div>
-            <div>✓ 获得专属知识库</div>
-            <div>✓ 查看影响力数据</div>
-          </div>
-          <button
-            onClick={() => applyCertification()}
-            className="mt-4 rounded bg-sage px-7 py-2.5 text-sm font-medium text-white transition-colors hover:bg-sage-dark"
-          >
-            立即申请
-          </button>
+      <section className="rounded-2xl border border-border-light bg-surface p-7 text-center">
+        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-sage text-2xl font-bold text-white">
+          {profile.user.name[0]}
         </div>
-      )}
-
-      {/* Pending Review */}
-      {certStatus === 'pending' && (
-        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-6 text-center"
-        >
-          <div className="font-display text-base font-bold text-amber-700"
-          >⏳ 认证审核中</div>
-          <div className="mt-2 text-[13px] text-amber-600"
-          >
-            你的申请已提交，团队正在审核中。
-            <br />
-            审核通过后你将获得写文章权限和专属知识库。
-          </div>
+        <h1 className="font-display text-[24px] font-bold text-ink">{profile.user.name}</h1>
+        <p className="mt-1 text-sm text-ink-muted">{profile.user.school}</p>
+        <div className="mt-6 grid grid-cols-3 gap-3 border-t border-border-light pt-5">
+          <Stat value={profile.stats.helpedCount} label="帮助了" />
+          <Stat value={profile.stats.articleCount} label="写了" />
+          <Stat value={profile.stats.favoriteCount} label="收藏" />
         </div>
-      )}
+      </section>
 
-      {/* Influence Panel (certified only) */}
-      {certStatus === 'approved' && (
-        <div className="mt-4 rounded-lg border border-border-light bg-surface p-5"
-        >
-          <div className="mb-4 font-display text-[15px] font-bold"
-          >影响力</div>
-          <div className="grid grid-cols-3 gap-4"
-          >
-            <div className="text-center"
+      <Section title="我的空间" icon={<FileText size={17} />}>
+        {profile.spaces.length === 0 ? <Empty text="暂无维护空间" /> : profile.spaces.map((space) => <Row key={space.id} title={space.title} sub={`${space.articleCount} 篇文章`} />)}
+      </Section>
+
+      <Section title="通知" icon={<Bell size={17} />}>
+        {notifications.length === 0 ? (
+          <Empty text="暂无通知" />
+        ) : (
+          notifications.map((item) => (
+            <button
+              key={item.id}
+              onClick={async () => {
+                if (!item.isRead) {
+                  await api.markNotificationRead(item.id);
+                  markNotificationRead(item.id);
+                }
+              }}
+              className="block w-full border-b border-border-light px-5 py-3.5 text-left last:border-b-0"
             >
-              <div className="font-display text-xl font-bold text-sage"
-              >{me.helped}</div>
-              <div className="text-[11px] text-ink-muted"
-              >帮助人数</div>
-            </div>
-            <div className="text-center"
-            >
-              <div className="font-display text-xl font-bold text-sage"
-              >{me.readCount}</div>
-              <div className="text-[11px] text-ink-muted"
-              >阅读量</div>
-            </div>
-            <div className="text-center"
-            >
-              <div className="font-display text-xl font-bold text-sage"
-              >{me.savedCount}</div>
-              <div className="text-[11px] text-ink-muted"
-              >收藏数</div>
-            </div>
-          </div>
-        </div>
-      )}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-ink">{item.title}</div>
+                  <div className="mt-0.5 text-xs leading-5 text-ink-muted">{item.content}</div>
+                </div>
+                {!item.isRead && <span className="mt-1 h-2.5 w-2.5 rounded-full bg-sage" />}
+              </div>
+            </button>
+          ))
+        )}
+      </Section>
 
-      {/* My Knowledge Base */}
-      {certStatus === 'approved' && (
-        <div className="mt-3 overflow-hidden rounded-lg border border-border-light bg-surface"
-        >
-          <div className="flex items-center justify-between border-b border-border-light px-5 py-3.5 font-display text-[15px] font-bold"
-          >
-            我的知识库
-          </div>
-          <button
-            onClick={() => navigate('/kb/arrival')}
-            className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-bg-subtle"
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sage-light"
-            >
-              🎒
-            </div>
-            <div className="flex-1"
-            >
-              <div className="text-sm font-medium"
-              >新生报到全攻略</div>
-              <div className="text-xs text-ink-muted"
-              >3 篇文章 · 156 收藏</div>
-            </div>
-            <ChevronRight size={16} className="text-ink-faint" />
-          </button>
-        </div>
-      )}
+      <Section title="我的内容" icon={<FileText size={17} />}>
+        {profile.contents.slice(0, 4).map((item) => <Row key={item.id} title={'title' in item ? item.title : item.content} sub={'helpfulCount' in item ? `${item.helpfulCount} 人确认` : ''} />)}
+      </Section>
 
-      {/* Menu Sections */}
-      <div className="mt-3 overflow-hidden rounded-lg border border-border-light bg-surface"
-      >
-        <div className="flex items-center justify-between border-b border-border-light px-5 py-3.5 font-display text-[15px] font-bold"
-        >
-          我的内容
-        </div>
-        <MenuItem icon={<FileText size={18} />}
-          iconBg="bg-bg-subtle" title="我的帖子" sub={`${realPostCount} 条`} />
-        <MenuItem icon={<Star size={18} />}
-          iconBg="bg-bg-subtle" title="我的收藏" sub={`${realBookmarkCount} 个`} />
-        <MenuItem icon={<BookOpen size={18} />}
-          iconBg="bg-bg-subtle" title="我的反馈" sub="0 条" />
-      </div>
+      <Section title="我的收藏" icon={<Bookmark size={17} />}>
+        {profile.favorites.length === 0 ? <Empty text="暂无收藏" /> : profile.favorites.map((item) => <Row key={item.id} title={item.title} sub={item.targetType === 'article' ? '文章' : '空间'} />)}
+      </Section>
 
-      <div className="mt-3 overflow-hidden rounded-lg border border-border-light bg-surface"
-      >
-        <div className="flex items-center justify-between border-b border-border-light px-5 py-3.5 font-display text-[15px] font-bold"
-        >
-          设置
-        </div>
-        <MenuItem icon={<Settings size={18} />}
-          iconBg="bg-bg-subtle" title="账号设置" />
-        <MenuItem icon={<Bell size={18} />}
-          iconBg="bg-bg-subtle" title="通知设置" />
-      </div>
-
-      {/* Logout */}
-      <div className="mt-6 text-center"
-      >
-        <button
-          onClick={() => navigate('/')}
-          className="text-[13px] text-ink-faint transition-colors hover:text-ink-muted"
-        >
-          退出登录
-        </button>
-      </div>
+      <Section title="设置" icon={<Settings size={17} />}>
+        <Row title="账号设置" sub="基础资料与登录状态" />
+        {profile.canCreateSpace && <Row title="创建空间" sub="你已解锁创建空间能力" />}
+      </Section>
     </div>
   );
 }
 
-function MenuItem({
-  icon,
-  iconBg,
-  title,
-  sub,
-}: {
-  icon: React.ReactNode;
-  iconBg: string;
-  title: string;
-  sub?: string;
-}) {
+function Stat({ value, label }: { value: number; label: string }) {
   return (
-    <button className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-bg-subtle last:rounded-b-[14px]"
-    >
-      <div
-        className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-secondary',
-          iconBg
-        )}
-      >
-        {icon}
-      </div>
-      <div className="flex-1"
-      >
-        <div className="text-sm font-medium"
-        >{title}</div>
-        {sub && <div className="text-xs text-ink-muted"
-        >{sub}</div>}
-      </div>
-      <ChevronRight size={16} className="text-ink-faint" />
-    </button>
+    <div>
+      <div className="font-display text-[22px] font-bold text-ink">{value}</div>
+      <div className="text-xs text-ink-muted">{label}</div>
+    </div>
   );
+}
+
+function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="mt-4 overflow-hidden rounded-2xl border border-border-light bg-surface">
+      <div className="flex items-center gap-2 border-b border-border-light px-5 py-4 font-display text-[16px] font-bold text-ink">
+        <span className="text-sage">{icon}</span>
+        {title}
+      </div>
+      <div>{children}</div>
+    </section>
+  );
+}
+
+function Row({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <div className="border-b border-border-light px-5 py-3.5 last:border-b-0">
+      <div className="text-sm font-medium text-ink">{title}</div>
+      {sub && <div className="mt-0.5 text-xs text-ink-muted">{sub}</div>}
+    </div>
+  );
+}
+
+function Empty({ text }: { text: string }) {
+  return <div className="px-5 py-6 text-sm text-ink-muted">{text}</div>;
 }

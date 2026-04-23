@@ -10,3 +10,4 @@ dist/
 *.heapsnapshot
 .claude/plans/
 .agents/
+NorthStar/.tmp/
