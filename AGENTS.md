@@ -26,7 +26,7 @@ pnpm workspace monorepo at `NorthStar/`，全栈 TypeScript：
 ```
 
 - 宪法：`.specify/memory/constitution.md`（最高约束）
-- 校园站 PRD：`specs/PRD-盘根校园-v8.md`
+- 校园站 PRD：`specs/PRD-盘根校园-v9.md`
 - 全球站 PRD：`specs/PRD-盘根AI指南针-标准版.md`
 - 全球站实现规格：`specs/implementation/specs.md`
 - 冲突时以上层为准
@@ -68,11 +68,11 @@ echo '{"api_key":"your-key","base_url":"https://open.bigmodel.cn"}' > NorthStar/
 
 - **拆分 Zustand store**：搜索、空间/内容、用户、UI 独立 store
 - **页面路由优先**：首页、搜索、探索、空间、文章、我的、登录由 App.tsx 路由组织
-- **移动端优先**：BottomNav 是 `md:hidden`，Header tabs 是 `hidden md:flex`，SpotlightBar 仅移动端
+- **移动端优先**：BottomNav 是 `md:hidden`，Header tabs 是 `hidden md:flex`
 - **路径别名**：`@/` → `src/`
 - **Tailwind 自定义 token**：颜色（sage 主色、ink 文字、amber 警告、rose）、间距（nav-h 56px、bottom-nav-h 60px、content-max 960px、reader-max 720px）
 - **内容渲染**：react-markdown + rehype，自定义 CodeBlock / ImageRenderer / Callout 组件
-- **Mock 数据**：`src/data/mock.ts`（用户、知识库、文章、帖子、Feed），当前所有数据走 mock
+- **数据模式**：`VITE_USE_MOCK=true` 使用 `services/mockApi.ts`，否则通过 `/api` 代理到 server
 
 ### 全球站（frontai-web）
 

@@ -7,8 +7,10 @@ import { api, type SpaceSummary } from '@/services/api';
 import { useSearchStore } from '@/store/useSearchStore';
 import { useUserStore } from '@/store/useUserStore';
 import FeedSkeleton, { FeedSkeletonList } from '@/components/FeedSkeleton';
+import { EmptyState, ErrorState } from '@/components/LoadingState';
 
 const PAGE_SIZE = 6;
+const RECOMMENDED_SPACE_IDS = ['arrival', 'food', 'academic', 'print'];
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -22,17 +24,24 @@ export default function HomePage() {
   const [postSpaceId, setPostSpaceId] = useState('freeboard');
   const [postTag, setPostTag] = useState('share');
   const [spaces, setSpaces] = useState<SpaceSummary[]>([]);
+  const [spacesError, setSpacesError] = useState('');
+  const [postError, setPostError] = useState('');
 
   const fetchData = useCallback(async (page: number) => {
     const result = await api.getFeed(page, PAGE_SIZE);
     return { items: result.items, hasMore: result.hasMore };
   }, []);
 
-  const { items, initialLoading, loading, hasMore, loaderRef } = useInfiniteFeed<FrontlifeFeedItem>({
+  const { items, initialLoading, loading, hasMore, error: feedError, retry: retryFeed, loaderRef } = useInfiniteFeed<FrontlifeFeedItem>({
     fetchData,
   });
+  const visibleSpaces = RECOMMENDED_SPACE_IDS
+    .map((spaceId) => spaces.find((space) => space.id === spaceId))
+    .filter((space): space is SpaceSummary => Boolean(space));
+  const homeSpaces = visibleSpaces.length === RECOMMENDED_SPACE_IDS.length ? visibleSpaces : spaces.slice(0, 4);
 
-  useEffect(() => {
+  const loadSpaces = useCallback(() => {
+    setSpacesError('');
     api
       .listSpaces()
       .then((result) => {
@@ -43,8 +52,27 @@ export default function HomePage() {
           setPostSpaceId(result.spaces[0].id);
         }
       })
-      .catch(() => undefined);
+      .catch((err) => {
+        setSpaces([]);
+        setSpacesError(err instanceof Error ? err.message : '空间列表加载失败，请稍后重试。');
+      });
   }, []);
+
+  useEffect(() => {
+    loadSpaces();
+  }, [loadSpaces]);
+
+  useEffect(() => {
+    if (spaces.length > 0 && !spaces.some((space) => space.id === postSpaceId)) {
+      setPostSpaceId(spaces[0].id);
+    }
+  }, [postSpaceId, spaces]);
+
+  useEffect(() => {
+    if (postContent.trim()) {
+      setPostError('');
+    }
+  }, [postContent]);
 
   useEffect(() => {
     if (searchParams.get('write') === '1' && canPost) {
@@ -63,15 +91,24 @@ export default function HomePage() {
   const publishPost = async () => {
     const content = postContent.trim();
     if (!content) return;
-    const result = await api.createPost({
-      spaceId: postSpaceId,
-      content,
-      tags: [postTag],
-      authorName: userName ?? '张同学',
-    });
-    setPostContent('');
-    setWriteOpen(false);
-    navigate(`/space/${result.post.spaceId}`);
+    if (!postSpaceId) {
+      setPostError('空间列表尚未加载完成，请稍后重试。');
+      return;
+    }
+    setPostError('');
+    try {
+      const result = await api.createPost({
+        spaceId: postSpaceId,
+        content,
+        tags: [postTag],
+        authorName: userName ?? '张同学',
+      });
+      setPostContent('');
+      setWriteOpen(false);
+      navigate(`/space/${result.post.spaceId}`);
+    } catch (err) {
+      setPostError(err instanceof Error ? err.message : '发布失败，请稍后重试。');
+    }
   };
 
   return (
@@ -118,6 +155,7 @@ export default function HomePage() {
                   <select
                     value={postSpaceId}
                     onChange={(event) => setPostSpaceId(event.target.value)}
+                    disabled={spaces.length === 0}
                     className="h-10 rounded-lg border border-border bg-white px-3 text-sm outline-none focus:border-sage"
                   >
                     {spaces.map((space) => (
@@ -141,6 +179,16 @@ export default function HomePage() {
                 <button onClick={publishPost} className="w-full rounded-lg bg-sage px-4 py-2 text-sm font-medium text-white sm:w-auto">
                   发布
                 </button>
+                {spacesError && (
+                  <div className="rounded-lg bg-rose-light px-3 py-2 text-sm text-rose-custom">
+                    {spacesError}
+                  </div>
+                )}
+                {postError && (
+                  <div className="rounded-lg bg-rose-light px-3 py-2 text-sm text-rose-custom">
+                    {postError}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -148,7 +196,17 @@ export default function HomePage() {
       </section>
 
       <section className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
-        {spaces.slice(0, 4).map((space) => (
+        {spacesError && (
+          <div className="col-span-full">
+            <ErrorState title="空间加载失败" message={spacesError} onRetry={loadSpaces} />
+          </div>
+        )}
+        {!spacesError && spaces.length === 0 && (
+          <div className="col-span-full">
+            <EmptyState title="暂无空间" description="当前还没有可浏览的校园空间。" />
+          </div>
+        )}
+        {!spacesError && homeSpaces.map((space) => (
             <button
               key={space.id}
               onClick={() => navigate(`/space/${space.id}`)}
@@ -172,7 +230,13 @@ export default function HomePage() {
         </div>
 
         {initialLoading && <FeedSkeletonList count={3} />}
-        {!initialLoading && (
+        {!initialLoading && feedError && (
+          <ErrorState title="生活流加载失败" message={feedError} onRetry={retryFeed} />
+        )}
+        {!initialLoading && !feedError && items.length === 0 && (
+          <EmptyState title="暂无生活流内容" description="当前还没有文章、动态或 AI 回答记录。" />
+        )}
+        {!initialLoading && !feedError && items.length > 0 && (
           <div className="space-y-3">
             {items.map((item) => (
               <button

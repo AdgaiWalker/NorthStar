@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Compass, Search } from 'lucide-react';
-import { ErrorState, LoadingState } from '@/components/LoadingState';
+import { EmptyState, ErrorState, LoadingState } from '@/components/LoadingState';
 import { api, type SpaceSummary } from '@/services/api';
 
 export default function ExplorePage() {
@@ -9,10 +9,13 @@ export default function ExplorePage() {
   const [spaces, setSpaces] = useState<SpaceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError('');
 
     api
       .listSpaces()
@@ -29,7 +32,15 @@ export default function ExplorePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
+
+  const visibleSpaces = spaces
+    .filter((space) => {
+      const value = query.trim();
+      if (!value) return true;
+      return `${space.title}\n${space.description}\n${space.maintainer.name}`.includes(value);
+    })
+    .sort((a, b) => b.recentActiveAt.localeCompare(a.recentActiveAt));
 
   return (
     <div className="mx-auto max-w-content-max px-5 py-8">
@@ -52,17 +63,20 @@ export default function ExplorePage() {
       </div>
 
       {loading && <LoadingState label="正在加载空间..." />}
-      {!loading && error && <ErrorState message={error} />}
+      {!loading && error && (
+        <ErrorState title="空间加载失败" message={error} onRetry={() => setReloadKey((value) => value + 1)} />
+      )}
       {!loading && !error && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {spaces
-            .filter((space) => {
-              const value = query.trim();
-              if (!value) return true;
-              return `${space.title}\n${space.description}\n${space.maintainer.name}`.includes(value);
-            })
-            .sort((a, b) => b.recentActiveAt.localeCompare(a.recentActiveAt))
-            .map((space) => (
+        <>
+          {visibleSpaces.length === 0 && (
+            <EmptyState
+              title={query.trim() ? '暂无匹配空间' : '暂无空间'}
+              description={query.trim() ? '没有找到符合关键词的空间，可以换个关键词试试。' : '当前还没有可浏览的校园空间。'}
+            />
+          )}
+          {visibleSpaces.length > 0 && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {visibleSpaces.map((space) => (
               <button
                 key={space.id}
                 onClick={() => navigate(`/space/${space.id}`)}
@@ -76,8 +90,10 @@ export default function ExplorePage() {
                   <span>{new Date(space.recentActiveAt).toLocaleDateString()} 活跃</span>
                 </div>
               </button>
-            ))}
-        </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

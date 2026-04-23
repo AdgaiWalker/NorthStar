@@ -20,12 +20,14 @@ export default function ArticlePage() {
   const [article, setArticle] = useState<ArticleDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [helpfulDone, setHelpfulDone] = useState(false);
   const [changeOpen, setChangeOpen] = useState(false);
   const [changeNote, setChangeNote] = useState('');
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [message, setMessage] = useState('');
+  const [actionError, setActionError] = useState('');
   const [previousArticleId, setPreviousArticleId] = useState<string | null>(null);
   const [nextArticleId, setNextArticleId] = useState<string | null>(null);
   const [spaceArticles, setSpaceArticles] = useState<ArticleSummary[]>([]);
@@ -34,6 +36,9 @@ export default function ArticlePage() {
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
+    setLoading(true);
+    setError('');
+    setActionError('');
 
     api
       .getArticle(id)
@@ -60,55 +65,83 @@ export default function ArticlePage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   const markHelpful = async () => {
     if (!token) return navigate('/login');
     if (!article || helpfulDone) return;
-    const result = await api.markArticleHelpful(article.id);
-    setArticle({ ...article, helpfulCount: result.helpfulCount, confirmedAt: result.confirmedAt });
-    setHelpfulDone(true);
-    setMessage('已确认有帮助');
+    setActionError('');
+    try {
+      const result = await api.markArticleHelpful(article.id);
+      setArticle({ ...article, helpfulCount: result.helpfulCount, confirmedAt: result.confirmedAt });
+      setHelpfulDone(true);
+      setMessage('已确认有帮助');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '确认失败，请稍后重试。');
+    }
   };
 
   const submitChange = async () => {
     if (!token) return navigate('/login');
     if (!article || !changeNote.trim()) return;
-    const result = await api.markArticleChanged(article.id, changeNote.trim());
-    setArticle({
-      ...article,
-      changedCount: result.changedCount,
-      changeNotes: [result.feedback, ...article.changeNotes],
-    });
-    setChangeNote('');
-    setChangeOpen(false);
-    setMessage('变化反馈已提交');
+    setActionError('');
+    try {
+      const result = await api.markArticleChanged(article.id, changeNote.trim());
+      setArticle({
+        ...article,
+        changedCount: result.changedCount,
+        changeNotes: [result.feedback, ...article.changeNotes],
+      });
+      setChangeNote('');
+      setChangeOpen(false);
+      setMessage('变化反馈已提交');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '变化反馈提交失败，请稍后重试。');
+    }
   };
 
   const submitReport = async () => {
     if (!token) return navigate('/login');
     if (!article || !reportReason.trim()) return;
-    await api.reportContent({
-      targetType: 'article',
-      targetId: article.id,
-      reason: reportReason.trim(),
-    });
-    setReportReason('');
-    setReportOpen(false);
-    setMessage('举报已提交');
+    setActionError('');
+    try {
+      await api.reportContent({
+        targetType: 'article',
+        targetId: article.id,
+        reason: reportReason.trim(),
+      });
+      setReportReason('');
+      setReportOpen(false);
+      setMessage('举报已提交');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '举报提交失败，请稍后重试。');
+    }
   };
 
   const favoriteArticle = async () => {
     if (!token) return navigate('/login');
     if (!article) return;
-    await api.favorite({ targetType: 'article', targetId: article.id });
-    setMessage('已收藏');
+    setActionError('');
+    try {
+      await api.favorite({ targetType: 'article', targetId: article.id });
+      setMessage('已收藏');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '收藏失败，请稍后重试。');
+    }
   };
 
   return (
     <div className="mx-auto max-w-content-max overflow-x-hidden px-4 py-6 sm:px-5 sm:py-8">
       {loading && <LoadingState label="正在加载文章..." />}
-      {!loading && error && <ErrorState message={error} />}
+      {!loading && error && (
+        <ErrorState
+          title="文章加载失败"
+          message={error}
+          onRetry={() => setReloadKey((value) => value + 1)}
+          onBack={() => navigate('/')}
+          backLabel="返回首页"
+        />
+      )}
       {!loading && !error && article && (
         <div className="lg:grid lg:grid-cols-[200px_minmax(0,1fr)_190px] lg:gap-4 xl:grid-cols-[220px_minmax(0,1fr)_210px] xl:gap-5">
           <aside className="sticky top-[72px] hidden max-h-[calc(100vh-88px)] overflow-y-auto rounded-2xl border border-border-light bg-bg-subtle p-4 lg:block">
@@ -271,6 +304,7 @@ export default function ArticlePage() {
               </div>
             )}
             {message && <div className="mt-3 text-sm text-sage">{message}</div>}
+            {actionError && <div className="mt-3 text-sm text-rose-custom">{actionError}</div>}
           </div>
 
           <nav className="mt-8 flex flex-col justify-between gap-3 border-t border-border-light pt-5 sm:flex-row">

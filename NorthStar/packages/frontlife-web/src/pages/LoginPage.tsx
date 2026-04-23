@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, User } from 'lucide-react';
 import { api } from '@/services/api';
+import { consumeSessionReason, SESSION_EXPIRED_MESSAGE, SESSION_EXPIRED_REASON } from '@/services/authSession';
+import { useUIStore } from '@/store/useUIStore';
 import { useUserStore } from '@/store/useUserStore';
 import { cn } from '@/lib/utils';
 
@@ -9,14 +11,25 @@ type Mode = 'login' | 'register';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const setToken = useUserStore((state) => state.setToken);
   const setUser = useUserStore((state) => state.setUser);
   const setPermissions = useUserStore((state) => state.setPermissions);
+  const clearSessionExpired = useUIStore((state) => state.clearSessionExpired);
   const [mode, setMode] = useState<Mode>('login');
   const [username, setUsername] = useState('zhang');
   const [password, setPassword] = useState('password');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const persistedReason = consumeSessionReason();
+    const reason = searchParams.get('reason') || persistedReason;
+    if (reason === SESSION_EXPIRED_REASON) {
+      setError(SESSION_EXPIRED_MESSAGE);
+      clearSessionExpired();
+    }
+  }, [clearSessionExpired, searchParams]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -33,6 +46,7 @@ export default function LoginPage() {
       setUser(result.user.id, result.user.name);
       const permissions = await api.getPermissions();
       setPermissions(permissions);
+      clearSessionExpired();
       navigate('/me');
     } catch (err) {
       setError(err instanceof Error ? err.message : '登录失败');
@@ -49,7 +63,7 @@ export default function LoginPage() {
             {mode === 'login' ? '登录盘根' : '注册盘根'}
           </div>
           <p className="text-sm leading-6 text-ink-muted">
-            初期使用用户名和密码。默认测试账号为 zhang / password。
+            当前使用用户名和密码登录。内测账号请按发放信息登录。
           </p>
         </div>
 
@@ -58,6 +72,8 @@ export default function LoginPage() {
           <div className="flex h-11 items-center gap-2 rounded-lg border border-border bg-bg-subtle px-3 focus-within:border-sage">
             <User size={16} className="text-ink-muted" />
             <input
+              id="frontlife-username"
+              name="username"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
               className="h-full flex-1 bg-transparent text-sm outline-none"
@@ -71,6 +87,8 @@ export default function LoginPage() {
           <div className="flex h-11 items-center gap-2 rounded-lg border border-border bg-bg-subtle px-3 focus-within:border-sage">
             <Lock size={16} className="text-ink-muted" />
             <input
+              id="frontlife-password"
+              name="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               type="password"

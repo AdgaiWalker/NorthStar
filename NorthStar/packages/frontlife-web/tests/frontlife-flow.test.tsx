@@ -46,6 +46,7 @@ describe('frontlife pages', () => {
     cleanup();
     useUserStore.getState().logout();
     useUIStore.getState().resetNotifications();
+    useUIStore.getState().clearSessionExpired();
   });
 
   beforeEach(() => {
@@ -262,6 +263,25 @@ describe('frontlife pages', () => {
     expect(await screen.findByText('二食堂麻辣烫实测')).toBeInTheDocument();
   });
 
+  it('shows a recoverable home error when the feed api fails', async () => {
+    apiMock.getFeed.mockRejectedValueOnce(new Error('网络连接失败，请确认后端服务已启动或稍后重试。'));
+
+    renderRoute('/');
+
+    expect(await screen.findByText('生活流加载失败')).toBeInTheDocument();
+    expect(screen.getByText('网络连接失败，请确认后端服务已启动或稍后重试。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
+  });
+
+  it('shows the session expired banner when the global ui state is set', async () => {
+    useUIStore.getState().setSessionExpired('登录状态已失效，请重新登录。');
+
+    renderRoute('/');
+
+    expect(await screen.findByText('登录状态已失效，请重新登录。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '去登录' })).toBeInTheDocument();
+  });
+
   it('renders search results', async () => {
     renderRoute('/search?q=食堂');
 
@@ -278,9 +298,35 @@ describe('frontlife pages', () => {
 
     renderRoute('/search?q=打印店在哪');
 
+    expect(await screen.findByText('暂无本地结果')).toBeInTheDocument();
     expect(await screen.findByText('由 AI 生成，仅供参考')).toBeInTheDocument();
     expect(await screen.findByText(/AI 补充回答/)).toBeInTheDocument();
     expect(apiMock.searchAiStream).toHaveBeenCalledWith('打印店在哪', expect.any(Function));
+  });
+
+  it('shows empty article and post states for an empty space', async () => {
+    apiMock.getSpace.mockResolvedValueOnce({
+      space: {
+        id: 'food',
+        slug: 'food',
+        title: '校园美食地图',
+        description: '吃遍每一食堂',
+        iconName: 'Utensils',
+        category: 'food',
+        articleCount: 0,
+        helpfulCount: 0,
+        favoriteCount: 0,
+        recentActiveAt: '2026-04-22T00:00:00.000Z',
+        maintainer: { id: 'u1', name: '盘根编辑' },
+      },
+      articles: [],
+    });
+    apiMock.getSpacePosts.mockResolvedValueOnce({ posts: [] });
+
+    renderRoute('/space/food');
+
+    expect((await screen.findAllByText('暂无文章')).length).toBeGreaterThan(0);
+    expect(screen.getByText('暂无帖子')).toBeInTheDocument();
   });
 
   it('renders article and feedback controls', async () => {
@@ -457,8 +503,41 @@ describe('frontlife pages', () => {
     renderRoute('/me');
 
     expect(await screen.findByText('有人回复了你的帖子')).toBeInTheDocument();
+    expect(screen.getByText('暂无个人内容')).toBeInTheDocument();
     fireEvent.click(screen.getByText('有人回复了你的帖子'));
 
     expect(apiMock.markNotificationRead).toHaveBeenCalledWith('notification-1');
+  });
+
+  it('keeps notification read state in sync when marking read from the header', async () => {
+    useUserStore.getState().setToken('test-token');
+    useUserStore.getState().setUser('1', '张同学');
+    useUserStore.getState().setPermissions({ canPost: true, canWrite: false, canCreateSpace: false });
+    apiMock.markNotificationRead.mockResolvedValue({
+      notification: {
+        id: 'notification-1',
+        type: 'reply',
+        title: '有人回复了你的帖子',
+        content: '图书馆工作日一般到晚上 10 点。',
+        isRead: true,
+        createdAt: '2026-04-22T00:00:00.000Z',
+      },
+    });
+
+    renderRoute('/');
+
+    fireEvent.click(await screen.findByRole('button', { name: '通知，1 条未读' }));
+    fireEvent.click(await screen.findByText('有人回复了你的帖子'));
+
+    expect(apiMock.markNotificationRead).toHaveBeenCalledWith('notification-1');
+    await waitFor(() => {
+      expect(useUIStore.getState().notifications[0]?.isRead).toBe(true);
+    });
+  });
+
+  it('shows the session expired message on the login page', async () => {
+    renderRoute('/login?reason=session-expired');
+
+    expect(await screen.findByText('登录状态已失效，请重新登录。')).toBeInTheDocument();
   });
 });

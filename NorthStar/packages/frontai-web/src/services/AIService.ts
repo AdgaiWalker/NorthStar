@@ -7,6 +7,23 @@ import { safeParseJsonObject, ZhipuChatResponse, normalizeStringArray, isRecord 
 const ZHIPU_MODEL = 'glm-4-flash';
 const EMIT_SEARCH_RESULT_TOOL_NAME = 'emit_search_result_v2';
 
+const resolveFallbackReason = async (response: Response): Promise<FallbackReason> => {
+  const payload = (await response.json().catch(() => null)) as { error?: string; fallbackReason?: string } | null;
+  const errorText = `${payload?.fallbackReason ?? ''} ${payload?.error ?? ''}`.toLowerCase();
+
+  if (
+    response.status === 401 ||
+    response.status === 403 ||
+    response.status === 404 ||
+    errorText.includes('missing_key') ||
+    errorText.includes('config missing')
+  ) {
+    return 'missing_key';
+  }
+
+  return 'network_error';
+};
+
 export const searchToolsWithAI = async (
   query: string, 
   availableTools: Tool[],
@@ -81,7 +98,7 @@ ${articleContext}
     });
  
     if (!response.ok) {
-      const reason = response.status === 401 || response.status === 403 || response.status === 404 ? 'missing_key' : 'network_error';
+      const reason = await resolveFallbackReason(response);
       return buildFallbackResult(reason, query, availableTools, availableArticles);
     }
  
@@ -228,7 +245,7 @@ ${toolContext}
     });
 
     if (!response.ok) {
-      const reason = response.status === 401 || response.status === 403 || response.status === 404 ? 'missing_key' : 'network_error';
+      const reason = await resolveFallbackReason(response);
       return buildFallbackSolution(reason, effectiveGoal, selectedTools);
     }
 

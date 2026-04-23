@@ -22,6 +22,25 @@ async function seed() {
     return;
   }
 
+  await db.execute(sql`
+    truncate table
+      reports,
+      search_logs,
+      notifications,
+      favorites,
+      auth_requests,
+      activities,
+      feedbacks,
+      post_replies,
+      posts,
+      articles,
+      knowledge_bases,
+      trust_events,
+      users,
+      cities
+    restart identity cascade
+  `);
+
   await db
     .insert(cities)
     .values({ id: 1, code: "heihe", name: "黑河学院", isActive: true })
@@ -108,6 +127,7 @@ async function seed() {
     .onConflictDoNothing();
 
   const childArticleSlug = "campus-a1-price-child";
+  await db.execute(sql`select setval('articles_id_seq', coalesce((select max(id) from articles), 1), true)`);
   const childArticle = await db.execute(sql`select id from articles where slug = ${childArticleSlug} limit 1`);
   if (childArticle.rows.length === 0) {
     await db.insert(articles).values({
@@ -115,7 +135,7 @@ async function seed() {
       parentId: 1,
       title: "二食堂麻辣烫价格补充",
       slug: childArticleSlug,
-      content: "# 二食堂麻辣烫价格补充\n\n这是父子文章结构的 seed 示例，用于验证空间页最多一层嵌套展示。",
+      content: "# 二食堂麻辣烫价格补充\n\n## 当前价格区间\n\n- 素菜为主：一般在 12-15 元\n- 加牛肉丸、培根等荤菜：通常会到 16-20 元\n- 晚高峰排队时间更长，建议提前 10-15 分钟去\n\n## 点单建议\n\n第一次吃可以先选基础套餐，再按口味补荤菜，避免一上来夹太多导致超预算。",
       authorId: 2,
       status: "published" as const,
       helpfulCount: 0,
@@ -163,6 +183,7 @@ async function seed() {
   console.log(
     JSON.stringify({
       skipped: false,
+      reset: true,
       spaces: SEED_TOPICS.length,
       articles: SEED_ARTICLES.length,
       posts: 2,

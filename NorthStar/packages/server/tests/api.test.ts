@@ -394,8 +394,8 @@ describe("frontlife API", () => {
         }),
       });
       const toolsBody = await toolsResponse.json();
-      expect(toolsResponse.status).toBe(200);
-      expect(toolsBody.choices[0].message.tool_calls[0].function.name).toBe("emit_solution_v1");
+      expect(toolsResponse.status).toBe(503);
+      expect(toolsBody.fallbackReason).toBe("missing_key");
     } finally {
       if (oldKey) process.env.AI_API_KEY = oldKey;
     }

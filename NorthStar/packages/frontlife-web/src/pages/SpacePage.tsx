@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, BookOpen, CheckCircle, Flag, LoaderCircle, MessageCircle, Sparkles } from 'lucide-react';
-import { ErrorState, LoadingState } from '@/components/LoadingState';
+import { EmptyState, ErrorState, LoadingState } from '@/components/LoadingState';
 import { api, type ArticleSummary, type PostRecord, type SpaceSummary } from '@/services/api';
 import { useUserStore } from '@/store/useUserStore';
 
@@ -16,9 +16,11 @@ export default function SpacePage() {
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [reportPostId, setReportPostId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState('');
   const [message, setMessage] = useState('');
+  const [actionError, setActionError] = useState('');
   const [postContent, setPostContent] = useState('');
   const [postTag, setPostTag] = useState('share');
   const [activePost, setActivePost] = useState<PostRecord | null>(null);
@@ -40,6 +42,8 @@ export default function SpacePage() {
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
+    setLoading(true);
+    setError('');
 
     Promise.all([api.getSpace(id), api.getSpacePosts(id)])
       .then(([spaceResult, postsResult]) => {
@@ -58,28 +62,36 @@ export default function SpacePage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   const parentArticles = articles.filter((article) => !article.parentId);
   const childArticles = articles.filter((article) => article.parentId);
+  const visiblePosts = posts.slice(0, 12);
 
   const submitPostReport = async (postId: string) => {
     if (!token) return navigate('/login');
     if (!reportReason.trim()) return;
-    await api.reportContent({
-      targetType: 'post',
-      targetId: postId,
-      reason: reportReason.trim(),
-    });
-    setReportPostId(null);
-    setReportReason('');
-    setMessage('举报已提交');
+    setMessage('');
+    setActionError('');
+    try {
+      await api.reportContent({
+        targetType: 'post',
+        targetId: postId,
+        reason: reportReason.trim(),
+      });
+      setReportPostId(null);
+      setReportReason('');
+      setMessage('举报已提交');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '举报提交失败，请稍后重试。');
+    }
   };
 
   const publishPost = async () => {
     if (!token) return navigate('/login');
     if (!id || !postContent.trim()) return;
     setPostError('');
+    setActionError('');
     setPostSubmitting(true);
     try {
       const result = await api.createPost({
@@ -102,6 +114,7 @@ export default function SpacePage() {
     if (!token) return navigate('/login');
     if (!activePost || !replyContent.trim()) return;
     setReplyError('');
+    setActionError('');
     try {
       const result = await api.replyToPost(activePost.id, replyContent.trim());
       const updatedPost: PostRecord = {
@@ -119,10 +132,16 @@ export default function SpacePage() {
 
   const solvePost = async (post: PostRecord) => {
     if (!token) return navigate('/login');
-    const result = await api.markPostSolved(post.id);
-    const updatedPost = { ...post, solved: result.post.solved ?? true };
-    setPosts((current) => current.map((item) => (item.id === post.id ? updatedPost : item)));
-    if (activePost?.id === post.id) setActivePost(updatedPost);
+    setMessage('');
+    setActionError('');
+    try {
+      const result = await api.markPostSolved(post.id);
+      const updatedPost = { ...post, solved: result.post.solved ?? true };
+      setPosts((current) => current.map((item) => (item.id === post.id ? updatedPost : item)));
+      if (activePost?.id === post.id) setActivePost(updatedPost);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '标记失败，请稍后重试。');
+    }
   };
 
   const generateDraft = async () => {
@@ -130,6 +149,7 @@ export default function SpacePage() {
     if (!space || !writingTopic.trim()) return;
     setWritingError('');
     setWritingSuccess('');
+    setActionError('');
     setWritingLoading(true);
     try {
       const result = await api.generateArticleDraft({
@@ -152,6 +172,7 @@ export default function SpacePage() {
     if (!space || !draftTitle.trim() || !draftContent.trim()) return;
     setWritingError('');
     setWritingSuccess('');
+    setActionError('');
     setPublishingArticle(true);
     try {
       const result = await api.createArticle({
@@ -179,12 +200,17 @@ export default function SpacePage() {
   return (
     <div className="mx-auto max-w-content-max overflow-x-hidden px-4 py-6 sm:px-5 sm:py-8">
       {loading && <LoadingState label="正在加载空间..." />}
-      {!loading && error && <ErrorState message={error} />}
+      {!loading && error && (
+        <ErrorState title="空间加载失败" message={error} onRetry={() => setReloadKey((value) => value + 1)} />
+      )}
       {!loading && !error && space && (
         <div className="lg:grid lg:grid-cols-[210px_minmax(0,1fr)_190px] lg:gap-4 xl:grid-cols-[230px_minmax(0,1fr)_220px] xl:gap-5">
           <aside className="sticky top-[72px] hidden max-h-[calc(100vh-88px)] overflow-y-auto rounded-2xl border border-border-light bg-bg-subtle p-4 lg:block">
             <div className="mb-3 text-xs font-semibold tracking-wider text-ink-muted">文章树</div>
             <div className="space-y-2">
+              {parentArticles.length === 0 && (
+                <div className="rounded-lg bg-white px-3 py-2 text-sm text-ink-muted">暂无文章</div>
+              )}
               {parentArticles.map((article) => {
                 const children = childArticles.filter((item) => item.parentId === article.id);
                 return (
@@ -318,6 +344,12 @@ export default function SpacePage() {
               </div>
             )}
             <div className="space-y-3">
+              {parentArticles.length === 0 && (
+                <EmptyState
+                  title="暂无文章"
+                  description="这个空间还没有知识文章。等编辑补充后会在这里形成知识体系。"
+                />
+              )}
               {parentArticles.map((article) => {
                 const children = childArticles.filter((item) => item.parentId === article.id);
                 return (
@@ -380,7 +412,18 @@ export default function SpacePage() {
               </div>
             )}
             <div className="space-y-3">
-              {posts.map((post) => (
+              {posts.length === 0 && (
+                <EmptyState
+                  title="暂无帖子"
+                  description="这个空间还没有同学动态。"
+                />
+              )}
+              {posts.length > visiblePosts.length && (
+                <div className="rounded-xl border border-border-light bg-bg-subtle px-4 py-3 text-sm text-ink-muted">
+                  共 {posts.length} 条动态，显示最近 {visiblePosts.length} 条
+                </div>
+              )}
+              {visiblePosts.map((post) => (
                 <div key={post.id} className="rounded-2xl border border-border-light bg-surface p-4">
                   <div className="mb-2 flex items-center justify-between gap-2 text-xs text-ink-muted">
                     <span className="flex items-center gap-2">
@@ -426,6 +469,7 @@ export default function SpacePage() {
               ))}
             </div>
             {message && <div className="mt-3 text-sm text-sage">{message}</div>}
+            {actionError && <div className="mt-3 text-sm text-rose-custom">{actionError}</div>}
           </section>
           </main>
 
@@ -458,6 +502,7 @@ export default function SpacePage() {
                 ))}
               </div>
               {replyError && <div className="mt-3 text-sm text-rose-custom">{replyError}</div>}
+              {actionError && <div className="mt-3 text-sm text-rose-custom">{actionError}</div>}
               {token ? <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <input
                   value={replyContent}

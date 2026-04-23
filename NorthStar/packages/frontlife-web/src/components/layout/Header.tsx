@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Bell, PenLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
@@ -23,6 +23,7 @@ export default function Header() {
   const markNotificationRead = useUIStore((s) => s.markNotificationRead);
   const resetNotifications = useUIStore((s) => s.resetNotifications);
   const [open, setOpen] = useState(false);
+  const [notificationError, setNotificationError] = useState('');
 
   const currentRoute =
     location.pathname === '/'
@@ -33,14 +34,25 @@ export default function Header() {
           ? 'me'
           : 'home';
 
-  useEffect(() => {
+  const refreshNotifications = useCallback(() => {
     if (!token) {
       resetNotifications();
+      setNotificationError('');
       return;
     }
 
-    api.getNotifications().then((result) => setNotifications(result.notifications)).catch(() => undefined);
+    setNotificationError('');
+    api
+      .getNotifications()
+      .then((result) => setNotifications(result.notifications))
+      .catch((err) => {
+        setNotificationError(err instanceof Error ? err.message : '通知加载失败，请稍后重试。');
+      });
   }, [resetNotifications, setNotifications, token]);
+
+  useEffect(() => {
+    refreshNotifications();
+  }, [refreshNotifications]);
 
   const unreadCount = notifications.filter((item) => !item.isRead).length;
 
@@ -87,6 +99,7 @@ export default function Header() {
         <div className="relative hidden md:block">
           <button
             onClick={() => setOpen((value) => !value)}
+            aria-label={unreadCount > 0 ? `通知，${unreadCount} 条未读` : '通知'}
             className="relative flex h-8 w-8 items-center justify-center rounded-full text-ink-muted hover:bg-bg-subtle hover:text-sage"
           >
             <Bell size={17} />
@@ -98,13 +111,26 @@ export default function Header() {
           </button>
           {open && (
             <div className="absolute right-0 top-10 w-72 rounded-2xl border border-border-light bg-white p-3 shadow-lg">
+              {notificationError && (
+                <div className="rounded-xl bg-rose-light px-3 py-2 text-sm leading-6 text-rose-custom">
+                  {notificationError}
+                  <button onClick={refreshNotifications} className="mt-2 block font-semibold">
+                    重试
+                  </button>
+                </div>
+              )}
               {notifications.length === 0 && <div className="px-2 py-4 text-sm text-ink-muted">暂无通知</div>}
               {notifications.slice(0, 5).map((item) => (
                 <button
                   key={item.id}
                   onClick={async () => {
-                    await api.markNotificationRead(item.id);
-                    markNotificationRead(item.id);
+                    setNotificationError('');
+                    try {
+                      await api.markNotificationRead(item.id);
+                      markNotificationRead(item.id);
+                    } catch (err) {
+                      setNotificationError(err instanceof Error ? err.message : '通知标记已读失败，请稍后重试。');
+                    }
                   }}
                   className="block w-full rounded-xl px-3 py-2 text-left hover:bg-bg-subtle"
                 >

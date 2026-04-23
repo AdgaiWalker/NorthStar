@@ -16,6 +16,8 @@ export default function ProfilePage() {
   const markNotificationRead = useUIStore((state) => state.markNotificationRead);
   const [loading, setLoading] = useState(Boolean(token));
   const [error, setError] = useState('');
+  const [notificationError, setNotificationError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!token) {
@@ -23,6 +25,9 @@ export default function ProfilePage() {
       return;
     }
 
+    setLoading(true);
+    setError('');
+    setNotificationError('');
     Promise.all([api.getProfile(), api.getNotifications()])
       .then(([profileResult, notificationResult]) => {
         setProfile(profileResult);
@@ -30,7 +35,7 @@ export default function ProfilePage() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : '个人页加载失败'))
       .finally(() => setLoading(false));
-  }, [setNotifications, token]);
+  }, [reloadKey, setNotifications, token]);
 
   if (!token) {
     return (
@@ -47,9 +52,16 @@ export default function ProfilePage() {
   }
 
   if (loading) return <div className="mx-auto max-w-[640px] px-4 py-6"><LoadingState label="正在加载个人页..." /></div>;
-  if (error || !profile) return <div className="mx-auto max-w-[640px] px-4 py-6"><ErrorState message={error} /></div>;
+  if (error || !profile) {
+    return (
+      <div className="mx-auto max-w-[640px] px-4 py-6">
+        <ErrorState title="个人页加载失败" message={error} onRetry={() => setReloadKey((value) => value + 1)} />
+      </div>
+    );
+  }
 
   const unreadCount = notifications.filter((item) => !item.isRead).length;
+  const visibleNotifications = notifications.slice(0, 12);
 
   return (
     <div className="mx-auto max-w-[640px] px-4 py-6">
@@ -84,31 +96,50 @@ export default function ProfilePage() {
         {notifications.length === 0 ? (
           <Empty text="暂无通知" />
         ) : (
-          notifications.map((item) => (
-            <button
-              key={item.id}
-              onClick={async () => {
-                if (!item.isRead) {
-                  await api.markNotificationRead(item.id);
-                  markNotificationRead(item.id);
-                }
-              }}
-              className="block w-full border-b border-border-light px-5 py-3.5 text-left last:border-b-0"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-ink">{item.title}</div>
-                  <div className="mt-0.5 text-xs leading-5 text-ink-muted">{item.content}</div>
-                </div>
-                {!item.isRead && <span className="mt-1 h-2.5 w-2.5 rounded-full bg-sage" />}
+          <>
+            {notifications.length > visibleNotifications.length && (
+              <div className="border-b border-border-light px-5 py-2 text-xs text-ink-muted">
+                共 {notifications.length} 条，显示最近 {visibleNotifications.length} 条
               </div>
-            </button>
-          ))
+            )}
+            {visibleNotifications.map((item) => (
+              <button
+                key={item.id}
+                onClick={async () => {
+                  if (!item.isRead) {
+                    setNotificationError('');
+                    try {
+                      await api.markNotificationRead(item.id);
+                      markNotificationRead(item.id);
+                    } catch (err) {
+                      setNotificationError(err instanceof Error ? err.message : '通知标记已读失败，请稍后重试。');
+                    }
+                  }
+                }}
+                className="block w-full border-b border-border-light px-5 py-3.5 text-left last:border-b-0"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-ink">{item.title}</div>
+                    <div className="mt-0.5 text-xs leading-5 text-ink-muted">{item.content}</div>
+                  </div>
+                  {!item.isRead && <span className="mt-1 h-2.5 w-2.5 rounded-full bg-sage" />}
+                </div>
+              </button>
+            ))}
+            {notificationError && (
+              <div className="px-5 py-3 text-sm text-rose-custom">{notificationError}</div>
+            )}
+          </>
         )}
       </Section>
 
       <Section title="我的内容" icon={<FileText size={17} />}>
-        {profile.contents.slice(0, 4).map((item) => <Row key={item.id} title={'title' in item ? item.title : item.content} sub={'helpfulCount' in item ? `${item.helpfulCount} 人确认` : ''} />)}
+        {profile.contents.length === 0 ? (
+          <Empty text="暂无个人内容" />
+        ) : (
+          profile.contents.slice(0, 4).map((item) => <Row key={item.id} title={'title' in item ? item.title : item.content} sub={'helpfulCount' in item ? `${item.helpfulCount} 人确认` : ''} />)
+        )}
       </Section>
 
       <Section title="我的收藏" icon={<Bookmark size={17} />}>

@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { BookOpen, ChevronDown, MessageCircle, Search, Sparkles } from 'lucide-react';
-import { ErrorState, LoadingState } from '@/components/LoadingState';
+import { EmptyState, ErrorState, LoadingState } from '@/components/LoadingState';
 import { api, type SearchResponse } from '@/services/api';
 
 type SearchMode = 'exact' | 'partial' | 'empty';
 
 export default function SearchResultPage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q')?.trim() ?? '';
   const [searchResult, setSearchResult] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState('');
   const [aiOpen, setAiOpen] = useState(false);
   const [aiAnswer, setAiAnswer] = useState('');
@@ -38,7 +40,7 @@ export default function SearchResultPage() {
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, reloadKey]);
 
   const result = useMemo(() => {
     const articles = searchResult?.articles ?? [];
@@ -110,9 +112,23 @@ export default function SearchResultPage() {
       </div>
 
       {loading && <LoadingState label="正在搜索本地内容..." />}
-      {!loading && error && <ErrorState message={error} />}
+      {!loading && error && (
+        <ErrorState
+          title="搜索失败"
+          message={error}
+          onRetry={() => setReloadKey((value) => value + 1)}
+          onBack={() => navigate('/')}
+          backLabel="返回首页"
+        />
+      )}
       {!loading && !error && (
         <div className="space-y-4">
+          {result.mode === 'empty' && (
+            <EmptyState
+              title="暂无本地结果"
+              description="没有找到已确认文章、空间或同学动态。下面可以查看 AI 的补充回答。"
+            />
+          )}
           {(result.articles.length > 0 || result.posts.length > 0 || result.spaces.length > 0) && (
             <div className="space-y-3">
               <div className="text-sm font-semibold text-ink-secondary">

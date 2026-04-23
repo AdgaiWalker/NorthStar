@@ -170,8 +170,16 @@ aiRoute.post("/api/ai/tools", async (c) => {
   const goal = body.goal?.trim() || extractQuotedText(prompt) || "提高效率";
 
   if (body.messages?.length) {
-    const response = await callChatCompletion(body, buildToolFallback(goal, functionName));
-    return c.json(response);
+    if (!hasAIConfig()) {
+      return c.json({ error: "AI config missing", fallbackReason: "missing_key" }, 503);
+    }
+
+    try {
+      const response = await callChatCompletion(body, null);
+      return c.json(response);
+    } catch {
+      return c.json({ error: "AI request failed", fallbackReason: "network_error" }, 502);
+    }
   }
 
   return c.json({
