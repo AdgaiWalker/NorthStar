@@ -33,6 +33,10 @@ export interface SiteConfigRecord {
   updatedAt: string;
 }
 
+export interface UpdateSiteConfigRequest {
+  value: Record<string, unknown>;
+}
+
 export interface AuditLogRecord {
   id: string;
   actorId: string | null;
@@ -42,5 +46,31 @@ export interface AuditLogRecord {
   action: string;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AdminUserRecord {
+  id: string;
+  username: string;
+  email: string;
+  name: string;
+  role: 'user' | 'editor' | 'reviewer' | 'operator' | 'admin';
+  site: SiteContext;
+  emailVerified: boolean;
+  disabled: boolean;
+  createdAt: string;
+}
+
+export interface UpdateAdminUserRoleRequest {
+  role: 'user' | 'editor' | 'reviewer' | 'operator' | 'admin';
+}
+
+export interface AdminContentRecord {
+  id: string;
+  site: SiteContext;
+  type: 'article' | 'post';
+  title: string;
+  authorId: string;
+  status: string;
   createdAt: string;
 }

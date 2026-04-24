@@ -28,7 +28,7 @@ export interface AccountDeletionRequestRecord {
   site: Exclude<SiteContext, 'all'>;
   status: AccountDeletionStatus;
   reason?: string;
-  createdAt: string;
+  requestedAt: string;
   resolvedAt?: string;
 }
 
@@ -37,4 +37,13 @@ export interface DataExportResponse {
   site: Exclude<SiteContext, 'all'>;
   exportedAt: string;
   payload: Record<string, unknown>;
+}
+
+export interface ConsentRequest {
+  site: Exclude<SiteContext, 'all'>;
+  version: string;
+}
+
+export interface AccountDeletionRequestInput {
+  reason?: string;
 }

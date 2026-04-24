@@ -1,6 +1,24 @@
-import type { AdminSummary, AuditLogRecord, SiteConfigRecord, SiteContext } from "@ns/shared";
+import type {
+  AdminContentRecord,
+  AdminSummary,
+  AdminUserRecord,
+  AuditLogRecord,
+  SiteConfigRecord,
+  SiteContext,
+  UpdateAdminUserRoleRequest,
+  UpdateSiteConfigRequest,
+} from "@ns/shared";
 
-export type { AdminSummary, AuditLogRecord, SiteConfigRecord, SiteContext };
+export type {
+  AdminContentRecord,
+  AdminSummary,
+  AdminUserRecord,
+  AuditLogRecord,
+  SiteConfigRecord,
+  SiteContext,
+  UpdateAdminUserRoleRequest,
+  UpdateSiteConfigRequest,
+};
 
 export interface CreateAuditLogInput {
   actorId: number | null;

@@ -2,7 +2,25 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { app } from "../src/index";
 import { db } from "../src/db/client";
-import { activities, articles, auditLogs, favorites, feedbacks, moderationTasks, notifications, postReplies, posts, reports, searchLogs, trustEvents, users } from "../src/db/schema";
+import {
+  accountDeletionRequests,
+  activities,
+  articles,
+  auditLogs,
+  favorites,
+  feedbacks,
+  legalDocuments,
+  moderationTasks,
+  notifications,
+  postReplies,
+  posts,
+  reports,
+  searchLogs,
+  siteConfigs,
+  trustEvents,
+  userConsents,
+  users,
+} from "../src/db/schema";
 import { signToken } from "../src/lib/auth";
 import {
   createAuthInviteNotificationInDb,
@@ -112,7 +130,178 @@ describe("frontlife API", () => {
     expect(loginBody.user.username).toBe(username);
   });
 
+  it("handles identity register, email verification, password reset and invalidates old tokens", async () => {
+    if (!db) return;
+
+    const username = `identity-user-${Date.now()}`;
+    const email = `${username}@example.com`;
+
+    const registerResponse = await app.request("/api/identity/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username,
+        email,
+        password: "password",
+        site: "cn",
+        consentVersion: "2026-04-24",
+      }),
+    });
+    const registerBody = await registerResponse.json();
+    const oldAuthorization = `Bearer ${registerBody.data.token}`;
+
+    expect(registerResponse.status).toBe(201);
+    expect(registerBody.ok).toBe(true);
+    expect(registerBody.data.user.username).toBe(username);
+    expect(registerBody.data.user.emailVerified).toBe(false);
+
+    const consentRows = await db
+      .select()
+      .from(userConsents)
+      .where(eq(userConsents.userId, Number(registerBody.data.user.id)));
+    expect(consentRows).toHaveLength(2);
+
+    const userRows = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    const verificationToken = userRows[0].emailVerificationToken;
+    expect(verificationToken).toBeTruthy();
+
+    const verifyResponse = await app.request("/api/identity/email/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: verificationToken }),
+    });
+    const verifyBody = await verifyResponse.json();
+
+    expect(verifyResponse.status).toBe(200);
+    expect(verifyBody.data.user.emailVerified).toBe(true);
+
+    const loginResponse = await app.request("/api/identity/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ account: email, password: "password", site: "cn" }),
+    });
+    expect(loginResponse.status).toBe(200);
+
+    const meResponse = await app.request("/api/identity/me", {
+      headers: { Authorization: oldAuthorization },
+    });
+    expect(meResponse.status).toBe(200);
+
+    const resetRequestResponse = await app.request("/api/identity/password-reset/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, site: "cn" }),
+    });
+    const resetRequestBody = await resetRequestResponse.json();
+    expect(resetRequestResponse.status).toBe(200);
+    expect(resetRequestBody.data.resetToken).toBeTruthy();
+
+    const resetConfirmResponse = await app.request("/api/identity/password-reset/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: resetRequestBody.data.resetToken, password: "new-password" }),
+    });
+    expect(resetConfirmResponse.status).toBe(200);
+
+    const invalidatedMeResponse = await app.request("/api/identity/me", {
+      headers: { Authorization: oldAuthorization },
+    });
+    expect(invalidatedMeResponse.status).toBe(401);
+
+    const newLoginResponse = await app.request("/api/identity/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ account: username, password: "new-password", site: "cn" }),
+    });
+    expect(newLoginResponse.status).toBe(200);
+  });
+
+  it("serves compliance documents, exports user data and processes deletion requests", async () => {
+    if (!db) return;
+
+    const username = `compliance-user-${Date.now()}`;
+    const email = `${username}@example.com`;
+    const registerResponse = await app.request("/api/identity/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username,
+        email,
+        password: "password",
+        site: "cn",
+        consentVersion: "2026-04-24",
+      }),
+    });
+    const registerBody = await registerResponse.json();
+    const authorization = `Bearer ${registerBody.data.token}`;
+
+    const docsResponse = await app.request("/api/compliance/legal-documents?type=terms", {
+      headers: { "x-pangen-site": "cn" },
+    });
+    const docsBody = await docsResponse.json();
+    expect(docsResponse.status).toBe(200);
+    expect(docsBody.data.items.length).toBeGreaterThan(0);
+    expect(await countRows(legalDocuments)).toBeGreaterThanOrEqual(4);
+
+    const exportResponse = await app.request("/api/compliance/data-export", {
+      headers: { Authorization: authorization },
+    });
+    const exportBody = await exportResponse.json();
+    expect(exportResponse.status).toBe(200);
+    expect(exportBody.data.payload.user.username).toBe(username);
+
+    const deletionResponse = await app.request("/api/compliance/account-deletions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: authorization },
+      body: JSON.stringify({ reason: "测试注销" }),
+    });
+    const deletionBody = await deletionResponse.json();
+    expect(deletionResponse.status).toBe(201);
+    expect(deletionBody.data.status).toBe("pending");
+    expect(await countRows(accountDeletionRequests)).toBeGreaterThan(0);
+
+    const forbiddenListResponse = await app.request("/api/compliance/account-deletions", {
+      headers: { Authorization: authorization },
+    });
+    expect(forbiddenListResponse.status).toBe(403);
+
+    const adminListResponse = await app.request("/api/compliance/account-deletions", {
+      headers: {
+        Authorization: adminAuthorization("cn"),
+        "x-pangen-site": "cn",
+      },
+    });
+    expect(adminListResponse.status).toBe(200);
+
+    const auditBefore = await countRows(auditLogs);
+    const completeResponse = await app.request(`/api/compliance/account-deletions/${deletionBody.data.id}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: adminAuthorization("cn"),
+        "x-pangen-site": "cn",
+      },
+      body: JSON.stringify({ status: "completed" }),
+    });
+    expect(completeResponse.status).toBe(200);
+    expect(await countRows(auditLogs)).toBe(auditBefore + 1);
+
+    const invalidatedExportResponse = await app.request("/api/compliance/data-export", {
+      headers: { Authorization: authorization },
+    });
+    expect(invalidatedExportResponse.status).toBe(401);
+  });
+
   it("enforces site-aware admin access boundaries", async () => {
+    const userCnResponse = await app.request("/api/admin/summary", {
+      headers: {
+        Authorization: userAuthorization("cn"),
+        "x-pangen-site": "cn",
+      },
+    });
+
+    expect(userCnResponse.status).toBe(403);
+
     const forbiddenResponse = await app.request("/api/admin/summary", {
       headers: {
         Authorization: userAuthorization("cn"),
@@ -133,6 +322,72 @@ describe("frontlife API", () => {
     expect(adminResponse.status).toBe(200);
     expect(adminBody.ok).toBe(true);
     expect(adminBody.data.site).toBe("all");
+  });
+
+  it("supports admin users, content and site config operations with audit logs", async () => {
+    if (!db) return;
+
+    const username = `admin-target-${Date.now()}`;
+    const registerResponse = await app.request("/api/identity/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username,
+        email: `${username}@example.com`,
+        password: "password",
+        site: "cn",
+      }),
+    });
+    const registerBody = await registerResponse.json();
+
+    const usersResponse = await app.request("/api/admin/users", {
+      headers: {
+        Authorization: adminAuthorization("cn"),
+        "x-pangen-site": "cn",
+      },
+    });
+    const usersBody = await usersResponse.json();
+    expect(usersResponse.status).toBe(200);
+    expect(usersBody.data.items.some((item: { username: string }) => item.username === username)).toBe(true);
+
+    const auditBefore = await countRows(auditLogs);
+    const roleResponse = await app.request(`/api/admin/users/${registerBody.data.user.id}/role`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: adminAuthorization("cn"),
+        "x-pangen-site": "cn",
+      },
+      body: JSON.stringify({ role: "reviewer" }),
+    });
+    const roleBody = await roleResponse.json();
+    expect(roleResponse.status).toBe(200);
+    expect(roleBody.data.role).toBe("reviewer");
+
+    const contentResponse = await app.request("/api/admin/content", {
+      headers: {
+        Authorization: adminAuthorization("cn"),
+        "x-pangen-site": "cn",
+      },
+    });
+    const contentBody = await contentResponse.json();
+    expect(contentResponse.status).toBe(200);
+    expect(contentBody.data.items.length).toBeGreaterThan(0);
+
+    const configRows = await db.select().from(siteConfigs).where(eq(siteConfigs.site, "cn")).limit(1);
+    const configResponse = await app.request(`/api/admin/site-configs/${configRows[0].id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: adminAuthorization("cn"),
+        "x-pangen-site": "cn",
+      },
+      body: JSON.stringify({ value: { name: "盘根校园", domain: "xyzidea.cn", test: "updated" } }),
+    });
+    const configBody = await configResponse.json();
+    expect(configResponse.status).toBe(200);
+    expect(configBody.data.value.test).toBe("updated");
+    expect(await countRows(auditLogs)).toBe(auditBefore + 2);
   });
 
   it("creates moderation tasks and writes audit logs on state changes", async () => {
@@ -241,6 +496,7 @@ describe("frontlife API", () => {
     const authorization = await login();
     const editorAuthorization = await login("editor");
     const feedbackBefore = await countRows(feedbacks);
+    const moderationBefore = await countRows(moderationTasks);
     const activityBefore = await countRows(activities);
     const trustBefore = await countRows(trustEvents);
 
@@ -274,6 +530,7 @@ describe("frontlife API", () => {
     expect(changedResponse.status).toBe(200);
     expect(changedBody.changedCount).toBeGreaterThan(0);
     expect(await countRows(feedbacks)).toBe(feedbackBefore + 2);
+    expect(await countRows(moderationTasks)).toBe(moderationBefore + 1);
 
     const editorChangedNotifications = await app.request("/api/notifications", {
       headers: { Authorization: editorAuthorization },
@@ -389,6 +646,7 @@ describe("frontlife API", () => {
     const postBody = await postResponse.json();
     const replyBefore = await countRows(postReplies);
     const reportBefore = await countRows(reports);
+    const moderationBefore = await countRows(moderationTasks);
     const searchBefore = await countRows(searchLogs);
 
     const replyResponse = await app.request(`/api/posts/${postBody.post.id}/replies`, {
@@ -416,6 +674,7 @@ describe("frontlife API", () => {
 
     expect(reportResponse.status).toBe(201);
     expect(await countRows(reports)).toBe(reportBefore + 1);
+    expect(await countRows(moderationTasks)).toBe(moderationBefore + 1);
 
     const searchResponse = await app.request("/api/search/logs", {
       method: "POST",

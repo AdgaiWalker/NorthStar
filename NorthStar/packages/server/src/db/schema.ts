@@ -96,8 +96,11 @@ export const users = pgTable(
     passwordHash: text("password_hash"),
     emailVerified: boolean("email_verified").default(false).notNull(),
     emailVerificationToken: varchar("email_verification_token", { length: 128 }),
+    emailVerificationExpiresAt: timestamp("email_verification_expires_at", { mode: "date" }),
     passwordResetToken: varchar("password_reset_token", { length: 128 }),
     passwordResetExpiresAt: timestamp("password_reset_expires_at", { mode: "date" }),
+    tokenInvalidBefore: timestamp("token_invalid_before", { mode: "date" }),
+    disabledAt: timestamp("disabled_at", { mode: "date" }),
     avatar: text("avatar"),
     school: varchar("school", { length: 100 }),
     cityId: integer("city_id").references(() => cities.id),
@@ -115,6 +118,7 @@ export const users = pgTable(
     uniqueIndex("users_wx_open_id_idx").on(table.wxOpenId),
     index("users_site_idx").on(table.site),
     index("users_role_idx").on(table.role),
+    index("users_token_invalid_before_idx").on(table.tokenInvalidBefore),
     index("users_trust_level_idx").on(table.trustLevel),
     index("users_city_id_idx").on(table.cityId),
   ]
@@ -183,6 +187,63 @@ export const moderationTasks = pgTable(
     index("moderation_tasks_type_idx").on(table.type),
     index("moderation_tasks_target_idx").on(table.targetType, table.targetId),
     index("moderation_tasks_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const legalDocuments = pgTable(
+  "legal_documents",
+  {
+    id: serial("id").primaryKey(),
+    site: varchar("site", { length: 10 }).notNull(),
+    type: varchar("type", { length: 30 }).notNull(),
+    version: varchar("version", { length: 50 }).notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    content: text("content").notNull(),
+    publishedAt: timestamp("published_at", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("legal_documents_site_type_version_idx").on(table.site, table.type, table.version),
+    index("legal_documents_site_type_idx").on(table.site, table.type),
+  ],
+);
+
+export const userConsents = pgTable(
+  "user_consents",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .references(() => users.id)
+      .notNull(),
+    site: varchar("site", { length: 10 }).notNull(),
+    documentType: varchar("document_type", { length: 30 }).notNull(),
+    version: varchar("version", { length: 50 }).notNull(),
+    consentedAt: timestamp("consented_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_consents_user_doc_version_idx").on(table.userId, table.documentType, table.version),
+    index("user_consents_site_idx").on(table.site),
+    index("user_consents_user_id_idx").on(table.userId),
+  ],
+);
+
+export const accountDeletionRequests = pgTable(
+  "account_deletion_requests",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .references(() => users.id)
+      .notNull(),
+    site: varchar("site", { length: 10 }).notNull(),
+    status: varchar("status", { length: 30 }).default("pending").notNull(),
+    reason: text("reason"),
+    requestedAt: timestamp("requested_at", { mode: "date" }).defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at", { mode: "date" }),
+    handledBy: integer("handled_by").references(() => users.id),
+  },
+  (table) => [
+    index("account_deletion_requests_user_id_idx").on(table.userId),
+    index("account_deletion_requests_site_status_idx").on(table.site, table.status),
   ],
 );
 
@@ -483,6 +544,9 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   moderationReports: many(moderationTasks, { relationName: "moderationReporter" }),
   moderationAssignments: many(moderationTasks, { relationName: "moderationAssignee" }),
   auditLogs: many(auditLogs),
+  consents: many(userConsents),
+  deletionRequests: many(accountDeletionRequests, { relationName: "deletionRequester" }),
+  handledDeletionRequests: many(accountDeletionRequests, { relationName: "deletionHandler" }),
   city: one(cities, { fields: [users.cityId], references: [cities.id] }),
   authRequest: one(authRequests, { fields: [users.id], references: [authRequests.userId] }),
 }));
@@ -570,5 +634,22 @@ export const moderationTasksRelations = relations(moderationTasks, ({ one }) => 
     fields: [moderationTasks.assigneeId],
     references: [users.id],
     relationName: "moderationAssignee",
+  }),
+}));
+
+export const userConsentsRelations = relations(userConsents, ({ one }) => ({
+  user: one(users, { fields: [userConsents.userId], references: [users.id] }),
+}));
+
+export const accountDeletionRequestsRelations = relations(accountDeletionRequests, ({ one }) => ({
+  user: one(users, {
+    fields: [accountDeletionRequests.userId],
+    references: [users.id],
+    relationName: "deletionRequester",
+  }),
+  handler: one(users, {
+    fields: [accountDeletionRequests.handledBy],
+    references: [users.id],
+    relationName: "deletionHandler",
   }),
 }));

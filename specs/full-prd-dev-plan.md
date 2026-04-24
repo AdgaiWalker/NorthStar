@@ -1,7 +1,7 @@
 # 盘根统一平台全量 PRD 实现方案
 
 > 日期：2026-04-24
-> 状态：待执行
+> 状态：P0 平台闭环进行中；M0/M1 已落地，M2/M3 最小闭环部分完成
 > 输入：
 > - `specs/MISSION.md`
 > - `specs/PRD-盘根校园-v9.md`
@@ -86,16 +86,16 @@ Payment Provider   全球站额度与支付
 
 统一平台层：
 
-- `admin-console`
-- `site-aware data layer`
-- 模块化后端目录
-- 统一 `identity`
-- 统一 `compliance`
-- 统一 `moderation`
+- `admin-console` 已有真实登录、审核、用户、内容、审计、配置最小闭环
+- `site-aware data layer` 已有基础实现
+- 模块化后端目录已建立
+- 统一 `identity` 已有用户名/邮箱注册登录、邮箱验证、密码重置、token 失效最小闭环
+- 统一 `compliance` 已有协议、consent、数据导出、注销申请最小闭环
+- 统一 `moderation` 已有任务、状态机、审计，校园举报/有变化已接入
 - 统一 `analytics`
 - 统一 `billing`
 - 统一 `notification`
-- shared API 契约扩展
+- shared API 契约已完成平台、identity、compliance、moderation、admin 基础扩展
 
 校园站全量缺口：
 
@@ -187,16 +187,16 @@ Payment Provider   全球站额度与支付
 
 ### P0 任务
 
-- [ ] M0-1 记录当前 git commit、tag、测试结果。
-- [ ] M0-2 更新 `specs/release-checklist-v0.3.1.md`，标明当前为全量 PRD 起点。
-- [ ] M0-3 跑一次基线验证：
+- [x] M0-1 记录当前 git commit、tag、测试结果。
+- [x] M0-2 更新 `specs/release-checklist-v0.3.1.md`，标明当前为全量 PRD 起点。
+- [x] M0-3 跑一次基线验证：
   - `frontlife-web` test/lint/typecheck/build
   - `frontai-web` typecheck/build
   - `server` test/typecheck
   - `db:push`
   - `db:seed`
   - 真实 API smoke
-- [ ] M0-4 列出现有旧路由和 mock 调用路径，标记“待替换”，不写兼容。
+- [x] M0-4 列出现有旧路由和 mock 调用路径，标记“待替换”，不写兼容。
 
 ### 验收
 
@@ -212,11 +212,11 @@ Payment Provider   全球站额度与支付
 
 ### M1-A：工作区与包结构
 
-- [ ] M1-A1 新增 `packages/admin-console`。
-- [ ] M1-A2 配置 Vite、React、TypeScript、Tailwind、Lucide。
-- [ ] M1-A3 管理后台只接真实 API，不建长期 mock 数据层。
-- [ ] M1-A4 admin 顶栏固定显示当前 `site`：`cn / com / all`。
-- [ ] M1-A5 admin 路由：
+- [x] M1-A1 新增 `packages/admin-console`。
+- [x] M1-A2 配置 Vite、React、TypeScript、Tailwind、Lucide。
+- [x] M1-A3 管理后台只接真实 API，不建长期 mock 数据层。
+- [x] M1-A4 admin 顶栏固定显示当前 `site`：`cn / com / all`。
+- [x] M1-A5 admin 路由：
   - `/`
   - `/content`
   - `/review`
@@ -228,7 +228,7 @@ Payment Provider   全球站额度与支付
 
 ### M1-B：后端模块目录
 
-- [ ] M1-B1 重整 `server/src/modules`：
+- [x] M1-B1 重整 `server/src/modules`：
   - `platform`
   - `identity`
   - `campus`
@@ -239,10 +239,10 @@ Payment Provider   全球站额度与支付
   - `analytics`
   - `billing`
   - `compliance`
-- [ ] M1-B2 新增 `server/src/middleware/site.ts`。
-- [ ] M1-B3 新增 `server/src/middleware/auth.ts`。
-- [ ] M1-B4 新增统一错误响应格式。
-- [ ] M1-B5 新增 API 命名空间路由：
+- [x] M1-B2 新增 `server/src/middleware/site.ts`。
+- [x] M1-B3 新增 `server/src/middleware/auth.ts`。
+- [x] M1-B4 新增统一错误响应格式。
+- [x] M1-B5 新增 API 命名空间路由：
   - `/api/campus/*`
   - `/api/compass/*`
   - `/api/admin/*`
@@ -250,24 +250,24 @@ Payment Provider   全球站额度与支付
   - `/api/compliance/*`
   - `/api/analytics/*`
   - `/api/billing/*`
-- [ ] M1-B6 新增 `site_configs` 表和 platform config repository。
-- [ ] M1-B7 新增 `audit_logs` 基础表，供后续后台、审核、合规复用。
+- [x] M1-B6 新增 `site_configs` 表和 platform config repository。
+- [x] M1-B7 新增 `audit_logs` 基础表，供后续后台、审核、合规复用。
 
 ### M1-C：site-aware data layer
 
-- [ ] M1-C1 新增 `SiteContext`：`cn | com | all`。
-- [ ] M1-C2 所有新 repository 必须接收 `SiteContext`。
-- [ ] M1-C3 新增数据源选择器，开发期默认单库。
-- [ ] M1-C4 增加跨站访问保护：非 admin 不允许 `site=all`。
-- [ ] M1-C5 增加隔离测试：cn 用户不能读取 com 数据，反向同理。
+- [x] M1-C1 新增 `SiteContext`：`cn | com | all`。
+- [x] M1-C2 所有新 repository 必须接收 `SiteContext`。
+- [x] M1-C3 新增数据源选择器，开发期默认单库。
+- [x] M1-C4 增加跨站访问保护：非 admin 不允许 `site=all`。
+- [x] M1-C5 增加隔离测试：cn 用户不能读取 com 数据，反向同理。
 
 ### M1-D：shared 契约
 
-- [ ] M1-D1 新增 shared site 类型。
-- [ ] M1-D2 新增统一 API envelope 类型。
-- [ ] M1-D3 新增 admin API 类型。
-- [ ] M1-D4 新增 identity/compliance/moderation/analytics/billing 契约。
-- [ ] M1-D5 前端禁止私造新接口结构。
+- [x] M1-D1 新增 shared site 类型。
+- [x] M1-D2 新增统一 API envelope 类型。
+- [x] M1-D3 新增 admin API 类型。
+- [x] M1-D4 新增 identity/compliance/moderation/analytics/billing 契约。
+- [x] M1-D5 前端禁止私造新接口结构。
 - [ ] M1-D6 新增 content/compass/search/news 契约，覆盖全球站工具、专题、文章、资讯和方案。
 
 ### 验收
@@ -285,22 +285,22 @@ Payment Provider   全球站额度与支付
 
 ### M2-A：identity
 
-- [ ] M2-A1 users 表补邮箱字段、邮箱唯一索引、邮箱验证状态。
-- [ ] M2-A2 用户名 + 邮箱 + 密码注册。
-- [ ] M2-A3 邮箱登录或用户名登录。
-- [ ] M2-A4 邮箱验证 token。
-- [ ] M2-A5 密码重置。
-- [ ] M2-A6 JWT session 统一。
-- [ ] M2-A7 登录态按站点隔离。
-- [ ] M2-A8 权限模型统一：
+- [x] M2-A1 users 表补邮箱字段、邮箱唯一索引、邮箱验证状态。
+- [x] M2-A2 用户名 + 邮箱 + 密码注册。
+- [x] M2-A3 邮箱登录或用户名登录。
+- [x] M2-A4 邮箱验证 token。
+- [x] M2-A5 密码重置。
+- [x] M2-A6 JWT session 统一。
+- [x] M2-A7 登录态按站点隔离。
+- [x] M2-A8 权限模型统一：
   - visitor
   - user
   - editor
   - reviewer
   - operator
   - admin
-- [ ] M2-A9 明确账号模型：同一 identity 模块，用户记录带 `site`，两站登录态、权限上下文和数据授权不互通。
-- [ ] M2-A10 禁止新增手机号字段依赖；现有 phone 字段若保留，只作为历史空字段，不参与注册登录。
+- [x] M2-A9 明确账号模型：同一 identity 模块，用户记录带 `site`，两站登录态、权限上下文和数据授权不互通。
+- [x] M2-A10 禁止新增手机号字段依赖；现有 phone 字段若保留，只作为历史空字段，不参与注册登录。
 
 ### M2-B：全球站申请与邀请
 
@@ -313,15 +313,15 @@ Payment Provider   全球站额度与支付
 
 ### M2-C：compliance
 
-- [ ] M2-C1 `legal_documents` 表。
-- [ ] M2-C2 `user_consents` 表。
+- [x] M2-C1 `legal_documents` 表。
+- [x] M2-C2 `user_consents` 表。
 - [ ] M2-C3 隐私政策页。
 - [ ] M2-C4 用户协议页。
-- [ ] M2-C5 登录/注册时记录协议版本。
-- [ ] M2-C6 `account_deletion_requests` 表。
-- [ ] M2-C7 注销账号 API。
+- [x] M2-C5 登录/注册时记录协议版本。
+- [x] M2-C6 `account_deletion_requests` 表。
+- [x] M2-C7 注销账号 API。
 - [ ] M2-C8 数据删除任务。
-- [ ] M2-C9 数据导出 API。
+- [x] M2-C9 数据导出 API。
 - [ ] M2-C10 GDPR 删除/导出流程适配全球站。
 
 ### M2-D：前端接入
@@ -330,7 +330,7 @@ Payment Provider   全球站额度与支付
 - [ ] M2-D2 全球站登录页去模拟登录，接真实注册/登录。
 - [ ] M2-D3 我的页增加注销账号入口。
 - [ ] M2-D4 用户中心增加数据导出入口。
-- [ ] M2-D5 admin 用户管理接 identity API。
+- [x] M2-D5 admin 用户管理接 identity API。
 
 ### 验收
 
@@ -347,36 +347,36 @@ Payment Provider   全球站额度与支付
 
 ### M3-A：moderation 数据模型
 
-- [ ] M3-A1 `moderation_tasks` 表。
-- [ ] M3-A2 moderation task 关联 `audit_logs`。
-- [ ] M3-A3 reports 并入 moderation task 流。
-- [ ] M3-A4 “有变化”反馈进入 moderation。
+- [x] M3-A1 `moderation_tasks` 表。
+- [x] M3-A2 moderation task 关联 `audit_logs`。
+- [x] M3-A3 reports 并入 moderation task 流。
+- [x] M3-A4 “有变化”反馈进入 moderation。
 - [ ] M3-A5 AI 输出抽检任务进入 moderation。
 - [ ] M3-A6 申请审核进入 moderation。
 
 ### M3-B：状态机
 
-- [ ] M3-B1 状态：`pending -> in_review -> resolved`。
-- [ ] M3-B2 状态：`pending -> in_review -> dismissed`。
-- [ ] M3-B3 状态：`pending -> escalated -> resolved`。
-- [ ] M3-B4 所有状态变更写审计日志。
-- [ ] M3-B5 后台操作必须记录 actor、site、target、action、before/after。
+- [x] M3-B1 状态：`pending -> in_review -> resolved`。
+- [x] M3-B2 状态：`pending -> in_review -> dismissed`。
+- [x] M3-B3 状态：`pending -> escalated -> resolved`。
+- [x] M3-B4 所有状态变更写审计日志。
+- [x] M3-B5 后台操作必须记录 actor、site、target、action、before/after。
 
 ### M3-C：admin-console
 
-- [ ] M3-C1 ReviewQueue 页面。
-- [ ] M3-C2 ReviewDetail 页面。
-- [ ] M3-C3 Site switcher。
-- [ ] M3-C4 用户管理。
-- [ ] M3-C5 内容管理。
-- [ ] M3-C6 审计日志页。
-- [ ] M3-C7 系统配置页。
-- [ ] M3-C8 所有页面有空态、错误态、加载态。
+- [x] M3-C1 ReviewQueue 页面。
+- [x] M3-C2 ReviewDetail 页面。
+- [x] M3-C3 Site switcher。
+- [x] M3-C4 用户管理。
+- [x] M3-C5 内容管理。
+- [x] M3-C6 审计日志页。
+- [x] M3-C7 系统配置页。
+- [x] M3-C8 所有页面有空态、错误态、加载态。
 
 ### M3-D：前台入口
 
-- [ ] M3-D1 校园站举报提交进入 moderation。
-- [ ] M3-D2 校园站“有变化”进入 moderation。
+- [x] M3-D1 校园站举报提交进入 moderation。
+- [x] M3-D2 校园站“有变化”进入 moderation。
 - [ ] M3-D3 全球站内容审核进入 moderation。
 - [ ] M3-D4 全球站申请审核进入 moderation。
 

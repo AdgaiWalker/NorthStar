@@ -31,8 +31,16 @@ export interface IdentitySession {
   user: IdentityUser;
 }
 
+export interface IdentityMeResponse {
+  user: IdentityUser;
+}
+
 export interface EmailVerificationRequest {
   token: string;
+}
+
+export interface EmailVerificationResponse {
+  user: IdentityUser;
 }
 
 export interface PasswordResetRequest {
@@ -40,7 +48,16 @@ export interface PasswordResetRequest {
   site: Exclude<SiteContext, 'all'>;
 }
 
+export interface PasswordResetRequestResponse {
+  resetToken?: string;
+  message: string;
+}
+
 export interface PasswordResetConfirmRequest {
   token: string;
   password: string;
+}
+
+export interface PasswordResetConfirmResponse {
+  message: string;
 }

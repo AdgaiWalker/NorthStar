@@ -2,7 +2,7 @@ import { SEED_ARTICLES, SEED_TOPICS } from "@ns/shared";
 import { config } from "dotenv";
 import { sql } from "drizzle-orm";
 import { hashPassword } from "../lib/auth";
-import { articles, cities, knowledgeBases, posts, siteConfigs, trustEvents, users } from "../db/schema";
+import { articles, cities, knowledgeBases, legalDocuments, posts, siteConfigs, trustEvents, users } from "../db/schema";
 import { db, pool } from "../db/client";
 
 config();
@@ -27,6 +27,9 @@ async function seed() {
       reports,
       moderation_tasks,
       audit_logs,
+      account_deletion_requests,
+      user_consents,
+      legal_documents,
       site_configs,
       search_logs,
       notifications,
@@ -64,6 +67,47 @@ async function seed() {
     });
 
   await db
+    .insert(legalDocuments)
+    .values([
+      {
+        site: "cn",
+        type: "terms",
+        version: "2026-04-24",
+        title: "盘根校园用户协议",
+        content: "使用盘根校园即表示你同意遵守校园内容共建规则，真实提交反馈，不发布违法、侵权或骚扰内容。",
+      },
+      {
+        site: "cn",
+        type: "privacy",
+        version: "2026-04-24",
+        title: "盘根校园隐私政策",
+        content: "盘根校园仅收集账号、内容互动和必要安全数据，用于提供校园信息服务、审核和安全保护。",
+      },
+      {
+        site: "com",
+        type: "terms",
+        version: "2026-04-24",
+        title: "盘根 AI 指南针用户协议",
+        content: "使用盘根 AI 指南针即表示你同意按工具评测、方案生成和内容共建规则使用服务。",
+      },
+      {
+        site: "com",
+        type: "privacy",
+        version: "2026-04-24",
+        title: "盘根 AI 指南针隐私政策",
+        content: "盘根 AI 指南针仅收集账号、方案、收藏、额度和必要安全数据，用于提供服务和合规处理。",
+      },
+    ])
+    .onConflictDoUpdate({
+      target: [legalDocuments.site, legalDocuments.type, legalDocuments.version],
+      set: {
+        title: sql`excluded.title`,
+        content: sql`excluded.content`,
+        publishedAt: sql`now()`,
+      },
+    });
+
+  await db
     .insert(users)
     .values([
       {
@@ -91,6 +135,19 @@ async function seed() {
         school: "黑河学院",
         cityId: 1,
         trustLevel: "author",
+      },
+      {
+        id: 3,
+        username: "admin",
+        email: "admin@example.com",
+        site: "cn",
+        role: "admin",
+        emailVerified: true,
+        nickname: "盘根管理员",
+        passwordHash: hashPassword("password"),
+        school: "黑河学院",
+        cityId: 1,
+        trustLevel: "admin",
       },
     ])
     .onConflictDoUpdate({
@@ -205,6 +262,7 @@ async function seed() {
 
   await db.execute(sql`select setval('cities_id_seq', coalesce((select max(id) from cities), 1), true)`);
   await db.execute(sql`select setval('users_id_seq', coalesce((select max(id) from users), 1), true)`);
+  await db.execute(sql`select setval('legal_documents_id_seq', coalesce((select max(id) from legal_documents), 1), true)`);
   await db.execute(sql`select setval('knowledge_bases_id_seq', coalesce((select max(id) from knowledge_bases), 1), true)`);
   await db.execute(sql`select setval('articles_id_seq', coalesce((select max(id) from articles), 1), true)`);
   await db.execute(sql`select setval('posts_id_seq', coalesce((select max(id) from posts), 1), true)`);

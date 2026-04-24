@@ -50,6 +50,58 @@ body {
     @apply min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-neutral-400;
   }
 
+  .login-panel {
+    @apply w-full max-w-md rounded-md border border-line bg-white p-6 shadow-sm;
+  }
+
+  .field-label {
+    @apply mb-4 block text-sm font-medium text-neutral-700;
+  }
+
+  .text-input {
+    @apply mt-2 h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20;
+  }
+
+  .select-input {
+    @apply h-10 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20;
+  }
+
+  .json-editor {
+    @apply min-h-40 w-full rounded-md border border-line bg-paper p-3 font-mono text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20;
+  }
+
+  .primary-button {
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-teal px-4 text-sm font-semibold text-white transition hover:bg-teal/90 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .ghost-button {
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-line bg-white px-4 text-sm font-medium text-neutral-700 transition hover:bg-paper;
+  }
+
+  .danger-button {
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-rust/40 bg-rust/10 px-4 text-sm font-semibold text-rust transition hover:bg-rust/15;
+  }
+
+  .user-chip {
+    @apply inline-flex min-h-10 items-center gap-2 rounded-md border border-line bg-paper px-3 text-neutral-700;
+  }
+
+  .toolbar {
+    @apply mb-4 flex flex-wrap gap-3;
+  }
+
+  .action-row {
+    @apply mt-5 flex flex-wrap gap-3;
+  }
+
+  .notice-line {
+    @apply mb-4 rounded-md border border-teal/30 bg-teal/10 px-4 py-3 text-sm font-medium text-teal;
+  }
+
+  .error-line {
+    @apply mb-4 rounded-md border border-rust/40 bg-rust/5 px-3 py-2 text-sm font-medium text-rust;
+  }
+
   .state-block {
     @apply flex min-h-32 flex-wrap items-center justify-center gap-3 rounded-md border border-line bg-white px-4 py-8 text-sm text-neutral-600;
   }

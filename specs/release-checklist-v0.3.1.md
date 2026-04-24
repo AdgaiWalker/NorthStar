@@ -12,6 +12,16 @@
 - [x] 后续注册登录以用户名 + 邮箱 + 密码为准，不做手机号/SMS 分支。
 - [x] P0 平台地基提交只声明“平台地基”，不声明“全量 PRD 完成”。
 
+## 全量 PRD P0 平台闭环记录
+
+- [x] `identity` 已补最小闭环：用户名/邮箱登录、邮箱验证 token、密码重置 token、`tokenInvalidBefore` 失效机制、`/api/identity/me`。
+- [x] `compliance` 已补最小闭环：协议/隐私政策公开查询、consent 记录、本人数据导出、注销申请、后台处理注销并失效旧 token。
+- [x] `moderation` 已接真实入口：举报和“有变化”反馈会创建审核任务，审核状态变化写入审计日志。
+- [x] `admin-console` 已接真实登录和真实 API：登录、站点切换、审核队列/详情、用户管理、内容管理、审计日志、系统配置。
+- [x] `/api/admin/*` 已限制为 `reviewer/operator/admin`，普通用户不能进入后台接口。
+- [x] seed 已补 `cn/com` 默认协议和隐私政策，并新增后台管理员种子账号。
+- [ ] 全球站申请审核、AI 输出抽检进入 moderation 尚未完成，进入下一批 P1/P2。
+
 ## P0：发布前必须完成
 
 - [x] P0-1 吸收当前工作区 WIP 并补最终验证
@@ -101,3 +111,5 @@
 - 2026-04-24：`db:seed` 成功，按可复现重置流程导入 8 个空间、59 篇文章、2 条帖子。
 - 2026-04-24：真实 API smoke 通过，覆盖 health、spaces、articles、login、permissions、posts、replies、feedback、notifications、AI search、AI write、article publish。
 - 2026-04-24：无 AI key 条件下，校园站 `/api/ai/search`、`/api/ai/write` 和全球站 `/api/ai/tools` 降级验证通过。
+- 2026-04-24：全量 PRD P0 平台闭环回归通过：`shared` typecheck、`server` typecheck、`server` 测试通过（19/19）、`db:push`、`db:seed`、`admin-console` typecheck/lint/build、`frontlife-web` typecheck/lint/test/build、`frontai-web` typecheck/lint/build。
+- 2026-04-24：最新包体记录：`admin-console` JS `258.66 kB`，gzip `80.88 kB`；`frontlife-web` JS `2,531.00 kB`，gzip `590.93 kB`；`frontai-web` JS `2,586.12 kB`，gzip `562.30 kB`。
