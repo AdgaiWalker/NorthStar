@@ -28,9 +28,7 @@ export const ContentStudioPage: React.FC = () => {
   } = useContentStore();
 
   // 当前编辑的内容
-  const [selectedContentId, setSelectedContentId] = useState<string | null>(
-    params.contentId ?? null
-  );
+  const selectedContentId = params.contentId ?? null;
   const currentItem = selectedContentId ? getArticleById(selectedContentId) : undefined;
 
   // 编辑器状态
@@ -40,18 +38,6 @@ export const ContentStudioPage: React.FC = () => {
 
   // 面板显示状态
   const [showProperties, setShowProperties] = useState(true);
-
-  // 同步 URL 参数
-  const paramsContentIdRef = useRef(params.contentId);
-  paramsContentIdRef.current = params.contentId;
-
-  useEffect(() => {
-    const id = paramsContentIdRef.current;
-    if (id && id !== selectedContentId) {
-      setSelectedContentId(id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.contentId]);
 
   // 同步编辑器内容
   const currentItemIdRef = useRef(currentItem?.id);

@@ -3,6 +3,15 @@
 > 目标：把校园站从“开发可运行”推进到“可发布、可试用、可继续收口”。
 > 规则：中文优先；无显性要求不写兼容代码；UI 图标统一使用 Lucide，不使用 emoji 做界面图标。
 
+## 全量 PRD 起点说明
+
+- [x] 当前 `v0.3.1` 不是两份 PRD 全量完成版本，而是全量 PRD 的平台化起点。
+- [x] 已记录平台地基基线：[full-prd-baseline-v0.3.1-p0.md](./full-prd-baseline-v0.3.1-p0.md)
+- [x] 已记录后续全量实施计划：[full-prd-next-implementation-plan.md](./full-prd-next-implementation-plan.md)
+- [x] 旧校园 API、全球站 mock、后台 placeholder 均标记为后续替换对象，不新增桥接层。
+- [x] 后续注册登录以用户名 + 邮箱 + 密码为准，不做手机号/SMS 分支。
+- [x] P0 平台地基提交只声明“平台地基”，不声明“全量 PRD 完成”。
+
 ## P0：发布前必须完成
 
 - [x] P0-1 吸收当前工作区 WIP 并补最终验证

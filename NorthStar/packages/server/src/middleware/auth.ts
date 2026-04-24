@@ -1,6 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import type { Context } from "hono";
 import { verifyToken, type AuthTokenPayload } from "../lib/auth";
+import { resolveSiteContext } from "./site";
 
 declare module "hono" {
   interface ContextVariableMap {
@@ -12,7 +13,17 @@ export const authMiddleware = createMiddleware(async (c, next) => {
   const authUser = resolveAuthUser(c);
 
   if (!authUser) {
-    return c.json({ error: "Unauthorized" }, 401);
+    return c.json({ error: "请先登录后再继续操作" }, 401);
+  }
+
+  const siteContext = c.get("siteContext") ?? resolveSiteContext(c);
+
+  if (siteContext === "all" && authUser.role !== "admin") {
+    return c.json({ error: "没有跨站访问权限" }, 403);
+  }
+
+  if (authUser.site && siteContext !== "all" && authUser.site !== siteContext) {
+    return c.json({ error: "登录状态不属于当前站点，请重新登录" }, 401);
   }
 
   c.set("authUser", authUser);

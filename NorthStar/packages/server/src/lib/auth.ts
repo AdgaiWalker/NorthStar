@@ -1,4 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual, createHmac } from "node:crypto";
+import type { PlatformRole, SiteContext } from "@ns/shared";
 
 const SCRYPT_OPTIONS = {
   N: 4096,
@@ -10,6 +11,10 @@ const SCRYPT_OPTIONS = {
 export interface AuthTokenPayload {
   sub: string;
   name: string;
+  username?: string;
+  email?: string;
+  site?: SiteContext;
+  role?: PlatformRole;
   iat: string;
 }
 

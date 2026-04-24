@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { app } from "../src/index";
 import { db } from "../src/db/client";
-import { activities, articles, favorites, feedbacks, notifications, postReplies, posts, reports, searchLogs, trustEvents, users } from "../src/db/schema";
+import { activities, articles, auditLogs, favorites, feedbacks, moderationTasks, notifications, postReplies, posts, reports, searchLogs, trustEvents, users } from "../src/db/schema";
+import { signToken } from "../src/lib/auth";
 import {
   createAuthInviteNotificationInDb,
   createContentExpiryNotificationInDb,
@@ -28,11 +29,20 @@ async function register(username: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       username,
+      email: `${username}@example.com`,
       password: "password",
     }),
   });
   const body = await response.json();
   return `Bearer ${body.token}`;
+}
+
+function adminAuthorization(site = "cn") {
+  return `Bearer ${signToken({ sub: "1", name: "管理员", site, role: "admin" })}`;
+}
+
+function userAuthorization(site = "cn") {
+  return `Bearer ${signToken({ sub: "1", name: "普通用户", site, role: "user" })}`;
 }
 
 async function countRows(table: Parameters<NonNullable<typeof db>["select"]>[0] extends never ? never : any) {
@@ -74,6 +84,97 @@ describe("frontlife API", () => {
 
     expect(response.status).toBe(200);
     expect(body.status).toBe("ok");
+  });
+
+  it("registers with username and email, then logs in by email", async () => {
+    const username = `mail-user-${Date.now()}`;
+    const email = `${username}@example.com`;
+
+    const registerResponse = await app.request("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, email, password: "password" }),
+    });
+    const registerBody = await registerResponse.json();
+
+    expect(registerResponse.status).toBe(201);
+    expect(registerBody.user.username).toBe(username);
+    expect(registerBody.user.email).toBe(email);
+
+    const loginResponse = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ account: email, password: "password" }),
+    });
+    const loginBody = await loginResponse.json();
+
+    expect(loginResponse.status).toBe(200);
+    expect(loginBody.user.username).toBe(username);
+  });
+
+  it("enforces site-aware admin access boundaries", async () => {
+    const forbiddenResponse = await app.request("/api/admin/summary", {
+      headers: {
+        Authorization: userAuthorization("cn"),
+        "x-pangen-site": "all",
+      },
+    });
+
+    expect(forbiddenResponse.status).toBe(403);
+
+    const adminResponse = await app.request("/api/admin/summary", {
+      headers: {
+        Authorization: adminAuthorization("cn"),
+        "x-pangen-site": "all",
+      },
+    });
+    const adminBody = await adminResponse.json();
+
+    expect(adminResponse.status).toBe(200);
+    expect(adminBody.ok).toBe(true);
+    expect(adminBody.data.site).toBe("all");
+  });
+
+  it("creates moderation tasks and writes audit logs on state changes", async () => {
+    if (!db) return;
+
+    const taskBefore = await countRows(moderationTasks);
+    const auditBefore = await countRows(auditLogs);
+
+    const createResponse = await app.request("/api/moderation/tasks", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: userAuthorization("cn"),
+      },
+      body: JSON.stringify({
+        site: "cn",
+        type: "report",
+        targetType: "post",
+        targetId: "1",
+        title: "测试审核任务",
+        reason: "测试举报原因",
+      }),
+    });
+    const createBody = await createResponse.json();
+
+    expect(createResponse.status).toBe(201);
+    expect(createBody.data.status).toBe("pending");
+    expect(await countRows(moderationTasks)).toBe(taskBefore + 1);
+
+    const updateResponse = await app.request(`/api/moderation/tasks/${createBody.data.id}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: adminAuthorization("cn"),
+      },
+      body: JSON.stringify({ status: "in_review" }),
+    });
+    const updateBody = await updateResponse.json();
+
+    expect(updateResponse.status).toBe(200);
+    expect(updateBody.data.status).toBe("in_review");
+    expect(await countRows(auditLogs)).toBe(auditBefore + 1);
   });
 
   it("returns spaces and a space detail", async () => {

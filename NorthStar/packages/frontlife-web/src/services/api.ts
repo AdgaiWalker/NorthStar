@@ -57,6 +57,8 @@ function toReadableApiMessage(message: string, status?: number) {
   if (status && status >= 500) return '服务暂时不可用，请确认后端服务已启动或稍后重试。';
   if (message === 'invalid username or password') return '用户名或密码不正确。';
   if (message === 'username already exists') return '用户名已存在，请换一个用户名。';
+  if (message === '用户名、邮箱或密码不正确') return '用户名、邮箱或密码不正确。';
+  if (message === '用户名或邮箱已被使用') return '用户名或邮箱已被使用，请更换后重试。';
   if (message === 'Forbidden') return '当前账号没有权限执行此操作。';
   if (message === 'Failed to fetch' || message === 'NetworkError when attempting to fetch resource.') {
     return '网络连接失败，请确认后端服务已启动或稍后重试。';
@@ -289,7 +291,7 @@ export const api = {
     }
   },
 
-  register(input: { username: string; password: string }) {
+  register(input: { username: string; email: string; password: string }) {
     if (useMock) return mockApi.register(input);
     return request<AuthResponse>('/api/auth/register', {
       method: 'POST',
@@ -297,7 +299,7 @@ export const api = {
     });
   },
 
-  login(input: { username: string; password: string }) {
+  login(input: { account: string; password: string }) {
     if (useMock) return mockApi.login(input);
     return request<AuthResponse>('/api/auth/login', {
       method: 'POST',

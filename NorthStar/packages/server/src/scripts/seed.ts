@@ -2,7 +2,7 @@ import { SEED_ARTICLES, SEED_TOPICS } from "@ns/shared";
 import { config } from "dotenv";
 import { sql } from "drizzle-orm";
 import { hashPassword } from "../lib/auth";
-import { articles, cities, knowledgeBases, posts, trustEvents, users } from "../db/schema";
+import { articles, cities, knowledgeBases, posts, siteConfigs, trustEvents, users } from "../db/schema";
 import { db, pool } from "../db/client";
 
 config();
@@ -25,6 +25,9 @@ async function seed() {
   await db.execute(sql`
     truncate table
       reports,
+      moderation_tasks,
+      audit_logs,
+      site_configs,
       search_logs,
       notifications,
       favorites,
@@ -47,11 +50,29 @@ async function seed() {
     .onConflictDoNothing();
 
   await db
+    .insert(siteConfigs)
+    .values([
+      { site: "cn", key: "display", value: { name: "盘根校园", domain: "xyzidea.cn" } },
+      { site: "com", key: "display", value: { name: "盘根 AI 指南针", domain: "xyzidea.com" } },
+    ])
+    .onConflictDoUpdate({
+      target: [siteConfigs.site, siteConfigs.key],
+      set: {
+        value: sql`excluded.value`,
+        updatedAt: sql`now()`,
+      },
+    });
+
+  await db
     .insert(users)
     .values([
       {
         id: 1,
         username: "zhang",
+        email: "zhang@example.com",
+        site: "cn",
+        role: "user",
+        emailVerified: true,
         nickname: "张同学",
         passwordHash: hashPassword("password"),
         school: "黑河学院",
@@ -61,6 +82,10 @@ async function seed() {
       {
         id: 2,
         username: "editor",
+        email: "editor@example.com",
+        site: "cn",
+        role: "editor",
+        emailVerified: true,
         nickname: "盘根编辑",
         passwordHash: hashPassword("password"),
         school: "黑河学院",
@@ -72,6 +97,10 @@ async function seed() {
       target: users.username,
       set: {
         nickname: sql`excluded.nickname`,
+        email: sql`excluded.email`,
+        site: sql`excluded.site`,
+        role: sql`excluded.role`,
+        emailVerified: sql`excluded.email_verified`,
         passwordHash: sql`excluded.password_hash`,
         school: sql`excluded.school`,
         cityId: sql`excluded.city_id`,

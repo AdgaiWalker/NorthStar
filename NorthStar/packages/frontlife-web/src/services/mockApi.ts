@@ -21,6 +21,7 @@ import { ARTICLES, FEED, KNOWLEDGE_BASES, POSTS, USERS } from '@/data/mock';
 type MockAccount = {
   id: string;
   username: string;
+  email: string;
   password: string;
   name: string;
   school: string;
@@ -74,6 +75,7 @@ const accounts = new Map<string, MockAccount>([
     {
       id: 'user-zhang',
       username: 'zhang',
+      email: 'zhang@example.com',
       password: 'password',
       name: '张同学',
       school: '黑河学院',
@@ -86,6 +88,7 @@ const accounts = new Map<string, MockAccount>([
     {
       id: 'user-editor',
       username: 'editor',
+      email: 'editor@example.com',
       password: 'password',
       name: '盘根编辑',
       school: '黑河学院',
@@ -711,14 +714,15 @@ export const mockApi = {
     }
   },
 
-  async register(input: { username: string; password: string }): Promise<AuthResponse> {
-    if (accounts.has(input.username)) {
+  async register(input: { username: string; email: string; password: string }): Promise<AuthResponse> {
+    if (accounts.has(input.username) || Array.from(accounts.values()).some((account) => account.email === input.email)) {
       throw new Error('username already exists');
     }
 
     const account: MockAccount = {
       id: `user-${input.username}`,
       username: input.username,
+      email: input.email,
       password: input.password,
       name: input.username,
       school: '黑河学院',
@@ -733,12 +737,15 @@ export const mockApi = {
         id: account.id,
         name: account.name,
         username: account.username,
+        email: account.email,
       },
     };
   },
 
-  async login(input: { username: string; password: string }): Promise<AuthResponse> {
-    const account = accounts.get(input.username);
+  async login(input: { account: string; password: string }): Promise<AuthResponse> {
+    const account = Array.from(accounts.values()).find(
+      (item) => item.username === input.account || item.email === input.account,
+    );
     if (!account || account.password !== input.password) {
       throw new Error('invalid username or password');
     }
@@ -749,6 +756,7 @@ export const mockApi = {
         id: account.id,
         name: account.name,
         username: account.username,
+        email: account.email,
       },
     };
   },

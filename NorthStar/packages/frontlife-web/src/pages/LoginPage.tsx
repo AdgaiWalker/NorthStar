@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Lock, User } from 'lucide-react';
+import { Lock, Mail, User } from 'lucide-react';
 import { api } from '@/services/api';
 import { consumeSessionReason, SESSION_EXPIRED_MESSAGE, SESSION_EXPIRED_REASON } from '@/services/authSession';
 import { useUIStore } from '@/store/useUIStore';
@@ -18,6 +18,7 @@ export default function LoginPage() {
   const clearSessionExpired = useUIStore((state) => state.clearSessionExpired);
   const [mode, setMode] = useState<Mode>('login');
   const [username, setUsername] = useState('zhang');
+  const [email, setEmail] = useState('zhang@example.com');
   const [password, setPassword] = useState('password');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -39,8 +40,8 @@ export default function LoginPage() {
     try {
       const result =
         mode === 'login'
-          ? await api.login({ username, password })
-          : await api.register({ username, password });
+          ? await api.login({ account: username, password })
+          : await api.register({ username, email, password });
 
       setToken(result.token);
       setUser(result.user.id, result.user.name);
@@ -57,18 +58,20 @@ export default function LoginPage() {
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-var(--nav-h))] max-w-[440px] items-center px-5 py-10">
-      <form onSubmit={submit} className="w-full rounded-2xl border border-border-light bg-surface p-6 shadow-md">
+      <form onSubmit={submit} className="w-full rounded-lg border border-border-light bg-surface p-6 shadow-md">
         <div className="mb-6">
           <div className="mb-2 font-display text-[26px] font-bold text-ink">
             {mode === 'login' ? '登录盘根' : '注册盘根'}
           </div>
           <p className="text-sm leading-6 text-ink-muted">
-            当前使用用户名和密码登录。内测账号请按发放信息登录。
+            注册使用用户名、邮箱和密码；登录可使用用户名或邮箱。
           </p>
         </div>
 
         <label className="mb-4 block">
-          <span className="mb-1.5 block text-sm font-medium text-ink-secondary">用户名</span>
+          <span className="mb-1.5 block text-sm font-medium text-ink-secondary">
+            {mode === 'login' ? '用户名或邮箱' : '用户名'}
+          </span>
           <div className="flex h-11 items-center gap-2 rounded-lg border border-border bg-bg-subtle px-3 focus-within:border-sage">
             <User size={16} className="text-ink-muted" />
             <input
@@ -81,6 +84,23 @@ export default function LoginPage() {
             />
           </div>
         </label>
+
+        {mode === 'register' && (
+          <label className="mb-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-ink-secondary">邮箱</span>
+            <div className="flex h-11 items-center gap-2 rounded-lg border border-border bg-bg-subtle px-3 focus-within:border-sage">
+              <Mail size={16} className="text-ink-muted" />
+              <input
+                id="frontlife-email"
+                name="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="h-full flex-1 bg-transparent text-sm outline-none"
+                autoComplete="email"
+              />
+            </div>
+          </label>
+        )}
 
         <label className="mb-4 block">
           <span className="mb-1.5 block text-sm font-medium text-ink-secondary">密码</span>

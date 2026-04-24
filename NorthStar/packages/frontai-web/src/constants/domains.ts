@@ -1,10 +1,11 @@
 import { Domain } from '@/types';
+import type { ElementType } from 'react';
 import { Monitor, Video, Building2 } from 'lucide-react';
 
 export const DOMAIN_CONFIG: Record<Domain, {
   key: Domain;
   label: string;
-  icon: React.ElementType;
+  icon: ElementType;
   description: string;
   requiresAuth: boolean;
 }> = {

@@ -60,6 +60,15 @@ export const notifyTypeEnum = pgEnum("notify_type", [
   "trust",
 ]);
 
+export const platformRoleEnum = pgEnum("platform_role", [
+  "visitor",
+  "user",
+  "editor",
+  "reviewer",
+  "operator",
+  "admin",
+]);
+
 // ─── Cities / Sites（多城市预留）───
 
 export const cities = pgTable("cities", {
@@ -78,10 +87,17 @@ export const users = pgTable(
   {
     id: serial("id").primaryKey(),
     username: varchar("username", { length: 50 }).notNull(),
+    email: varchar("email", { length: 255 }),
+    site: varchar("site", { length: 10 }).default("cn").notNull(),
+    role: platformRoleEnum("role").default("user").notNull(),
     phone: varchar("phone", { length: 20 }),
     wxOpenId: varchar("wx_open_id", { length: 255 }),
     nickname: varchar("nickname", { length: 50 }).notNull(),
     passwordHash: text("password_hash"),
+    emailVerified: boolean("email_verified").default(false).notNull(),
+    emailVerificationToken: varchar("email_verification_token", { length: 128 }),
+    passwordResetToken: varchar("password_reset_token", { length: 128 }),
+    passwordResetExpiresAt: timestamp("password_reset_expires_at", { mode: "date" }),
     avatar: text("avatar"),
     school: varchar("school", { length: 100 }),
     cityId: integer("city_id").references(() => cities.id),
@@ -95,10 +111,79 @@ export const users = pgTable(
   (table) => [
     uniqueIndex("users_phone_idx").on(table.phone),
     uniqueIndex("users_username_idx").on(table.username),
+    uniqueIndex("users_email_idx").on(table.email),
     uniqueIndex("users_wx_open_id_idx").on(table.wxOpenId),
+    index("users_site_idx").on(table.site),
+    index("users_role_idx").on(table.role),
     index("users_trust_level_idx").on(table.trustLevel),
     index("users_city_id_idx").on(table.cityId),
   ]
+);
+
+// ─── Platform / Admin 基础表 ───
+
+export const siteConfigs = pgTable(
+  "site_configs",
+  {
+    id: serial("id").primaryKey(),
+    site: varchar("site", { length: 10 }).notNull(),
+    key: varchar("key", { length: 100 }).notNull(),
+    value: jsonb("value").$type<Record<string, unknown>>().default({}).notNull(),
+    updatedBy: integer("updated_by").references(() => users.id),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("site_configs_site_key_idx").on(table.site, table.key),
+    index("site_configs_site_idx").on(table.site),
+  ],
+);
+
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: serial("id").primaryKey(),
+    actorId: integer("actor_id").references(() => users.id),
+    site: varchar("site", { length: 10 }).notNull(),
+    targetType: varchar("target_type", { length: 50 }).notNull(),
+    targetId: varchar("target_id", { length: 100 }).notNull(),
+    action: varchar("action", { length: 100 }).notNull(),
+    before: jsonb("before").$type<Record<string, unknown> | null>(),
+    after: jsonb("after").$type<Record<string, unknown> | null>(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("audit_logs_site_idx").on(table.site),
+    index("audit_logs_actor_id_idx").on(table.actorId),
+    index("audit_logs_target_idx").on(table.targetType, table.targetId),
+    index("audit_logs_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const moderationTasks = pgTable(
+  "moderation_tasks",
+  {
+    id: serial("id").primaryKey(),
+    site: varchar("site", { length: 10 }).notNull(),
+    type: varchar("type", { length: 50 }).notNull(),
+    status: varchar("status", { length: 30 }).default("pending").notNull(),
+    targetType: varchar("target_type", { length: 50 }).notNull(),
+    targetId: varchar("target_id", { length: 100 }).notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    reason: text("reason"),
+    payload: jsonb("payload").$type<Record<string, unknown>>().default({}).notNull(),
+    reporterId: integer("reporter_id").references(() => users.id),
+    assigneeId: integer("assignee_id").references(() => users.id),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("moderation_tasks_site_idx").on(table.site),
+    index("moderation_tasks_status_idx").on(table.status),
+    index("moderation_tasks_type_idx").on(table.type),
+    index("moderation_tasks_target_idx").on(table.targetType, table.targetId),
+    index("moderation_tasks_created_at_idx").on(table.createdAt),
+  ],
 );
 
 // ─── Knowledge Bases ───
@@ -395,6 +480,9 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   searchLogs: many(searchLogs),
   reports: many(reports),
   trustEvents: many(trustEvents),
+  moderationReports: many(moderationTasks, { relationName: "moderationReporter" }),
+  moderationAssignments: many(moderationTasks, { relationName: "moderationAssignee" }),
+  auditLogs: many(auditLogs),
   city: one(cities, { fields: [users.cityId], references: [cities.id] }),
   authRequest: one(authRequests, { fields: [users.id], references: [authRequests.userId] }),
 }));
@@ -462,4 +550,25 @@ export const reportsRelations = relations(reports, ({ one }) => ({
 
 export const trustEventsRelations = relations(trustEvents, ({ one }) => ({
   user: one(users, { fields: [trustEvents.userId], references: [users.id] }),
+}));
+
+export const siteConfigsRelations = relations(siteConfigs, ({ one }) => ({
+  updater: one(users, { fields: [siteConfigs.updatedBy], references: [users.id] }),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  actor: one(users, { fields: [auditLogs.actorId], references: [users.id] }),
+}));
+
+export const moderationTasksRelations = relations(moderationTasks, ({ one }) => ({
+  reporter: one(users, {
+    fields: [moderationTasks.reporterId],
+    references: [users.id],
+    relationName: "moderationReporter",
+  }),
+  assignee: one(users, {
+    fields: [moderationTasks.assigneeId],
+    references: [users.id],
+    relationName: "moderationAssignee",
+  }),
 }));
