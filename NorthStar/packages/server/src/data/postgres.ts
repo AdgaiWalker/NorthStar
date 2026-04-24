@@ -16,7 +16,21 @@ import {
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { getHigherTrustLevel, getTrustLevelFromScore } from "../lib/permissions";
 import { db } from "../db/client";
-import { activities, articles, favorites, feedbacks, knowledgeBases, notifications, postReplies, posts, reports, searchLogs, trustEvents, users } from "../db/schema";
+import {
+  activities,
+  articles,
+  favorites,
+  feedbacks,
+  knowledgeBases,
+  notifications,
+  postReplies,
+  posts,
+  reports,
+  searchDocuments,
+  searchLogs,
+  trustEvents,
+  users,
+} from "../db/schema";
 
 export async function listSpacesFromDb() {
   if (!db) return null;
@@ -972,6 +986,28 @@ export async function recordSearchLogInDb(input: {
     : null;
 }
 
+export async function listSearchGapsFromDb() {
+  if (!db) return null;
+
+  const rows = await db
+    .select({
+      query: searchLogs.query,
+      count: sql<number>`count(*)::int`,
+      lastSearchedAt: sql<Date>`max(${searchLogs.createdAt})`,
+    })
+    .from(searchLogs)
+    .where(eq(searchLogs.resultCount, 0))
+    .groupBy(searchLogs.query)
+    .orderBy(sql`count(*) desc`, sql`max(${searchLogs.createdAt}) desc`)
+    .limit(50);
+
+  return rows.map((row) => ({
+    query: row.query,
+    count: row.count,
+    lastSearchedAt: toIso(row.lastSearchedAt) ?? new Date().toISOString(),
+  }));
+}
+
 export async function searchContentFromDb(query: string) {
   if (!db) return null;
 
@@ -985,99 +1021,279 @@ export async function searchContentFromDb(query: string) {
   }
 
   const pattern = `%${value}%`;
-
-  const articleRows = await db
+  const documentRows = await db
     .select({
-      slug: articles.slug,
-      kbSlug: knowledgeBases.slug,
-      title: articles.title,
-      content: articles.content,
-      helpfulCount: articles.helpfulCount,
-      changedCount: articles.changedCount,
-      readCount: articles.readCount,
-      favoriteCount: articles.favoriteCount,
-      confirmedAt: articles.confirmedAt,
-      updatedAt: articles.updatedAt,
+      targetType: searchDocuments.targetType,
+      targetId: searchDocuments.targetId,
+      title: searchDocuments.title,
+      body: searchDocuments.body,
+      spaceSlug: searchDocuments.spaceSlug,
+      payload: searchDocuments.payload,
+      updatedAt: searchDocuments.updatedAt,
+      rank: sql<number>`ts_rank(
+        to_tsvector('simple', ${searchDocuments.title} || ' ' || ${searchDocuments.body}),
+        plainto_tsquery('simple', ${value})
+      )`,
+      exactRank: sql<number>`case when lower(${searchDocuments.title}) = lower(${value}) then 2 when ${searchDocuments.title} ilike ${pattern} then 1 else 0 end`,
     })
-    .from(articles)
-    .innerJoin(knowledgeBases, eq(articles.kbId, knowledgeBases.id))
-    .where(sql`${articles.title} ilike ${pattern} or ${articles.content} ilike ${pattern}`)
-    .orderBy(desc(articles.helpfulCount), desc(articles.updatedAt))
-    .limit(10);
+    .from(searchDocuments)
+    .where(
+      and(
+        eq(searchDocuments.site, "cn"),
+        sql`(
+          to_tsvector('simple', ${searchDocuments.title} || ' ' || ${searchDocuments.body}) @@ plainto_tsquery('simple', ${value})
+          or ${searchDocuments.title} ilike ${pattern}
+          or ${searchDocuments.body} ilike ${pattern}
+        )`,
+      ),
+    )
+    .orderBy(
+      sql`case when lower(${searchDocuments.title}) = lower(${value}) then 2 when ${searchDocuments.title} ilike ${pattern} then 1 else 0 end desc`,
+      sql`ts_rank(to_tsvector('simple', ${searchDocuments.title} || ' ' || ${searchDocuments.body}), plainto_tsquery('simple', ${value})) desc`,
+      desc(searchDocuments.updatedAt),
+    )
+    .limit(30);
 
-  const postRows = await db
-    .select({
-      id: posts.id,
-      kbSlug: knowledgeBases.slug,
-      content: posts.content,
-      tags: posts.tags,
-      authorId: users.id,
-      authorName: users.nickname,
-      favoriteCount: posts.favoriteCount,
-      replyCount: posts.replyCount,
-      solved: posts.solved,
-      createdAt: posts.createdAt,
-    })
-    .from(posts)
-    .leftJoin(knowledgeBases, eq(posts.kbId, knowledgeBases.id))
-    .innerJoin(users, eq(posts.authorId, users.id))
-    .where(sql`${posts.content} ilike ${pattern}`)
-    .orderBy(desc(posts.createdAt))
-    .limit(10);
+  if (documentRows.length === 0) {
+    await refreshSearchDocumentsInDb();
+    return searchContentFromDocuments(value, pattern);
+  }
 
-  const spaceRows = await db
+  return toSearchResponse(documentRows);
+}
+
+async function searchContentFromDocuments(value: string, pattern: string) {
+  if (!db) return null;
+
+  const rows = await db
     .select({
-      dbId: knowledgeBases.id,
-      id: knowledgeBases.slug,
-      slug: knowledgeBases.slug,
-      title: knowledgeBases.title,
-      description: knowledgeBases.description,
-      category: knowledgeBases.category,
-      articleCount: knowledgeBases.articleCount,
-      favoriteCount: knowledgeBases.favoriteCount,
-      recentActiveAt: knowledgeBases.updatedAt,
-      maintainerId: users.id,
-      maintainerName: users.nickname,
-      helpfulCount: sql<number>`0`,
+      targetType: searchDocuments.targetType,
+      targetId: searchDocuments.targetId,
+      title: searchDocuments.title,
+      body: searchDocuments.body,
+      spaceSlug: searchDocuments.spaceSlug,
+      payload: searchDocuments.payload,
+      updatedAt: searchDocuments.updatedAt,
+      rank: sql<number>`ts_rank(
+        to_tsvector('simple', ${searchDocuments.title} || ' ' || ${searchDocuments.body}),
+        plainto_tsquery('simple', ${value})
+      )`,
+      exactRank: sql<number>`case when lower(${searchDocuments.title}) = lower(${value}) then 2 when ${searchDocuments.title} ilike ${pattern} then 1 else 0 end`,
     })
-    .from(knowledgeBases)
-    .leftJoin(users, eq(knowledgeBases.ownerId, users.id))
-    .where(sql`${knowledgeBases.title} ilike ${pattern} or ${knowledgeBases.description} ilike ${pattern}`)
-    .orderBy(desc(knowledgeBases.updatedAt))
-    .limit(10);
+    .from(searchDocuments)
+    .where(
+      and(
+        eq(searchDocuments.site, "cn"),
+        sql`(
+          to_tsvector('simple', ${searchDocuments.title} || ' ' || ${searchDocuments.body}) @@ plainto_tsquery('simple', ${value})
+          or ${searchDocuments.title} ilike ${pattern}
+          or ${searchDocuments.body} ilike ${pattern}
+        )`,
+      ),
+    )
+    .orderBy(
+      sql`case when lower(${searchDocuments.title}) = lower(${value}) then 2 when ${searchDocuments.title} ilike ${pattern} then 1 else 0 end desc`,
+      sql`ts_rank(to_tsvector('simple', ${searchDocuments.title} || ' ' || ${searchDocuments.body}), plainto_tsquery('simple', ${value})) desc`,
+      desc(searchDocuments.updatedAt),
+    )
+    .limit(30);
+
+  return toSearchResponse(rows);
+}
+
+interface SearchDocumentResultRow {
+  targetType: string;
+  targetId: string;
+  title: string;
+  body: string;
+  spaceSlug: string | null;
+  payload: Record<string, unknown>;
+  updatedAt: Date;
+  rank?: number;
+  exactRank?: number;
+}
+
+function toSearchResponse(rows: SearchDocumentResultRow[]) {
+  const articleRows = rows.filter((row) => row.targetType === "article").slice(0, 10);
+  const postRows = rows.filter((row) => row.targetType === "post").slice(0, 10);
+  const spaceRows = rows.filter((row) => row.targetType === "space").slice(0, 10);
 
   return {
     articles: articleRows.map((row) => ({
-      id: row.slug,
-      slug: row.slug,
-      spaceId: row.kbSlug,
+      id: stringFromPayload(row.payload, "slug") ?? row.targetId,
+      slug: stringFromPayload(row.payload, "slug") ?? row.targetId,
+      spaceId: row.spaceSlug ?? "",
       parentId: null,
       title: row.title,
-      summary: summarizeContent(row.content),
-      helpfulCount: row.helpfulCount,
-      changedCount: row.changedCount,
-      readCount: row.readCount,
-      favoriteCount: row.favoriteCount,
-      confirmedAt: toIso(row.confirmedAt),
+      summary: summarizeContent(row.body),
+      helpfulCount: numberFromPayload(row.payload, "helpfulCount"),
+      changedCount: numberFromPayload(row.payload, "changedCount"),
+      readCount: numberFromPayload(row.payload, "readCount"),
+      favoriteCount: numberFromPayload(row.payload, "favoriteCount"),
+      confirmedAt: stringFromPayload(row.payload, "confirmedAt"),
       updatedAt: toIso(row.updatedAt) ?? new Date().toISOString(),
     }) satisfies ArticleSummary),
     posts: postRows.map((row) => ({
-      id: String(row.id),
-      spaceId: row.kbSlug ?? "",
-      content: row.content,
-      tags: Array.isArray(row.tags) ? row.tags.map(String) : [],
+      id: row.targetId,
+      spaceId: row.spaceSlug ?? "",
+      content: row.body,
+      tags: arrayFromPayload(row.payload, "tags"),
       author: {
-        id: String(row.authorId),
-        name: row.authorName,
+        id: stringFromPayload(row.payload, "authorId") ?? "0",
+        name: stringFromPayload(row.payload, "authorName") ?? "同学",
       },
-      helpfulCount: row.favoriteCount,
-      replyCount: row.replyCount,
-      solved: row.solved,
-      createdAt: toIso(row.createdAt) ?? new Date().toISOString(),
+      helpfulCount: numberFromPayload(row.payload, "helpfulCount"),
+      replyCount: numberFromPayload(row.payload, "replyCount"),
+      solved: Boolean(row.payload.solved),
+      createdAt: toIso(row.updatedAt) ?? new Date().toISOString(),
       replies: [],
     }) satisfies PostRecord),
-    spaces: spaceRows.map(mapSpaceRow),
+    spaces: spaceRows.map((row) =>
+      mapSpaceRow({
+        id: row.targetId,
+        slug: row.targetId,
+        title: row.title,
+        description: row.body,
+        category: stringFromPayload(row.payload, "category"),
+        articleCount: numberFromPayload(row.payload, "articleCount"),
+        favoriteCount: numberFromPayload(row.payload, "favoriteCount"),
+        recentActiveAt: row.updatedAt,
+        maintainerId: numberFromPayload(row.payload, "maintainerId"),
+        maintainerName: stringFromPayload(row.payload, "maintainerName"),
+        helpfulCount: numberFromPayload(row.payload, "helpfulCount"),
+      }),
+    ),
   } satisfies SearchResponse;
+}
+
+function numberFromPayload(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function stringFromPayload(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  return typeof value === "string" ? value : null;
+}
+
+function arrayFromPayload(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  return Array.isArray(value) ? value.map(String) : [];
+}
+
+export async function refreshSearchDocumentsInDb() {
+  if (!db) return null;
+
+  const [spaceRows, articleRows, postRows] = await Promise.all([
+    db
+      .select({
+        slug: knowledgeBases.slug,
+        title: knowledgeBases.title,
+        description: knowledgeBases.description,
+        category: knowledgeBases.category,
+        articleCount: knowledgeBases.articleCount,
+        favoriteCount: knowledgeBases.favoriteCount,
+        updatedAt: knowledgeBases.updatedAt,
+        maintainerId: users.id,
+        maintainerName: users.nickname,
+      })
+      .from(knowledgeBases)
+      .leftJoin(users, eq(knowledgeBases.ownerId, users.id)),
+    db
+      .select({
+        dbId: articles.id,
+        slug: articles.slug,
+        title: articles.title,
+        content: articles.content,
+        helpfulCount: articles.helpfulCount,
+        changedCount: articles.changedCount,
+        readCount: articles.readCount,
+        favoriteCount: articles.favoriteCount,
+        confirmedAt: articles.confirmedAt,
+        updatedAt: articles.updatedAt,
+        spaceSlug: knowledgeBases.slug,
+      })
+      .from(articles)
+      .innerJoin(knowledgeBases, eq(articles.kbId, knowledgeBases.id)),
+    db
+      .select({
+        id: posts.id,
+        content: posts.content,
+        tags: posts.tags,
+        favoriteCount: posts.favoriteCount,
+        replyCount: posts.replyCount,
+        solved: posts.solved,
+        updatedAt: posts.updatedAt,
+        spaceSlug: knowledgeBases.slug,
+        authorId: users.id,
+        authorName: users.nickname,
+      })
+      .from(posts)
+      .leftJoin(knowledgeBases, eq(posts.kbId, knowledgeBases.id))
+      .innerJoin(users, eq(posts.authorId, users.id)),
+  ]);
+
+  await db.delete(searchDocuments).where(eq(searchDocuments.site, "cn"));
+
+  const values = [
+    ...spaceRows.map((row) => ({
+      site: "cn",
+      targetType: "space",
+      targetId: row.slug,
+      title: row.title,
+      body: row.description ?? "",
+      spaceSlug: row.slug,
+      payload: {
+        category: row.category,
+        articleCount: row.articleCount,
+        favoriteCount: row.favoriteCount,
+        helpfulCount: 0,
+        maintainerId: row.maintainerId,
+        maintainerName: row.maintainerName,
+      },
+      updatedAt: row.updatedAt,
+    })),
+    ...articleRows.map((row) => ({
+      site: "cn",
+      targetType: "article",
+      targetId: String(row.dbId),
+      title: row.title,
+      body: row.content,
+      spaceSlug: row.spaceSlug,
+      payload: {
+        slug: row.slug,
+        helpfulCount: row.helpfulCount,
+        changedCount: row.changedCount,
+        readCount: row.readCount,
+        favoriteCount: row.favoriteCount,
+        confirmedAt: toIso(row.confirmedAt),
+      },
+      updatedAt: row.updatedAt,
+    })),
+    ...postRows.map((row) => ({
+      site: "cn",
+      targetType: "post",
+      targetId: String(row.id),
+      title: summarizeContent(row.content).slice(0, 80) || `帖子 ${row.id}`,
+      body: row.content,
+      spaceSlug: row.spaceSlug ?? null,
+      payload: {
+        tags: Array.isArray(row.tags) ? row.tags.map(String) : [],
+        helpfulCount: row.favoriteCount,
+        replyCount: row.replyCount,
+        solved: row.solved,
+        authorId: String(row.authorId),
+        authorName: row.authorName,
+      },
+      updatedAt: row.updatedAt,
+    })),
+  ];
+
+  if (values.length) {
+    await db.insert(searchDocuments).values(values);
+  }
+
+  return values.length;
 }
 
 export async function listFeedFromDb(page: number, pageSize: number) {

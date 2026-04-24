@@ -8,6 +8,7 @@
     "start": "tsx src/index.ts",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/scripts/seed.ts",
+    "search:refresh": "tsx src/scripts/refresh-search-documents.ts",
     "test": "vitest run"
   },
   "dependencies": {

@@ -16,6 +16,7 @@ import {
   postReplies,
   posts,
   reports,
+  searchDocuments,
   searchLogs,
   siteConfigs,
   trustEvents,
@@ -734,6 +735,35 @@ describe("frontlife API", () => {
 
     expect(searchResponse.status).toBe(201);
     expect(await countRows(searchLogs)).toBe(searchBefore + 1);
+  });
+
+  it("searches through search_documents and reports content gaps", async () => {
+    const searchResponse = await app.request("/api/search?q=麻辣烫");
+    const searchBody = await searchResponse.json();
+
+    expect(searchResponse.status).toBe(200);
+    expect(searchBody.articles.length).toBeGreaterThan(0);
+    expect(await countRows(searchDocuments)).toBeGreaterThan(0);
+
+    const gapQuery = `缺口-${Date.now()}`;
+    const logResponse = await app.request("/api/search/logs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: gapQuery, resultCount: 0, usedAi: true }),
+    });
+    expect(logResponse.status).toBe(201);
+
+    const forbiddenResponse = await app.request("/api/search/gaps", {
+      headers: { Authorization: userAuthorization("cn") },
+    });
+    expect(forbiddenResponse.status).toBe(403);
+
+    const gapsResponse = await app.request("/api/search/gaps", {
+      headers: { Authorization: adminAuthorization("cn") },
+    });
+    const gapsBody = await gapsResponse.json();
+    expect(gapsResponse.status).toBe(200);
+    expect(gapsBody.data.items.some((item: { query: string }) => item.query === gapQuery)).toBe(true);
   });
 
   it("publishes an article into database", async () => {

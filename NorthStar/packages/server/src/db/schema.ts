@@ -487,6 +487,28 @@ export const searchLogs = pgTable(
   ]
 );
 
+export const searchDocuments = pgTable(
+  "search_documents",
+  {
+    id: serial("id").primaryKey(),
+    site: varchar("site", { length: 10 }).default("cn").notNull(),
+    targetType: varchar("target_type", { length: 30 }).notNull(),
+    targetId: varchar("target_id", { length: 100 }).notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    body: text("body").notNull(),
+    spaceSlug: varchar("space_slug", { length: 100 }),
+    payload: jsonb("payload").$type<Record<string, unknown>>().default({}).notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("search_documents_target_idx").on(table.site, table.targetType, table.targetId),
+    index("search_documents_site_idx").on(table.site),
+    index("search_documents_type_idx").on(table.targetType),
+    index("search_documents_title_idx").on(table.title),
+    index("search_documents_updated_at_idx").on(table.updatedAt),
+  ],
+);
+
 // ─── Reports（举报）───
 
 export const reports = pgTable(
@@ -606,6 +628,10 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
 
 export const searchLogsRelations = relations(searchLogs, ({ one }) => ({
   user: one(users, { fields: [searchLogs.userId], references: [users.id] }),
+}));
+
+export const searchDocumentsRelations = relations(searchDocuments, ({ one }) => ({
+  space: one(knowledgeBases, { fields: [searchDocuments.spaceSlug], references: [knowledgeBases.slug] }),
 }));
 
 export const reportsRelations = relations(reports, ({ one }) => ({

@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { hashPassword } from "../lib/auth";
 import { articles, cities, knowledgeBases, legalDocuments, posts, siteConfigs, trustEvents, users } from "../db/schema";
 import { db, pool } from "../db/client";
+import { refreshSearchDocumentsInDb } from "../data/postgres";
 
 config();
 
@@ -31,6 +32,7 @@ async function seed() {
       user_consents,
       legal_documents,
       site_configs,
+      search_documents,
       search_logs,
       notifications,
       favorites,
@@ -266,6 +268,9 @@ async function seed() {
   await db.execute(sql`select setval('knowledge_bases_id_seq', coalesce((select max(id) from knowledge_bases), 1), true)`);
   await db.execute(sql`select setval('articles_id_seq', coalesce((select max(id) from articles), 1), true)`);
   await db.execute(sql`select setval('posts_id_seq', coalesce((select max(id) from posts), 1), true)`);
+  await db.execute(sql`select setval('search_documents_id_seq', coalesce((select max(id) from search_documents), 1), true)`);
+
+  const searchDocuments = await refreshSearchDocumentsInDb();
 
   console.log(
     JSON.stringify({
@@ -274,6 +279,7 @@ async function seed() {
       spaces: SEED_TOPICS.length,
       articles: SEED_ARTICLES.length,
       posts: 2,
+      searchDocuments,
     }),
   );
 }

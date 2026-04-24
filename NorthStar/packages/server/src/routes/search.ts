@@ -1,6 +1,7 @@
 import { Hono } from "hono";
-import { recordSearchLogInDb, searchContentFromDb } from "../data/postgres";
-import { resolveAuthUser } from "../middleware/auth";
+import { listSearchGapsFromDb, recordSearchLogInDb, searchContentFromDb } from "../data/postgres";
+import { fail, ok } from "../lib/http";
+import { authMiddleware, requireAuthUser, resolveAuthUser } from "../middleware/auth";
 
 interface SearchLogBody {
   query?: string;
@@ -48,4 +49,16 @@ searchRoute.post("/api/search/logs", async (c) => {
   if (!log) return c.json({ error: "Search log write failed" }, 500);
 
   return c.json({ log }, 201);
+});
+
+searchRoute.get("/api/search/gaps", authMiddleware, async (c) => {
+  const actor = requireAuthUser(c);
+  if (actor.role !== "reviewer" && actor.role !== "operator" && actor.role !== "admin") {
+    return fail(c, 403, "SEARCH_GAPS_FORBIDDEN", "没有查看搜索缺口的权限");
+  }
+
+  const gaps = await listSearchGapsFromDb();
+  if (!gaps) return fail(c, 500, "SEARCH_GAPS_FAILED", "搜索缺口报表生成失败");
+
+  return ok(c, { items: gaps });
 });

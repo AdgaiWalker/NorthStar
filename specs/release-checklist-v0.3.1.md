@@ -117,3 +117,4 @@
 - 2026-04-24：校园站前端举报主路径已切到 `/api/moderation/tasks`，不再从前端直接调用 `/api/reports`。
 - 2026-04-24：校园站空间创建回归通过：`server` 测试通过（20/20），`frontlife-web` typecheck/lint/test/build 通过；`frontlife-web` 最新 JS `2,540.46 kB`，gzip `592.26 kB`。
 - 2026-04-24：校园站成长与创作补齐：我的页显示“下一步能力”，AI 写作发布内容自动追加“AI 辅助”标注。
+- 2026-04-24：校园搜索升级完成一批：新增 `search_documents`、`pnpm search:refresh`、seed 自动刷新索引（当前 70 条）、PostgreSQL 全文搜索、搜索缺口报表；`server` 测试通过（21/21）。
