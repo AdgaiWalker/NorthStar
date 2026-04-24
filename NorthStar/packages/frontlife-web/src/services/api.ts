@@ -6,6 +6,7 @@ import type {
   CreateArticleInput,
   CreatePostInput,
   FeedResponse,
+  ModerationTaskRecord,
   NotificationRecord,
   PermissionResponse,
   PostRecord,
@@ -25,6 +26,7 @@ export type {
   CreateArticleInput,
   CreatePostInput,
   FeedResponse,
+  ModerationTaskRecord,
   NotificationRecord,
   PermissionResponse,
   PostRecord,
@@ -47,6 +49,15 @@ class ApiError extends Error {
 type RequestOptions = RequestInit & {
   authIntent?: 'read' | 'write';
 };
+
+interface ApiEnvelope<T> {
+  ok: boolean;
+  data: T;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? '';
 const useMock = import.meta.env.VITE_USE_MOCK === 'true';
@@ -206,19 +217,18 @@ export const api = {
 
   reportContent(input: { targetType: 'article' | 'post'; targetId: string; reason: string }) {
     if (useMock) return mockApi.reportContent(input);
-    return request<{
-      report: {
-        id: string;
-        targetType: 'article' | 'post';
-        targetId: string;
-        reason: string;
-        createdAt: string;
-      };
-    }>('/api/reports', {
+    return request<ApiEnvelope<ModerationTaskRecord>>('/api/moderation/tasks', {
       method: 'POST',
       authIntent: 'write',
-      body: JSON.stringify(input),
-    });
+      body: JSON.stringify({
+        site: 'cn',
+        type: 'report',
+        targetType: input.targetType,
+        targetId: input.targetId,
+        title: input.targetType === 'article' ? '文章举报' : '帖子举报',
+        reason: input.reason,
+      }),
+    }).then((payload) => ({ task: payload.data }));
   },
 
   getFeed(page: number, pageSize: number) {

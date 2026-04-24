@@ -112,4 +112,5 @@
 - 2026-04-24：真实 API smoke 通过，覆盖 health、spaces、articles、login、permissions、posts、replies、feedback、notifications、AI search、AI write、article publish。
 - 2026-04-24：无 AI key 条件下，校园站 `/api/ai/search`、`/api/ai/write` 和全球站 `/api/ai/tools` 降级验证通过。
 - 2026-04-24：全量 PRD P0 平台闭环回归通过：`shared` typecheck、`server` typecheck、`server` 测试通过（19/19）、`db:push`、`db:seed`、`admin-console` typecheck/lint/build、`frontlife-web` typecheck/lint/test/build、`frontai-web` typecheck/lint/build。
-- 2026-04-24：最新包体记录：`admin-console` JS `258.66 kB`，gzip `80.88 kB`；`frontlife-web` JS `2,531.00 kB`，gzip `590.93 kB`；`frontai-web` JS `2,586.12 kB`，gzip `562.30 kB`。
+- 2026-04-24：最新包体记录：`admin-console` JS `258.66 kB`，gzip `80.88 kB`；`frontlife-web` JS `2,531.28 kB`，gzip `591.01 kB`；`frontai-web` JS `2,586.12 kB`，gzip `562.30 kB`。
+- 2026-04-24：校园站前端举报主路径已切到 `/api/moderation/tasks`，不再从前端直接调用 `/api/reports`。
