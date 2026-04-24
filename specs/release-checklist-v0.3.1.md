@@ -19,6 +19,7 @@
 - [x] `moderation` 已接真实入口：举报和“有变化”反馈会创建审核任务，审核状态变化写入审计日志。
 - [x] `admin-console` 已接真实登录和真实 API：登录、站点切换、审核队列/详情、用户管理、内容管理、审计日志、系统配置。
 - [x] `/api/admin/*` 已限制为 `reviewer/operator/admin`，普通用户不能进入后台接口。
+- [x] 校园空间创建已接 `/api/campus/spaces`，仅 `editor/admin` 或高信任用户可创建。
 - [x] seed 已补 `cn/com` 默认协议和隐私政策，并新增后台管理员种子账号。
 - [ ] 全球站申请审核、AI 输出抽检进入 moderation 尚未完成，进入下一批 P1/P2。
 
@@ -114,3 +115,4 @@
 - 2026-04-24：全量 PRD P0 平台闭环回归通过：`shared` typecheck、`server` typecheck、`server` 测试通过（19/19）、`db:push`、`db:seed`、`admin-console` typecheck/lint/build、`frontlife-web` typecheck/lint/test/build、`frontai-web` typecheck/lint/build。
 - 2026-04-24：最新包体记录：`admin-console` JS `258.66 kB`，gzip `80.88 kB`；`frontlife-web` JS `2,531.28 kB`，gzip `591.01 kB`；`frontai-web` JS `2,586.12 kB`，gzip `562.30 kB`。
 - 2026-04-24：校园站前端举报主路径已切到 `/api/moderation/tasks`，不再从前端直接调用 `/api/reports`。
+- 2026-04-24：校园站空间创建回归通过：`server` 测试通过（20/20），`frontlife-web` typecheck/lint/test/build 通过；`frontlife-web` 最新 JS `2,539.38 kB`，gzip `591.93 kB`。

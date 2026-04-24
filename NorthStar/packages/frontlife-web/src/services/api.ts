@@ -3,6 +3,7 @@ import type {
   ArticleDraftResponse,
   ArticleSummary,
   AuthResponse,
+  CreateCampusSpaceRequest,
   CreateArticleInput,
   CreatePostInput,
   FeedResponse,
@@ -23,6 +24,7 @@ export type {
   ArticleDraftResponse,
   ArticleSummary,
   AuthResponse,
+  CreateCampusSpaceRequest,
   CreateArticleInput,
   CreatePostInput,
   FeedResponse,
@@ -129,6 +131,14 @@ export const api = {
   listSpaces() {
     if (useMock) return mockApi.listSpaces();
     return request<{ spaces: SpaceSummary[] }>('/api/spaces');
+  },
+
+  createSpace(input: CreateCampusSpaceRequest) {
+    return request<ApiEnvelope<SpaceSummary>>('/api/campus/spaces', {
+      method: 'POST',
+      authIntent: 'write',
+      body: JSON.stringify(input),
+    }).then((payload) => ({ space: payload.data }));
   },
 
   getSpace(id: string) {

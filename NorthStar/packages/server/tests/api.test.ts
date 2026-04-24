@@ -9,6 +9,7 @@ import {
   auditLogs,
   favorites,
   feedbacks,
+  knowledgeBases,
   legalDocuments,
   moderationTasks,
   notifications,
@@ -624,7 +625,7 @@ describe("frontlife API", () => {
     expect(await editorPermissionsResponse.json()).toEqual({
       canPost: true,
       canWrite: true,
-      canCreateSpace: false,
+      canCreateSpace: true,
     });
 
     expect(visitorPermissionsResponse.status).toBe(200);
@@ -633,6 +634,55 @@ describe("frontlife API", () => {
       canWrite: false,
       canCreateSpace: false,
     });
+  });
+
+  it("allows qualified users to create campus spaces and rejects ordinary users", async () => {
+    const plainAuthorization = await register(`space-user-${Date.now()}`);
+    const beforeCount = await countRows(knowledgeBases);
+
+    const forbiddenResponse = await app.request("/api/campus/spaces", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: plainAuthorization, "x-pangen-site": "cn" },
+      body: JSON.stringify({
+        slug: `plain-space-${Date.now()}`,
+        title: "普通用户空间",
+        description: "普通用户不应直接创建空间",
+        category: "activity",
+      }),
+    });
+
+    expect(forbiddenResponse.status).toBe(403);
+
+    const editorAuthorization = await login("editor");
+    const slug = `club-space-${Date.now()}`;
+    const createResponse = await app.request("/api/campus/spaces", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: editorAuthorization, "x-pangen-site": "cn" },
+      body: JSON.stringify({
+        slug,
+        title: "社团活动空间",
+        description: "收集社团招新、活动报名和比赛提醒。",
+        category: "activity",
+      }),
+    });
+    const createBody = await createResponse.json();
+
+    expect(createResponse.status).toBe(201);
+    expect(createBody.data.id).toBe(slug);
+    expect(await countRows(knowledgeBases)).toBe(beforeCount + 1);
+
+    const duplicateResponse = await app.request("/api/campus/spaces", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: editorAuthorization, "x-pangen-site": "cn" },
+      body: JSON.stringify({
+        slug,
+        title: "重复空间",
+        description: "重复标识应被拒绝。",
+        category: "activity",
+      }),
+    });
+
+    expect(duplicateResponse.status).toBe(409);
   });
 
   it("stores replies, reports and search logs in database", async () => {

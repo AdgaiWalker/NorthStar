@@ -61,9 +61,36 @@ export async function getPermissionStateForUser(options: {
   const rows = await db
     .select({
       trustLevel: users.trustLevel,
+      role: users.role,
     })
     .from(users)
     .where(eq(users.id, userId));
 
-  return getPermissionStateFromTrustLevel(rows[0]?.trustLevel ?? "user");
+  const user = rows[0];
+  const state = getPermissionStateFromTrustLevel(user?.trustLevel ?? "user");
+  if (!user) return state;
+
+  if (user.role === "editor") {
+    return {
+      trustLevel: state.trustLevel,
+      permissions: {
+        canPost: true,
+        canWrite: true,
+        canCreateSpace: true,
+      },
+    };
+  }
+
+  if (user.role === "admin") {
+    return {
+      trustLevel: state.trustLevel,
+      permissions: {
+        canPost: true,
+        canWrite: true,
+        canCreateSpace: true,
+      },
+    };
+  }
+
+  return state;
 }
