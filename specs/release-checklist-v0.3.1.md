@@ -115,4 +115,5 @@
 - 2026-04-24：全量 PRD P0 平台闭环回归通过：`shared` typecheck、`server` typecheck、`server` 测试通过（19/19）、`db:push`、`db:seed`、`admin-console` typecheck/lint/build、`frontlife-web` typecheck/lint/test/build、`frontai-web` typecheck/lint/build。
 - 2026-04-24：最新包体记录：`admin-console` JS `258.66 kB`，gzip `80.88 kB`；`frontlife-web` JS `2,531.28 kB`，gzip `591.01 kB`；`frontai-web` JS `2,586.12 kB`，gzip `562.30 kB`。
 - 2026-04-24：校园站前端举报主路径已切到 `/api/moderation/tasks`，不再从前端直接调用 `/api/reports`。
-- 2026-04-24：校园站空间创建回归通过：`server` 测试通过（20/20），`frontlife-web` typecheck/lint/test/build 通过；`frontlife-web` 最新 JS `2,539.38 kB`，gzip `591.93 kB`。
+- 2026-04-24：校园站空间创建回归通过：`server` 测试通过（20/20），`frontlife-web` typecheck/lint/test/build 通过；`frontlife-web` 最新 JS `2,540.46 kB`，gzip `592.26 kB`。
+- 2026-04-24：校园站成长与创作补齐：我的页显示“下一步能力”，AI 写作发布内容自动追加“AI 辅助”标注。

@@ -178,7 +178,7 @@ export default function SpacePage() {
       const result = await api.createArticle({
         spaceId: space.id,
         title: draftTitle.trim(),
-        content: draftContent.trim(),
+        content: `${draftContent.trim()}\n\n> AI 辅助：本文由 AI 草稿辅助生成，发布前请维护者自行核对事实和时效。`,
         authorName: userName ?? '张同学',
       });
       setArticles((current) => [result.article, ...current]);

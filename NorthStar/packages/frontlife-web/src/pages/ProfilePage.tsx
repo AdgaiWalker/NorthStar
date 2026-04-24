@@ -10,6 +10,7 @@ import { useUserStore } from '@/store/useUserStore';
 export default function ProfilePage() {
   const navigate = useNavigate();
   const token = useUserStore((state) => state.token);
+  const permissions = useUserStore((state) => state.permissions);
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const notifications = useUIStore((state) => state.notifications);
   const setNotifications = useUIStore((state) => state.setNotifications);
@@ -62,6 +63,7 @@ export default function ProfilePage() {
 
   const unreadCount = notifications.filter((item) => !item.isRead).length;
   const visibleNotifications = notifications.slice(0, 12);
+  const nextAbility = getNextAbility(permissions.canWrite, permissions.canCreateSpace);
 
   return (
     <div className="mx-auto max-w-[640px] px-4 py-6">
@@ -90,6 +92,10 @@ export default function ProfilePage() {
 
       <Section title="我的空间" icon={<FileText size={17} />}>
         {profile.spaces.length === 0 ? <Empty text="暂无维护空间" /> : profile.spaces.map((space) => <Row key={space.id} title={space.title} sub={`${space.articleCount} 篇文章`} />)}
+      </Section>
+
+      <Section title="下一步能力" icon={<Settings size={17} />}>
+        <Row title={nextAbility.title} sub={nextAbility.description} />
       </Section>
 
       <Section title="通知" icon={<Bell size={17} />}>
@@ -186,4 +192,25 @@ function Row({ title, sub }: { title: string; sub?: string }) {
 
 function Empty({ text }: { text: string }) {
   return <div className="px-5 py-6 text-sm text-ink-muted">{text}</div>;
+}
+
+function getNextAbility(canWrite: boolean, canCreateSpace: boolean) {
+  if (!canWrite) {
+    return {
+      title: '继续发帖和回复',
+      description: '多贡献真实经验、解决求助后，可解锁文章创作能力。',
+    };
+  }
+
+  if (!canCreateSpace) {
+    return {
+      title: '继续沉淀文章',
+      description: '持续维护高质量内容后，可解锁创建空间能力。',
+    };
+  }
+
+  return {
+    title: '维护空间和文章体系',
+    description: '你已可以创建空间，下一步是把高频问题整理成稳定内容。',
+  };
 }
