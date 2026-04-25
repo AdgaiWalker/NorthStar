@@ -19,6 +19,8 @@ pnpm workspace monorepo at `NorthStar/`，全栈 TypeScript：
 
 后端通过 `SITE=cn|com` 环境变量切换站点行为。原型阶段两前端通过 Vite proxy 连接，上线后各自独立部署。
 
+当前目标架构主文档：`specs/架构设计.md`。该文档裁定统一账号、账号级 LV 两站共享、产品 profile 与知识库分离。
+
 ## Document Hierarchy
 
 ```
@@ -28,7 +30,9 @@ pnpm workspace monorepo at `NorthStar/`，全栈 TypeScript：
 - 宪法：`.specify/memory/constitution.md`（最高约束）
 - 校园站 PRD：`specs/PRD-盘根校园-v9.md`
 - 全球站 PRD：`specs/PRD-盘根AI指南针-标准版.md`
-- 全球站实现规格：`specs/implementation/specs.md`
+- 目标架构：`specs/架构设计.md`
+- 全量任务计划：`specs/全量任务计划.md`
+- 全球站实现规格：`specs/全球specs.md`
 - 冲突时以上层为准
 
 ## Commands
@@ -98,7 +102,7 @@ echo '{"api_key":"your-key","base_url":"https://open.bigmodel.cn"}' > NorthStar/
 
 - 前端构建产物不得包含任何 API Key
 - cn 用户数据绝不流向海外；com 站禁止收集中国敏感个人信息
-- 两站账号体系完全独立，跳转不传递登录态
+- 两站共享统一账号和账号级 LV 等级；校园 profile、全球 profile、知识库、个人行为数据和跨域 Cookie/token 不默认共享
 - `@ns/shared` 必须保持纯 TS，不得引入 React 或任何 UI 依赖
 - 敏感词管控：`shared/src/sensitive.ts`，输入拦截 + 输出过滤
 - UI 图标统一使用 Lucide（SVG），禁止 emoji 做 UI 图标。emoji 只出现在用户输入的文本中
