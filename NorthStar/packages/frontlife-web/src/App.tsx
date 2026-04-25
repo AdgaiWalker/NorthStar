@@ -12,6 +12,7 @@ import SpacePage from './pages/SpacePage';
 import ArticlePage from './pages/ArticlePage';
 import ProfilePage from './pages/ProfilePage';
 import LoginPage from './pages/LoginPage';
+import LegalDocumentPage from './pages/LegalDocumentPage';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -26,11 +27,25 @@ function page(element: ReactElement) {
 }
 
 export default function App() {
+  const token = useUserStore((state) => state.token);
+  const setIdentityUser = useUserStore((state) => state.setIdentityUser);
   const setPermissions = useUserStore((state) => state.setPermissions);
 
   useEffect(() => {
-    api.getPermissions().then(setPermissions).catch(() => undefined);
-  }, [setPermissions]);
+    if (token) {
+      api
+        .getIdentityMe()
+        .then((result) => setIdentityUser(result.user))
+        .catch(() => undefined);
+    } else {
+      setIdentityUser(null);
+    }
+
+    api
+      .getPermissions()
+      .then(setPermissions)
+      .catch(() => undefined);
+  }, [setIdentityUser, setPermissions, token]);
 
   return (
     <>
@@ -44,6 +59,8 @@ export default function App() {
           <Route path="/article/:id" element={page(<ArticlePage />)} />
           <Route path="/me" element={page(<ProfilePage />)} />
           <Route path="/login" element={page(<LoginPage />)} />
+          <Route path="/legal/terms" element={page(<LegalDocumentPage type="terms" />)} />
+          <Route path="/legal/privacy" element={page(<LegalDocumentPage type="privacy" />)} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </PageLayout>

@@ -2,13 +2,18 @@ import type {
   ArticleDetail,
   ArticleDraftResponse,
   ArticleSummary,
-  AuthResponse,
+  AccountDeletionRequestRecord,
   CreateArticleInput,
   CreatePostInput,
+  DataExportResponse,
   FeedResponse,
   FavoriteRecord,
+  IdentityMeResponse,
+  IdentitySession,
+  LegalDocumentRecord,
   NotificationRecord,
   PermissionResponse,
+  PlatformRole,
   PostRecord,
   PostReplyRecord,
   ProfileResponse,
@@ -25,6 +30,9 @@ type MockAccount = {
   password: string;
   name: string;
   school: string;
+  role: PlatformRole;
+  site: 'cn' | 'com';
+  emailVerified: boolean;
   permissions: PermissionResponse;
   contentAuthorId: string;
 };
@@ -79,6 +87,9 @@ const accounts = new Map<string, MockAccount>([
       password: 'password',
       name: '张同学',
       school: '黑河学院',
+      role: 'user',
+      site: 'cn',
+      emailVerified: false,
       permissions: { canPost: true, canWrite: false, canCreateSpace: false },
       contentAuthorId: 'zhang',
     },
@@ -92,6 +103,9 @@ const accounts = new Map<string, MockAccount>([
       password: 'password',
       name: '盘根编辑',
       school: '黑河学院',
+      role: 'editor',
+      site: 'cn',
+      emailVerified: true,
       permissions: { canPost: true, canWrite: true, canCreateSpace: false },
       contentAuthorId: 'li',
     },
@@ -194,7 +208,34 @@ const notifications: MockNotificationState[] = [
 ];
 
 const favorites: MockFavoriteState[] = [];
-const searchLogs: Array<{ id: string; query: string; resultCount: number; usedAi: boolean; createdAt: string }> = [];
+const searchLogs: Array<{
+  id: string;
+  query: string;
+  resultCount: number;
+  usedAi: boolean;
+  createdAt: string;
+}> = [];
+const deletionRequests: AccountDeletionRequestRecord[] = [];
+const legalDocuments: LegalDocumentRecord[] = [
+  {
+    id: 'mock-terms-cn',
+    site: 'cn',
+    type: 'terms',
+    version: '2026-04-24',
+    title: '盘根校园用户协议',
+    content: '使用盘根校园即表示你同意遵守校园内容共建规则，真实提交反馈，不发布违法、侵权或骚扰内容。',
+    publishedAt: toIso(now - 24 * 60 * 60 * 1000),
+  },
+  {
+    id: 'mock-privacy-cn',
+    site: 'cn',
+    type: 'privacy',
+    version: '2026-04-24',
+    title: '盘根校园隐私政策',
+    content: '盘根校园仅收集账号、内容互动和必要安全数据，用于提供校园信息服务、审核和安全保护。',
+    publishedAt: toIso(now - 24 * 60 * 60 * 1000),
+  },
+];
 
 const staticAiFeed = {
   id: 'feed-ai-1',
@@ -252,6 +293,21 @@ function getCurrentAccount() {
   if (!token?.startsWith('mock-token:')) return null;
   const username = token.slice('mock-token:'.length);
   return accounts.get(username) ?? null;
+}
+
+function buildIdentitySession(account: MockAccount): IdentitySession {
+  return {
+    token: `mock-token:${account.username}`,
+    user: {
+      id: account.id,
+      username: account.username,
+      email: account.email,
+      name: account.name,
+      role: account.role,
+      site: account.site,
+      emailVerified: account.emailVerified,
+    },
+  };
 }
 
 function ensureAccount() {
@@ -375,14 +431,15 @@ function buildNotificationsForUser(userId: string) {
 }
 
 function buildFavoritesForUser(userId: string) {
-  return favorites
-    .filter((favorite) => favorite.userId === userId)
-    .map(({ userId: _userId, ...favorite }) => favorite);
+  return favorites.filter((favorite) => favorite.userId === userId).map(({ userId: _userId, ...favorite }) => favorite);
 }
 
-function createNotification(userId: string, input: Omit<MockNotificationState, 'id' | 'userId' | 'createdAt' | 'isRead'>) {
+function createNotification(
+  userId: string,
+  input: Omit<MockNotificationState, 'id' | 'userId' | 'createdAt' | 'isRead'>,
+) {
   notifications.unshift({
-    id: `notification-${notificationCounter += 1}`,
+    id: `notification-${(notificationCounter += 1)}`,
     userId,
     type: input.type,
     title: input.title,
@@ -599,7 +656,11 @@ export const mockApi = {
       createdAt: new Date().toISOString(),
     };
     article.changedCount += 1;
-    article.changeNotes.unshift({ id: feedback.id, note: feedback.note, createdAt: feedback.createdAt });
+    article.changeNotes.unshift({
+      id: feedback.id,
+      note: feedback.note,
+      createdAt: feedback.createdAt,
+    });
     return {
       articleId,
       changedCount: article.changedCount,
@@ -700,7 +761,9 @@ export const mockApi = {
       .map(buildPostRecord);
     const spaces = Object.keys(KNOWLEDGE_BASES)
       .map((spaceId, index) => buildSpaceSummary(spaceId, index))
-      .filter((space) => `${space.title} ${space.description} ${space.maintainer.name}`.toLowerCase().includes(keyword));
+      .filter((space) =>
+        `${space.title} ${space.description} ${space.maintainer.name}`.toLowerCase().includes(keyword),
+      );
 
     return { articles, posts, spaces };
   },
@@ -714,8 +777,16 @@ export const mockApi = {
     }
   },
 
-  async register(input: { username: string; email: string; password: string }): Promise<AuthResponse> {
-    if (accounts.has(input.username) || Array.from(accounts.values()).some((account) => account.email === input.email)) {
+  async register(input: {
+    username: string;
+    email: string;
+    password: string;
+    consentVersion?: string;
+  }): Promise<IdentitySession> {
+    if (
+      accounts.has(input.username) ||
+      Array.from(accounts.values()).some((account) => account.email === input.email)
+    ) {
       throw new Error('username already exists');
     }
 
@@ -726,23 +797,18 @@ export const mockApi = {
       password: input.password,
       name: input.username,
       school: '黑河学院',
+      role: 'user',
+      site: 'cn',
+      emailVerified: false,
       permissions: { canPost: true, canWrite: false, canCreateSpace: false },
       contentAuthorId: input.username,
     };
     accounts.set(input.username, account);
 
-    return {
-      token: `mock-token:${account.username}`,
-      user: {
-        id: account.id,
-        name: account.name,
-        username: account.username,
-        email: account.email,
-      },
-    };
+    return buildIdentitySession(account);
   },
 
-  async login(input: { account: string; password: string }): Promise<AuthResponse> {
+  async login(input: { account: string; password: string }): Promise<IdentitySession> {
     const account = Array.from(accounts.values()).find(
       (item) => item.username === input.account || item.email === input.account,
     );
@@ -750,20 +816,64 @@ export const mockApi = {
       throw new Error('invalid username or password');
     }
 
+    return buildIdentitySession(account);
+  },
+
+  async getIdentityMe(): Promise<IdentityMeResponse> {
+    const account = ensureAccount();
+    return { user: buildIdentitySession(account).user };
+  },
+
+  async listLegalDocuments(type?: 'terms' | 'privacy') {
     return {
-      token: `mock-token:${account.username}`,
-      user: {
-        id: account.id,
-        name: account.name,
-        username: account.username,
-        email: account.email,
+      items: legalDocuments.filter((document) => !type || document.type === type),
+    };
+  },
+
+  async exportUserData(): Promise<DataExportResponse> {
+    const account = ensureAccount();
+    return {
+      userId: account.id,
+      site: account.site,
+      exportedAt: new Date().toISOString(),
+      payload: {
+        user: {
+          id: account.id,
+          username: account.username,
+          email: account.email,
+          name: account.name,
+          role: account.role,
+          emailVerified: account.emailVerified,
+        },
+        favorites: buildFavoritesForUser(account.id),
+        notifications: buildNotificationsForUser(account.id),
       },
     };
   },
 
+  async requestAccountDeletion(input: { reason?: string }): Promise<AccountDeletionRequestRecord> {
+    const account = ensureAccount();
+    const request: AccountDeletionRequestRecord = {
+      id: `mock-deletion-${deletionRequests.length + 1}`,
+      userId: account.id,
+      site: account.site,
+      status: 'pending',
+      reason: input.reason?.trim() || undefined,
+      requestedAt: new Date().toISOString(),
+    };
+    deletionRequests.unshift(request);
+    return request;
+  },
+
   async getPermissions() {
     const account = getCurrentAccount();
-    return account?.permissions ?? { canPost: false, canWrite: false, canCreateSpace: false };
+    return (
+      account?.permissions ?? {
+        canPost: false,
+        canWrite: false,
+        canCreateSpace: false,
+      }
+    );
   },
 
   async getNotifications() {
@@ -812,7 +922,9 @@ export const mockApi = {
       },
       stats: {
         helpedCount,
-        articleCount: Array.from(articleState.values()).filter((article) => article.authorId === account.contentAuthorId).length,
+        articleCount: Array.from(articleState.values()).filter(
+          (article) => article.authorId === account.contentAuthorId,
+        ).length,
         favoriteCount: favoriteRows.length,
       },
       spaces: authoredSpaces,
@@ -838,8 +950,8 @@ export const mockApi = {
     favoriteCounter += 1;
     const targetTitle =
       input.targetType === 'article'
-        ? articleState.get(input.targetId)?.title ?? input.targetId
-        : KNOWLEDGE_BASES[input.targetId]?.name ?? input.targetId;
+        ? (articleState.get(input.targetId)?.title ?? input.targetId)
+        : (KNOWLEDGE_BASES[input.targetId]?.name ?? input.targetId);
     const favorite: MockFavoriteState = {
       id: `favorite-${favoriteCounter}`,
       userId: account.id,

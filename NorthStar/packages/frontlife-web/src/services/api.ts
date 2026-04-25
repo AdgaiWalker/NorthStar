@@ -2,11 +2,15 @@ import type {
   ArticleDetail,
   ArticleDraftResponse,
   ArticleSummary,
-  AuthResponse,
+  AccountDeletionRequestRecord,
   CreateCampusSpaceRequest,
   CreateArticleInput,
   CreatePostInput,
+  DataExportResponse,
   FeedResponse,
+  IdentityMeResponse,
+  IdentitySession,
+  LegalDocumentRecord,
   ModerationTaskRecord,
   NotificationRecord,
   PermissionResponse,
@@ -23,11 +27,15 @@ export type {
   ArticleDetail,
   ArticleDraftResponse,
   ArticleSummary,
-  AuthResponse,
+  AccountDeletionRequestRecord,
   CreateCampusSpaceRequest,
   CreateArticleInput,
   CreatePostInput,
+  DataExportResponse,
   FeedResponse,
+  IdentityMeResponse,
+  IdentitySession,
+  LegalDocumentRecord,
   ModerationTaskRecord,
   NotificationRecord,
   PermissionResponse,
@@ -63,6 +71,7 @@ interface ApiEnvelope<T> {
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? '';
 const useMock = import.meta.env.VITE_USE_MOCK === 'true';
+const FRONTLIFE_SITE = 'cn';
 
 function toReadableApiMessage(message: string, status?: number) {
   if (status === 401) return SESSION_EXPIRED_MESSAGE;
@@ -77,6 +86,29 @@ function toReadableApiMessage(message: string, status?: number) {
     return '网络连接失败，请确认后端服务已启动或稍后重试。';
   }
   return message || '请求失败，请稍后重试。';
+}
+
+function extractErrorMessage(payload: unknown) {
+  if (!payload || typeof payload !== 'object') return null;
+  if (!('error' in payload)) return null;
+
+  const error = (payload as { error?: unknown }).error;
+  if (!error) return null;
+  if (typeof error === 'string') return error;
+  if (typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    return typeof message === 'string' ? message : null;
+  }
+
+  return null;
+}
+
+function unwrapEnvelope<T>(payload: ApiEnvelope<T>) {
+  if (!payload.ok) {
+    throw new ApiError(toReadableApiMessage(payload.error?.message ?? '请求失败，请稍后重试。'), 200);
+  }
+
+  return payload.data;
 }
 
 function getPersistedToken() {
@@ -102,6 +134,7 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
       ...requestInit,
       headers: {
         'Content-Type': 'application/json',
+        'x-pangen-site': FRONTLIFE_SITE,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...requestInit.headers,
       },
@@ -114,10 +147,7 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   const payload = (await response.json().catch(() => null)) as T | { error?: string } | null;
 
   if (!response.ok) {
-    const message =
-      payload && typeof payload === 'object' && 'error' in payload && payload.error
-        ? payload.error
-        : `请求失败 (${response.status})`;
+    const message = extractErrorMessage(payload) ?? `请求失败 (${response.status})`;
     if (response.status === 401) {
       handleExpiredSession(authIntent ?? 'read');
     }
@@ -206,10 +236,14 @@ export const api = {
 
   markArticleHelpful(articleId: string) {
     if (useMock) return mockApi.markArticleHelpful(articleId);
-    return request<{ articleId: string; helpfulCount: number; confirmedAt: string }>(
-      `/api/articles/${articleId}/helpful`,
-      { method: 'POST', authIntent: 'write' },
-    );
+    return request<{
+      articleId: string;
+      helpfulCount: number;
+      confirmedAt: string;
+    }>(`/api/articles/${articleId}/helpful`, {
+      method: 'POST',
+      authIntent: 'write',
+    });
   },
 
   markArticleChanged(articleId: string, note: string) {
@@ -217,7 +251,12 @@ export const api = {
     return request<{
       articleId: string;
       changedCount: number;
-      feedback: { id: string; articleId: string; note: string; createdAt: string };
+      feedback: {
+        id: string;
+        articleId: string;
+        note: string;
+        createdAt: string;
+      };
     }>(`/api/articles/${articleId}/changed`, {
       method: 'POST',
       authIntent: 'write',
@@ -271,6 +310,7 @@ export const api = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-pangen-site': FRONTLIFE_SITE,
           ...(getPersistedToken() ? { Authorization: `Bearer ${getPersistedToken()}` } : {}),
         },
         body: JSON.stringify({ query }),
@@ -281,11 +321,14 @@ export const api = {
     }
 
     if (!response.ok || !response.body) {
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as unknown;
       if (response.status === 401) {
         handleExpiredSession('read');
       }
-      throw new ApiError(toReadableApiMessage(payload?.error ?? 'AI 回答生成失败', response.status), response.status);
+      throw new ApiError(
+        toReadableApiMessage(extractErrorMessage(payload) ?? 'AI 回答生成失败', response.status),
+        response.status,
+      );
     }
 
     const reader = response.body.getReader();
@@ -311,20 +354,47 @@ export const api = {
     }
   },
 
-  register(input: { username: string; email: string; password: string }) {
+  register(input: { username: string; email: string; password: string; consentVersion?: string }) {
     if (useMock) return mockApi.register(input);
-    return request<AuthResponse>('/api/auth/register', {
+    return request<ApiEnvelope<IdentitySession>>('/api/identity/register', {
       method: 'POST',
-      body: JSON.stringify(input),
-    });
+      body: JSON.stringify({ ...input, site: FRONTLIFE_SITE }),
+    }).then(unwrapEnvelope);
   },
 
   login(input: { account: string; password: string }) {
     if (useMock) return mockApi.login(input);
-    return request<AuthResponse>('/api/auth/login', {
+    return request<ApiEnvelope<IdentitySession>>('/api/identity/login', {
       method: 'POST',
+      body: JSON.stringify({ ...input, site: FRONTLIFE_SITE }),
+    }).then(unwrapEnvelope);
+  },
+
+  getIdentityMe() {
+    if (useMock) return mockApi.getIdentityMe();
+    return request<ApiEnvelope<IdentityMeResponse>>('/api/identity/me').then(unwrapEnvelope);
+  },
+
+  listLegalDocuments(type?: 'terms' | 'privacy') {
+    if (useMock) return mockApi.listLegalDocuments(type);
+    const query = type ? `?type=${type}` : '';
+    return request<ApiEnvelope<{ items: LegalDocumentRecord[] }>>(`/api/compliance/legal-documents${query}`).then(
+      unwrapEnvelope,
+    );
+  },
+
+  exportUserData() {
+    if (useMock) return mockApi.exportUserData();
+    return request<ApiEnvelope<DataExportResponse>>('/api/compliance/data-export').then(unwrapEnvelope);
+  },
+
+  requestAccountDeletion(input: { reason?: string }) {
+    if (useMock) return mockApi.requestAccountDeletion(input);
+    return request<ApiEnvelope<AccountDeletionRequestRecord>>('/api/compliance/account-deletions', {
+      method: 'POST',
+      authIntent: 'write',
       body: JSON.stringify(input),
-    });
+    }).then(unwrapEnvelope);
   },
 
   getPermissions() {

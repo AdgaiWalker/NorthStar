@@ -23,6 +23,12 @@ const apiMock = vi.hoisted(() => ({
   markPostSolved: vi.fn(),
   generateArticleDraft: vi.fn(),
   createArticle: vi.fn(),
+  register: vi.fn(),
+  login: vi.fn(),
+  getIdentityMe: vi.fn(),
+  listLegalDocuments: vi.fn(),
+  exportUserData: vi.fn(),
+  requestAccountDeletion: vi.fn(),
   getNotifications: vi.fn(),
   markNotificationRead: vi.fn(),
   getProfile: vi.fn(),
@@ -233,6 +239,85 @@ describe('frontlife pages', () => {
         changeNotes: [],
       },
     });
+    apiMock.register.mockResolvedValue({
+      token: 'registered-token',
+      user: {
+        id: 'demo-user',
+        username: 'new-user',
+        email: 'new-user@example.com',
+        name: 'new-user',
+        role: 'user',
+        site: 'cn',
+        emailVerified: false,
+      },
+    });
+    apiMock.login.mockResolvedValue({
+      token: 'test-token',
+      user: {
+        id: 'demo-user',
+        username: 'zhang',
+        email: 'zhang@example.com',
+        name: '张同学',
+        role: 'user',
+        site: 'cn',
+        emailVerified: false,
+      },
+    });
+    apiMock.getIdentityMe.mockResolvedValue({
+      user: {
+        id: 'demo-user',
+        username: 'zhang',
+        email: 'zhang@example.com',
+        name: '张同学',
+        role: 'user',
+        site: 'cn',
+        emailVerified: false,
+      },
+    });
+    const legalDocuments = [
+      {
+        id: 'terms-cn',
+        site: 'cn',
+        type: 'terms',
+        version: '2026-04-24',
+        title: '盘根校园用户协议',
+        content: '使用盘根校园即表示你同意遵守校园内容共建规则。',
+        publishedAt: '2026-04-24T00:00:00.000Z',
+      },
+      {
+        id: 'privacy-cn',
+        site: 'cn',
+        type: 'privacy',
+        version: '2026-04-24',
+        title: '盘根校园隐私政策',
+        content: '盘根校园仅收集账号、内容互动和必要安全数据。',
+        publishedAt: '2026-04-24T00:00:00.000Z',
+      },
+    ];
+    apiMock.listLegalDocuments.mockImplementation((type?: 'terms' | 'privacy') =>
+      Promise.resolve({
+        items: legalDocuments.filter((document) => !type || document.type === type),
+      }),
+    );
+    apiMock.exportUserData.mockResolvedValue({
+      userId: 'demo-user',
+      site: 'cn',
+      exportedAt: '2026-04-24T12:00:00.000Z',
+      payload: {
+        user: {
+          username: 'zhang',
+          email: 'zhang@example.com',
+        },
+      },
+    });
+    apiMock.requestAccountDeletion.mockResolvedValue({
+      id: 'deletion-1',
+      userId: 'demo-user',
+      site: 'cn',
+      status: 'pending',
+      reason: '毕业离校',
+      requestedAt: '2026-04-24T12:00:00.000Z',
+    });
     apiMock.getNotifications.mockResolvedValue({
       notifications: [
         {
@@ -345,13 +430,21 @@ describe('frontlife pages', () => {
           token: 'test-token',
           userId: '1',
           userName: '张同学',
-          permissions: { canPost: true, canWrite: false, canCreateSpace: false },
+          permissions: {
+            canPost: true,
+            canWrite: false,
+            canCreateSpace: false,
+          },
         },
       }),
     );
     useUserStore.getState().setToken('test-token');
     useUserStore.getState().setUser('1', '张同学');
-    useUserStore.getState().setPermissions({ canPost: true, canWrite: false, canCreateSpace: false });
+    useUserStore.getState().setPermissions({
+      canPost: true,
+      canWrite: false,
+      canCreateSpace: false,
+    });
     renderRoute('/space/food');
 
     const input = await screen.findByPlaceholderText('在这里说点什么...');
@@ -369,7 +462,11 @@ describe('frontlife pages', () => {
   it('creates a post from the home composer', async () => {
     useUserStore.getState().setToken('test-token');
     useUserStore.getState().setUser('1', '张同学');
-    useUserStore.getState().setPermissions({ canPost: true, canWrite: false, canCreateSpace: false });
+    useUserStore.getState().setPermissions({
+      canPost: true,
+      canWrite: false,
+      canCreateSpace: false,
+    });
 
     renderRoute('/?write=1');
 
@@ -392,7 +489,11 @@ describe('frontlife pages', () => {
   it('replies to a post and marks a help post solved', async () => {
     useUserStore.getState().setToken('test-token');
     useUserStore.getState().setUser('1', '张同学');
-    useUserStore.getState().setPermissions({ canPost: true, canWrite: false, canCreateSpace: false });
+    useUserStore.getState().setPermissions({
+      canPost: true,
+      canWrite: false,
+      canCreateSpace: false,
+    });
     apiMock.getSpacePosts.mockResolvedValueOnce({
       posts: [
         {
@@ -451,7 +552,9 @@ describe('frontlife pages', () => {
     expect((await screen.findAllByDisplayValue('三食堂烤冷面窗口测评')).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByDisplayValue(/适合晚饭前快速解决一餐/), {
-      target: { value: '# 编辑后的窗口测评\n\n## 结论\n这是一段人工核对后的正文。' },
+      target: {
+        value: '# 编辑后的窗口测评\n\n## 结论\n这是一段人工核对后的正文。',
+      },
     });
     fireEvent.click(screen.getByText('发布文章'));
 
@@ -478,7 +581,11 @@ describe('frontlife pages', () => {
   it('shows header write entry after login', async () => {
     useUserStore.getState().setToken('test-token');
     useUserStore.getState().setUser('1', '张同学');
-    useUserStore.getState().setPermissions({ canPost: true, canWrite: false, canCreateSpace: false });
+    useUserStore.getState().setPermissions({
+      canPost: true,
+      canWrite: false,
+      canCreateSpace: false,
+    });
 
     renderRoute('/');
 
@@ -488,7 +595,11 @@ describe('frontlife pages', () => {
   it('marks notification as read from profile page', async () => {
     useUserStore.getState().setToken('test-token');
     useUserStore.getState().setUser('1', '张同学');
-    useUserStore.getState().setPermissions({ canPost: true, canWrite: false, canCreateSpace: false });
+    useUserStore.getState().setPermissions({
+      canPost: true,
+      canWrite: false,
+      canCreateSpace: false,
+    });
     apiMock.markNotificationRead.mockResolvedValue({
       notification: {
         id: 'notification-1',
@@ -512,7 +623,11 @@ describe('frontlife pages', () => {
   it('keeps notification read state in sync when marking read from the header', async () => {
     useUserStore.getState().setToken('test-token');
     useUserStore.getState().setUser('1', '张同学');
-    useUserStore.getState().setPermissions({ canPost: true, canWrite: false, canCreateSpace: false });
+    useUserStore.getState().setPermissions({
+      canPost: true,
+      canWrite: false,
+      canCreateSpace: false,
+    });
     apiMock.markNotificationRead.mockResolvedValue({
       notification: {
         id: 'notification-1',
@@ -539,5 +654,68 @@ describe('frontlife pages', () => {
     renderRoute('/login?reason=session-expired');
 
     expect(await screen.findByText('登录状态已失效，请重新登录。')).toBeInTheDocument();
+  });
+
+  it('registers through identity with legal consent version', async () => {
+    renderRoute('/login');
+
+    fireEvent.click(screen.getByText('没有账号？去注册'));
+    expect(await screen.findByText(/当前协议版本：2026-04-24/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('用户名'), {
+      target: { value: 'new-user' },
+    });
+    fireEvent.change(screen.getByLabelText('邮箱'), {
+      target: { value: 'new-user@example.com' },
+    });
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: '注册' }));
+
+    await waitFor(() => {
+      expect(apiMock.register).toHaveBeenCalledWith({
+        username: 'new-user',
+        email: 'new-user@example.com',
+        password: 'password',
+        consentVersion: '2026-04-24',
+      });
+    });
+    expect(apiMock.getIdentityMe).toHaveBeenCalled();
+    expect(useUserStore.getState().userRole).toBe('user');
+  });
+
+  it('renders legal documents from compliance api', async () => {
+    renderRoute('/legal/privacy');
+
+    expect(await screen.findByText('盘根校园隐私政策')).toBeInTheDocument();
+    expect(screen.getByText('盘根校园仅收集账号、内容互动和必要安全数据。')).toBeInTheDocument();
+  });
+
+  it('exports user data and submits an account deletion request from profile', async () => {
+    useUserStore.getState().setToken('test-token');
+    useUserStore.getState().setUser('1', '张同学');
+    useUserStore.getState().setPermissions({
+      canPost: true,
+      canWrite: false,
+      canCreateSpace: false,
+    });
+
+    renderRoute('/me');
+
+    expect(await screen.findByText('账号与数据')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '导出数据' }));
+    expect(await screen.findByText('导出内容')).toBeInTheDocument();
+    expect(screen.getByText(/"username": "zhang"/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('注销原因（可选）'), {
+      target: { value: '毕业离校' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '提交注销申请' }));
+
+    await waitFor(() => {
+      expect(apiMock.requestAccountDeletion).toHaveBeenCalledWith({
+        reason: '毕业离校',
+      });
+    });
+    expect(await screen.findByText('注销申请已提交，当前状态：待处理')).toBeInTheDocument();
   });
 });

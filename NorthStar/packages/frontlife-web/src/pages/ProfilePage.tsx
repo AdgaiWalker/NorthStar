@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Bookmark, FileText, Settings } from 'lucide-react';
-import type { ProfileResponse } from '@ns/shared';
+import { Bell, Bookmark, Download, FileText, Settings, ShieldCheck, Trash2 } from 'lucide-react';
+import type { AccountDeletionRequestRecord, DataExportResponse, ProfileResponse } from '@ns/shared';
 import { ErrorState, LoadingState } from '@/components/LoadingState';
 import { api } from '@/services/api';
 import { useUIStore } from '@/store/useUIStore';
@@ -18,6 +18,13 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(Boolean(token));
   const [error, setError] = useState('');
   const [notificationError, setNotificationError] = useState('');
+  const [exportResult, setExportResult] = useState<DataExportResponse | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const [deletionReason, setDeletionReason] = useState('');
+  const [deletionRequest, setDeletionRequest] = useState<AccountDeletionRequestRecord | null>(null);
+  const [deletionLoading, setDeletionLoading] = useState(false);
+  const [deletionError, setDeletionError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -44,7 +51,10 @@ export default function ProfilePage() {
         <div className="rounded-2xl border border-border-light bg-surface p-7 text-center">
           <h1 className="font-display text-[24px] font-bold text-ink">登录后查看我的盘根</h1>
           <p className="mt-2 text-sm text-ink-muted">登录后可以查看通知、收藏、贡献数据和个人内容。</p>
-          <button onClick={() => navigate('/login')} className="mt-5 rounded-lg bg-sage px-5 py-2.5 text-sm font-semibold text-white">
+          <button
+            onClick={() => navigate('/login')}
+            className="mt-5 rounded-lg bg-sage px-5 py-2.5 text-sm font-semibold text-white"
+          >
             去登录
           </button>
         </div>
@@ -52,7 +62,12 @@ export default function ProfilePage() {
     );
   }
 
-  if (loading) return <div className="mx-auto max-w-[640px] px-4 py-6"><LoadingState label="正在加载个人页..." /></div>;
+  if (loading)
+    return (
+      <div className="mx-auto max-w-[640px] px-4 py-6">
+        <LoadingState label="正在加载个人页..." />
+      </div>
+    );
   if (error || !profile) {
     return (
       <div className="mx-auto max-w-[640px] px-4 py-6">
@@ -64,6 +79,36 @@ export default function ProfilePage() {
   const unreadCount = notifications.filter((item) => !item.isRead).length;
   const visibleNotifications = notifications.slice(0, 12);
   const nextAbility = getNextAbility(permissions.canWrite, permissions.canCreateSpace);
+
+  const exportData = async () => {
+    setExportLoading(true);
+    setExportError('');
+
+    try {
+      setExportResult(await api.exportUserData());
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : '数据导出失败，请稍后重试。');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const requestDeletion = async () => {
+    setDeletionLoading(true);
+    setDeletionError('');
+
+    try {
+      const result = await api.requestAccountDeletion({
+        reason: deletionReason,
+      });
+      setDeletionRequest(result);
+      setDeletionReason('');
+    } catch (err) {
+      setDeletionError(err instanceof Error ? err.message : '注销申请提交失败，请稍后重试。');
+    } finally {
+      setDeletionLoading(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-[640px] px-4 py-6">
@@ -91,7 +136,11 @@ export default function ProfilePage() {
       </section>
 
       <Section title="我的空间" icon={<FileText size={17} />}>
-        {profile.spaces.length === 0 ? <Empty text="暂无维护空间" /> : profile.spaces.map((space) => <Row key={space.id} title={space.title} sub={`${space.articleCount} 篇文章`} />)}
+        {profile.spaces.length === 0 ? (
+          <Empty text="暂无维护空间" />
+        ) : (
+          profile.spaces.map((space) => <Row key={space.id} title={space.title} sub={`${space.articleCount} 篇文章`} />)
+        )}
       </Section>
 
       <Section title="下一步能力" icon={<Settings size={17} />}>
@@ -133,9 +182,7 @@ export default function ProfilePage() {
                 </div>
               </button>
             ))}
-            {notificationError && (
-              <div className="px-5 py-3 text-sm text-rose-custom">{notificationError}</div>
-            )}
+            {notificationError && <div className="px-5 py-3 text-sm text-rose-custom">{notificationError}</div>}
           </>
         )}
       </Section>
@@ -144,17 +191,85 @@ export default function ProfilePage() {
         {profile.contents.length === 0 ? (
           <Empty text="暂无个人内容" />
         ) : (
-          profile.contents.slice(0, 4).map((item) => <Row key={item.id} title={'title' in item ? item.title : item.content} sub={'helpfulCount' in item ? `${item.helpfulCount} 人确认` : ''} />)
+          profile.contents
+            .slice(0, 4)
+            .map((item) => (
+              <Row
+                key={item.id}
+                title={'title' in item ? item.title : item.content}
+                sub={'helpfulCount' in item ? `${item.helpfulCount} 人确认` : ''}
+              />
+            ))
         )}
       </Section>
 
       <Section title="我的收藏" icon={<Bookmark size={17} />}>
-        {profile.favorites.length === 0 ? <Empty text="暂无收藏" /> : profile.favorites.map((item) => <Row key={item.id} title={item.title} sub={item.targetType === 'article' ? '文章' : '空间'} />)}
+        {profile.favorites.length === 0 ? (
+          <Empty text="暂无收藏" />
+        ) : (
+          profile.favorites.map((item) => (
+            <Row key={item.id} title={item.title} sub={item.targetType === 'article' ? '文章' : '空间'} />
+          ))
+        )}
       </Section>
 
       <Section title="设置" icon={<Settings size={17} />}>
         <Row title="账号设置" sub="基础资料与登录状态" />
         {profile.canCreateSpace && <Row title="创建空间" sub="你已解锁创建空间能力" />}
+      </Section>
+
+      <Section title="账号与数据" icon={<ShieldCheck size={17} />}>
+        <ActionRow
+          icon={<Download size={16} />}
+          title="数据导出"
+          sub={exportResult ? `已生成 ${formatDateTime(exportResult.exportedAt)}` : '导出账号、同意记录和内容互动数据'}
+          actionLabel={exportLoading ? '导出中...' : '导出数据'}
+          disabled={exportLoading}
+          onAction={exportData}
+        />
+        {exportError && <InlineError text={exportError} />}
+        {exportResult && (
+          <div className="border-b border-border-light px-5 py-3.5">
+            <div className="mb-2 text-xs font-semibold text-ink-muted">导出内容</div>
+            <pre className="max-h-48 overflow-auto rounded-lg bg-bg-subtle p-3 text-xs leading-5 text-ink-secondary">
+              {JSON.stringify(exportResult.payload, null, 2)}
+            </pre>
+          </div>
+        )}
+
+        <div className="border-b border-border-light px-5 py-3.5 last:border-b-0">
+          <div className="flex items-start gap-2">
+            <Trash2 size={16} className="mt-0.5 text-rose-custom" />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-ink">注销账号</div>
+              <div className="mt-0.5 text-xs leading-5 text-ink-muted">
+                申请提交后由后台处理，处理完成后当前登录状态会失效。
+              </div>
+            </div>
+          </div>
+          <textarea
+            value={deletionReason}
+            onChange={(event) => setDeletionReason(event.target.value)}
+            rows={3}
+            className="mt-3 w-full resize-none rounded-lg border border-border bg-bg-subtle px-3 py-2 text-sm outline-none focus:border-sage"
+            placeholder="注销原因（可选）"
+          />
+          <button
+            type="button"
+            disabled={deletionLoading}
+            onClick={requestDeletion}
+            className="mt-3 rounded-lg bg-rose-custom px-4 py-2 text-sm font-semibold text-white transition-colors disabled:bg-ink-faint"
+          >
+            {deletionLoading ? '提交中...' : '提交注销申请'}
+          </button>
+          {deletionError && <div className="mt-3 text-sm text-rose-custom">{deletionError}</div>}
+          {deletionRequest && (
+            <div className="mt-3 rounded-lg bg-sage-light px-3 py-2 text-sm text-sage">
+              注销申请已提交，当前状态：
+              {toDeletionStatusText(deletionRequest.status)}
+            </div>
+          )}
+        </div>
       </Section>
     </div>
   );
@@ -190,8 +305,67 @@ function Row({ title, sub }: { title: string; sub?: string }) {
   );
 }
 
+function ActionRow({
+  icon,
+  title,
+  sub,
+  actionLabel,
+  disabled,
+  onAction,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  sub?: string;
+  actionLabel: string;
+  disabled?: boolean;
+  onAction: () => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-border-light px-5 py-3.5">
+      <div className="flex min-w-0 items-start gap-2">
+        <span className="mt-0.5 text-sage">{icon}</span>
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-ink">{title}</div>
+          {sub && <div className="mt-0.5 text-xs leading-5 text-ink-muted">{sub}</div>}
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onAction}
+        className="shrink-0 rounded-lg border border-border bg-white px-3 py-1.5 text-sm font-semibold text-ink-secondary transition-colors hover:border-sage hover:text-sage disabled:bg-bg-subtle disabled:text-ink-faint"
+      >
+        {actionLabel}
+      </button>
+    </div>
+  );
+}
+
+function InlineError({ text }: { text: string }) {
+  return <div className="border-b border-border-light px-5 py-3 text-sm text-rose-custom">{text}</div>;
+}
+
 function Empty({ text }: { text: string }) {
   return <div className="px-5 py-6 text-sm text-ink-muted">{text}</div>;
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString('zh-CN', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
+}
+
+function toDeletionStatusText(status: AccountDeletionRequestRecord['status']) {
+  const map: Record<AccountDeletionRequestRecord['status'], string> = {
+    pending: '待处理',
+    in_review: '审核中',
+    processing: '处理中',
+    completed: '已完成',
+    rejected: '已驳回',
+  };
+
+  return map[status];
 }
 
 function getNextAbility(canWrite: boolean, canCreateSpace: boolean) {

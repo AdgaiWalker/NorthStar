@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Lock, Mail, User } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import type { LegalDocumentRecord } from '@ns/shared';
+import { CheckCircle, FileText, Lock, Mail, User } from 'lucide-react';
 import { api } from '@/services/api';
 import { consumeSessionReason, SESSION_EXPIRED_MESSAGE, SESSION_EXPIRED_REASON } from '@/services/authSession';
 import { useUIStore } from '@/store/useUIStore';
@@ -13,13 +14,17 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const setToken = useUserStore((state) => state.setToken);
-  const setUser = useUserStore((state) => state.setUser);
+  const setIdentityUser = useUserStore((state) => state.setIdentityUser);
   const setPermissions = useUserStore((state) => state.setPermissions);
   const clearSessionExpired = useUIStore((state) => state.clearSessionExpired);
   const [mode, setMode] = useState<Mode>('login');
   const [username, setUsername] = useState('zhang');
   const [email, setEmail] = useState('zhang@example.com');
   const [password, setPassword] = useState('password');
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [legalDocuments, setLegalDocuments] = useState<LegalDocumentRecord[]>([]);
+  const [legalLoading, setLegalLoading] = useState(false);
+  const [legalError, setLegalError] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -32,19 +37,61 @@ export default function LoginPage() {
     }
   }, [clearSessionExpired, searchParams]);
 
+  useEffect(() => {
+    if (mode !== 'register' || legalDocuments.length > 0) return;
+
+    let active = true;
+    setLegalLoading(true);
+    setLegalError('');
+
+    api
+      .listLegalDocuments()
+      .then((result) => {
+        if (active) setLegalDocuments(result.items);
+      })
+      .catch((err) => {
+        if (active) setLegalError(err instanceof Error ? err.message : '协议加载失败，请稍后重试。');
+      })
+      .finally(() => {
+        if (active) setLegalLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [legalDocuments.length, mode]);
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
+
+    const latestConsentVersion = getLatestConsentVersion(legalDocuments);
+    if (mode === 'register' && !consentAccepted) {
+      setError('请先阅读并同意用户协议和隐私政策。');
+      return;
+    }
+
+    if (mode === 'register' && !latestConsentVersion) {
+      setError('协议版本暂时不可用，请稍后重试。');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       const result =
         mode === 'login'
           ? await api.login({ account: username, password })
-          : await api.register({ username, email, password });
+          : await api.register({
+              username,
+              email,
+              password,
+              consentVersion: latestConsentVersion ?? undefined,
+            });
 
       setToken(result.token);
-      setUser(result.user.id, result.user.name);
+      const identity = await api.getIdentityMe();
+      setIdentityUser(identity.user);
       const permissions = await api.getPermissions();
       setPermissions(permissions);
       clearSessionExpired();
@@ -63,9 +110,7 @@ export default function LoginPage() {
           <div className="mb-2 font-display text-[26px] font-bold text-ink">
             {mode === 'login' ? '登录盘根' : '注册盘根'}
           </div>
-          <p className="text-sm leading-6 text-ink-muted">
-            注册使用用户名、邮箱和密码；登录可使用用户名或邮箱。
-          </p>
+          <p className="text-sm leading-6 text-ink-muted">注册使用用户名、邮箱和密码；登录可使用用户名或邮箱。</p>
         </div>
 
         <label className="mb-4 block">
@@ -118,6 +163,46 @@ export default function LoginPage() {
           </div>
         </label>
 
+        {mode === 'register' && (
+          <div className="mb-4 rounded-lg border border-border bg-bg-subtle px-3 py-3">
+            <label className="flex items-start gap-3 text-sm leading-6 text-ink-secondary">
+              <input
+                type="checkbox"
+                checked={consentAccepted}
+                onChange={(event) => setConsentAccepted(event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-border text-sage focus:ring-sage"
+              />
+              <span>
+                我已阅读并同意
+                <Link to="/legal/terms" className="mx-1 font-semibold text-sage hover:text-sage-dark">
+                  用户协议
+                </Link>
+                和
+                <Link to="/legal/privacy" className="mx-1 font-semibold text-sage hover:text-sage-dark">
+                  隐私政策
+                </Link>
+                。
+              </span>
+            </label>
+            <div className="mt-2 flex items-center gap-2 text-xs text-ink-muted">
+              {legalLoading ? (
+                <>
+                  <FileText size={14} />
+                  正在读取协议版本...
+                </>
+              ) : legalError ? (
+                <span className="text-rose-custom">{legalError}</span>
+              ) : (
+                <>
+                  <CheckCircle size={14} className="text-sage" />
+                  当前协议版本：
+                  {getLatestConsentVersion(legalDocuments) ?? '待加载'}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 rounded-lg border border-rose-light bg-rose-light px-3 py-2 text-sm text-rose-custom">
             {error}
@@ -144,4 +229,10 @@ export default function LoginPage() {
       </form>
     </div>
   );
+}
+
+function getLatestConsentVersion(documents: LegalDocumentRecord[]) {
+  const terms = documents.find((item) => item.type === 'terms');
+  const privacy = documents.find((item) => item.type === 'privacy');
+  return terms?.version ?? privacy?.version ?? null;
 }
