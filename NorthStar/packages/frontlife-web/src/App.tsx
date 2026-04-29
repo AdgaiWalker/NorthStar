@@ -3,8 +3,10 @@ import type { ReactElement } from 'react';
 import { useEffect } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import PageLayout from './components/layout/PageLayout';
+import SearchOverlay from './components/SearchOverlay';
 import { api } from './services/api';
 import { useUserStore } from './store/useUserStore';
+import { useUIStore } from './store/useUIStore';
 import HomePage from './pages/HomePage';
 import SearchResultPage from './pages/SearchResultPage';
 import ExplorePage from './pages/ExplorePage';
@@ -30,6 +32,7 @@ export default function App() {
   const token = useUserStore((state) => state.token);
   const setIdentityUser = useUserStore((state) => state.setIdentityUser);
   const setPermissions = useUserStore((state) => state.setPermissions);
+  const showSearch = useUIStore((state) => state.showSearch);
 
   useEffect(() => {
     if (token) {
@@ -50,6 +53,7 @@ export default function App() {
   return (
     <>
       <ScrollToTop />
+      <SearchOverlay />
       <PageLayout>
         <Routes>
           <Route path="/" element={page(<HomePage />)} />

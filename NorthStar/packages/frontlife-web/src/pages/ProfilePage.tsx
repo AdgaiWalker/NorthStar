@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Bookmark, Download, FileText, Settings, ShieldCheck, Trash2 } from 'lucide-react';
+import { Award, Bell, Bookmark, Download, FileText, LoaderCircle, Settings, ShieldCheck, Trash2, X } from 'lucide-react';
 import type { AccountDeletionRequestRecord, DataExportResponse, ProfileResponse } from '@ns/shared';
 import { ErrorState, LoadingState } from '@/components/LoadingState';
 import { api } from '@/services/api';
@@ -26,6 +26,12 @@ export default function ProfilePage() {
   const [deletionLoading, setDeletionLoading] = useState(false);
   const [deletionError, setDeletionError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [certStatus, setCertStatus] = useState<'none' | 'pending' | 'verified' | 'rejected'>('none');
+  const [certDialogOpen, setCertDialogOpen] = useState(false);
+  const [certSchoolId, setCertSchoolId] = useState('');
+  const [certSchoolName, setCertSchoolName] = useState('');
+  const [certSubmitting, setCertSubmitting] = useState(false);
+  const [certError, setCertError] = useState('');
 
   useEffect(() => {
     if (!token) {
@@ -36,10 +42,13 @@ export default function ProfilePage() {
     setLoading(true);
     setError('');
     setNotificationError('');
-    Promise.all([api.getProfile(), api.getNotifications()])
-      .then(([profileResult, notificationResult]) => {
+    Promise.all([api.getProfile(), api.getNotifications(), api.getCertificationStatus()])
+      .then(([profileResult, notificationResult, certResult]) => {
         setProfile(profileResult);
         setNotifications(notificationResult.notifications);
+        if (certResult.certification) {
+          setCertStatus(certResult.certification.status);
+        }
       })
       .catch((err) => setError(err instanceof Error ? err.message : '个人页加载失败'))
       .finally(() => setLoading(false));
@@ -110,6 +119,29 @@ export default function ProfilePage() {
     }
   };
 
+  const submitCertApplication = async () => {
+    if (!certSchoolId.trim() || !certSchoolName.trim()) {
+      setCertError('请填写完整的学校信息');
+      return;
+    }
+    setCertError('');
+    setCertSubmitting(true);
+    try {
+      await api.applyCertification({
+        schoolId: certSchoolId.trim(),
+        schoolName: certSchoolName.trim(),
+      });
+      setCertStatus('pending');
+      setCertDialogOpen(false);
+      setCertSchoolId('');
+      setCertSchoolName('');
+    } catch (err) {
+      setCertError(err instanceof Error ? err.message : '认证申请提交失败，请稍后重试。');
+    } finally {
+      setCertSubmitting(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-[640px] px-4 py-6">
       <div className="mb-4 rounded-2xl border border-border-light bg-surface p-4 md:hidden">
@@ -127,7 +159,15 @@ export default function ProfilePage() {
           {profile.user.name[0]}
         </div>
         <h1 className="font-display text-[24px] font-bold text-ink">{profile.user.name}</h1>
-        <p className="mt-1 text-sm text-ink-muted">{profile.user.school}</p>
+        <div className="mt-1 flex items-center justify-center gap-2">
+          <p className="text-sm text-ink-muted">{profile.user.school}</p>
+          {certStatus === 'verified' && (
+            <span className="flex items-center gap-1 rounded-full bg-sage-light px-2 py-0.5 text-xs font-medium text-sage">
+              <Award size={12} />
+              已认证
+            </span>
+          )}
+        </div>
         <div className="mt-6 grid grid-cols-3 gap-3 border-t border-border-light pt-5">
           <Stat value={profile.stats.helpedCount} label="帮助了" />
           <Stat value={profile.stats.articleCount} label="写了" />
@@ -216,6 +256,27 @@ export default function ProfilePage() {
       <Section title="设置" icon={<Settings size={17} />}>
         <Row title="账号设置" sub="基础资料与登录状态" />
         {profile.canCreateSpace && <Row title="创建空间" sub="你已解锁创建空间能力" />}
+        {certStatus === 'none' && (
+          <ActionRow
+            icon={<Award size={16} />}
+            title="学生认证"
+            sub="认证后可获得更多权限和标识"
+            actionLabel="申请认证"
+            onAction={() => setCertDialogOpen(true)}
+          />
+        )}
+        {certStatus === 'pending' && (
+          <Row title="学生认证" sub="审核中，请耐心等待" />
+        )}
+        {certStatus === 'rejected' && (
+          <ActionRow
+            icon={<Award size={16} />}
+            title="学生认证"
+            sub="认证未通过，可重新申请"
+            actionLabel="重新申请"
+            onAction={() => setCertDialogOpen(true)}
+          />
+        )}
       </Section>
 
       <Section title="账号与数据" icon={<ShieldCheck size={17} />}>
@@ -271,6 +332,66 @@ export default function ProfilePage() {
           )}
         </div>
       </Section>
+      {certDialogOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4" onClick={() => setCertDialogOpen(false)}>
+          <div className="w-full max-w-[420px] rounded-2xl bg-white p-5 shadow-lg" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Award size={20} className="text-sage" />
+                <h3 className="text-lg font-semibold text-ink">申请学生认证</h3>
+              </div>
+              <button onClick={() => setCertDialogOpen(false)} className="text-ink-faint hover:text-ink">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-ink-muted">
+              认证通过后，你将获得学生标识，并可解锁更多平台权限。
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-ink-secondary">学校 ID</label>
+                <input
+                  value={certSchoolId}
+                  onChange={(e) => setCertSchoolId(e.target.value)}
+                  placeholder="例如：heibeixueyuan"
+                  className="h-10 w-full rounded-lg border border-border bg-bg-subtle px-3 text-sm outline-none focus:border-sage"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-ink-secondary">学校名称</label>
+                <input
+                  value={certSchoolName}
+                  onChange={(e) => setCertSchoolName(e.target.value)}
+                  placeholder="例如：黑河学院"
+                  className="h-10 w-full rounded-lg border border-border bg-bg-subtle px-3 text-sm outline-none focus:border-sage"
+                />
+              </div>
+            </div>
+            {certError && <div className="mt-3 text-sm text-rose-custom">{certError}</div>}
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={submitCertApplication}
+                disabled={certSubmitting}
+                className="flex-1 rounded-lg bg-sage px-4 py-2 text-sm font-medium text-white disabled:bg-ink-faint"
+              >
+                {certSubmitting && <LoaderCircle size={15} className="mr-1.5 inline animate-spin" />}
+                提交申请
+              </button>
+              <button
+                onClick={() => {
+                  setCertDialogOpen(false);
+                  setCertSchoolId('');
+                  setCertSchoolName('');
+                  setCertError('');
+                }}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-ink-secondary hover:bg-bg-subtle"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

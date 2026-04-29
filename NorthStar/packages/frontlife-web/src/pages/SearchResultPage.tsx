@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { BookOpen, ChevronDown, MessageCircle, Search, Sparkles } from 'lucide-react';
+import { BookOpen, ChevronDown, CircleHelp, ExternalLink, MessageCircle, PenLine, Search, Sparkles } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingState } from '@/components/LoadingState';
 import { api, type SearchResponse } from '@/services/api';
+import { useUserStore } from '@/store/useUserStore';
 
 type SearchMode = 'exact' | 'partial' | 'empty';
 
@@ -17,6 +18,8 @@ export default function SearchResultPage() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiAnswer, setAiAnswer] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const token = useUserStore((state) => state.token);
+  const canPost = useUserStore((state) => state.permissions.canPost);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +94,15 @@ export default function SearchResultPage() {
     };
   }, [aiOpen, query]);
 
+  const openHelpComposer = () => {
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    navigate(`/?write=1&tag=help&q=${encodeURIComponent(query)}`);
+  };
+
   if (!query) {
     return (
       <div className="mx-auto max-w-reader-max px-5 py-8">
@@ -124,10 +136,38 @@ export default function SearchResultPage() {
       {!loading && !error && (
         <div className="space-y-4">
           {result.mode === 'empty' && (
-            <EmptyState
-              title="暂无本地结果"
-              description="没有找到已确认文章、空间或同学动态。下面可以查看 AI 的补充回答。"
-            />
+            <div className="rounded-2xl border border-border-light bg-surface p-5">
+              <div className="mb-4">
+                <EmptyState
+                  title="暂无本地结果"
+                  description="没有找到已确认文章、空间或同学动态。AI 只能给参考建议，不会替校园事实作断言。"
+                />
+              </div>
+              <div className="rounded-xl border border-sage-light bg-sage-light p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-sage">
+                    <CircleHelp size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-sage-dark">把这个问题发给同学和维护者</div>
+                    <p className="mt-1 break-words text-sm leading-6 text-ink-muted">
+                      会预填为“我想问：{query}”，并作为求助帖进入生活流。
+                    </p>
+                    <button
+                      onClick={openHelpComposer}
+                      disabled={Boolean(token) && !canPost}
+                      className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-sage px-4 text-sm font-medium text-white transition-colors hover:bg-sage-dark disabled:bg-ink-faint"
+                    >
+                      <PenLine size={15} />
+                      {token ? '发起求助' : '登录后发起求助'}
+                    </button>
+                    {token && !canPost && (
+                      <div className="mt-2 text-xs leading-5 text-ink-muted">当前账号暂未开放发帖能力。</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
           {(result.articles.length > 0 || result.posts.length > 0 || result.spaces.length > 0) && (
             <div className="space-y-3">
@@ -191,9 +231,30 @@ export default function SearchResultPage() {
             </button>
 
             {aiOpen && (
-              <div className="mt-4 min-h-20 break-words rounded-xl bg-bg-subtle p-4 text-sm leading-7 text-ink-secondary">
-                {aiAnswer}
-                {aiLoading && <span className="ml-1 animate-pulse text-sage">▋</span>}
+              <div className="mt-4 space-y-3">
+                <div className="min-h-20 break-words rounded-xl bg-bg-subtle p-4 text-sm leading-7 text-ink-secondary">
+                  {aiAnswer}
+                  {aiLoading && <span className="ml-1 animate-pulse text-sage">▋</span>}
+                </div>
+                {result.mode === 'empty' && (
+                  <button
+                    onClick={openHelpComposer}
+                    disabled={Boolean(token) && !canPost}
+                    className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border-light px-3 text-xs font-medium text-ink-secondary hover:border-sage hover:text-sage disabled:text-ink-faint"
+                  >
+                    <PenLine size={14} />
+                    我知道准确信息，来补充
+                  </button>
+                )}
+                <a
+                  href="https://xyzidea.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-ink-faint transition-colors hover:text-sage"
+                >
+                  想了解更多 AI 工具？
+                  <ExternalLink size={10} />
+                </a>
               </div>
             )}
           </div>

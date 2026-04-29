@@ -88,6 +88,7 @@ export const users = pgTable(
     id: serial("id").primaryKey(),
     username: varchar("username", { length: 50 }).notNull(),
     email: varchar("email", { length: 255 }),
+    githubId: varchar("github_id", { length: 64 }),
     site: varchar("site", { length: 10 }).default("cn").notNull(),
     role: platformRoleEnum("role").default("user").notNull(),
     phone: varchar("phone", { length: 20 }),
@@ -115,6 +116,7 @@ export const users = pgTable(
     uniqueIndex("users_phone_idx").on(table.phone),
     uniqueIndex("users_username_idx").on(table.username),
     uniqueIndex("users_email_idx").on(table.email),
+    uniqueIndex("users_github_id_idx").on(table.githubId),
     uniqueIndex("users_wx_open_id_idx").on(table.wxOpenId),
     index("users_site_idx").on(table.site),
     index("users_role_idx").on(table.role),
@@ -130,7 +132,7 @@ export const siteConfigs = pgTable(
   "site_configs",
   {
     id: serial("id").primaryKey(),
-    site: varchar("site", { length: 10 }).notNull(),
+    site: varchar("site", { length: 10 }).default("cn").notNull(),
     key: varchar("key", { length: 100 }).notNull(),
     value: jsonb("value").$type<Record<string, unknown>>().default({}).notNull(),
     updatedBy: integer("updated_by").references(() => users.id),
@@ -244,6 +246,45 @@ export const accountDeletionRequests = pgTable(
   (table) => [
     index("account_deletion_requests_user_id_idx").on(table.userId),
     index("account_deletion_requests_site_status_idx").on(table.site, table.status),
+  ],
+);
+
+export const applicationRequests = pgTable(
+  "application_requests",
+  {
+    id: serial("id").primaryKey(),
+    site: varchar("site", { length: 10 }).default("com").notNull(),
+    name: varchar("name", { length: 80 }).notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    useCase: text("use_case").notNull(),
+    status: varchar("status", { length: 30 }).default("pending").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    reviewedAt: timestamp("reviewed_at", { mode: "date" }),
+    reviewerId: integer("reviewer_id").references(() => users.id),
+  },
+  (table) => [
+    index("application_requests_site_idx").on(table.site),
+    index("application_requests_status_idx").on(table.status),
+    index("application_requests_email_idx").on(table.email),
+  ],
+);
+
+export const inviteCodes = pgTable(
+  "invite_codes",
+  {
+    id: serial("id").primaryKey(),
+    site: varchar("site", { length: 10 }).default("com").notNull(),
+    code: varchar("code", { length: 80 }).notNull(),
+    maxUses: integer("max_uses").default(1).notNull(),
+    usedCount: integer("used_count").default(0).notNull(),
+    expiresAt: timestamp("expires_at", { mode: "date" }),
+    createdBy: integer("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("invite_codes_code_idx").on(table.code),
+    index("invite_codes_site_idx").on(table.site),
+    index("invite_codes_created_by_idx").on(table.createdBy),
   ],
 );
 
@@ -454,6 +495,7 @@ export const notifications = pgTable(
     userId: integer("user_id")
       .references(() => users.id)
       .notNull(),
+    site: varchar("site", { length: 10 }).notNull(),
     type: notifyTypeEnum("type").notNull(),
     title: varchar("title", { length: 200 }).notNull(),
     content: text("content"),
@@ -464,6 +506,7 @@ export const notifications = pgTable(
   },
   (table) => [
     index("notify_user_id_idx").on(table.userId),
+    index("notify_site_idx").on(table.site),
     index("notify_is_read_idx").on(table.isRead),
   ]
 );
@@ -506,6 +549,231 @@ export const searchDocuments = pgTable(
     index("search_documents_type_idx").on(table.targetType),
     index("search_documents_title_idx").on(table.title),
     index("search_documents_updated_at_idx").on(table.updatedAt),
+  ],
+);
+
+export const contentRecords = pgTable(
+  "content_records",
+  {
+    id: serial("id").primaryKey(),
+    site: varchar("site", { length: 10 }).default("com").notNull(),
+    contentType: varchar("content_type", { length: 30 }).notNull(),
+    slug: varchar("slug", { length: 120 }).notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    summary: text("summary").notNull(),
+    body: text("body").notNull(),
+    domain: varchar("domain", { length: 30 }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+    status: varchar("status", { length: 30 }).default("draft").notNull(),
+    ownerId: integer("owner_id").references(() => users.id),
+    publishedAt: timestamp("published_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("content_records_site_type_slug_idx").on(table.site, table.contentType, table.slug),
+    index("content_records_site_idx").on(table.site),
+    index("content_records_type_idx").on(table.contentType),
+    index("content_records_status_idx").on(table.status),
+    index("content_records_owner_id_idx").on(table.ownerId),
+  ],
+);
+
+export const contentVersions = pgTable(
+  "content_versions",
+  {
+    id: serial("id").primaryKey(),
+    contentRecordId: integer("content_record_id")
+      .references(() => contentRecords.id)
+      .notNull(),
+    version: integer("version").notNull(),
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull(),
+    editorId: integer("editor_id").references(() => users.id),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("content_versions_record_version_idx").on(table.contentRecordId, table.version),
+    index("content_versions_record_idx").on(table.contentRecordId),
+    index("content_versions_editor_idx").on(table.editorId),
+  ],
+);
+
+export const solutions = pgTable(
+  "solutions",
+  {
+    id: serial("id").primaryKey(),
+    site: varchar("site", { length: 10 }).default("com").notNull(),
+    userId: integer("user_id")
+      .references(() => users.id)
+      .notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    targetGoal: text("target_goal").notNull(),
+    toolIds: jsonb("tool_ids").$type<string[]>().default([]).notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("solutions_site_idx").on(table.site),
+    index("solutions_user_id_idx").on(table.userId),
+    index("solutions_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const solutionFeedbacks = pgTable(
+  "solution_feedbacks",
+  {
+    id: serial("id").primaryKey(),
+    solutionId: integer("solution_id")
+      .references(() => solutions.id)
+      .notNull(),
+    userId: integer("user_id")
+      .references(() => users.id)
+      .notNull(),
+    helpful: boolean("helpful").notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("solution_feedbacks_solution_idx").on(table.solutionId),
+    index("solution_feedbacks_user_idx").on(table.userId),
+  ],
+);
+
+export const solutionExports = pgTable(
+  "solution_exports",
+  {
+    id: serial("id").primaryKey(),
+    solutionId: integer("solution_id")
+      .references(() => solutions.id)
+      .notNull(),
+    userId: integer("user_id")
+      .references(() => users.id)
+      .notNull(),
+    format: varchar("format", { length: 10 }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("solution_exports_solution_idx").on(table.solutionId),
+    index("solution_exports_user_idx").on(table.userId),
+  ],
+);
+
+export const compassFavorites = pgTable(
+  "compass_favorites",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .references(() => users.id)
+      .notNull(),
+    targetType: varchar("target_type", { length: 30 }).notNull(),
+    targetId: varchar("target_id", { length: 120 }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("compass_favorites_unique_idx").on(table.userId, table.targetType, table.targetId),
+    index("compass_favorites_user_idx").on(table.userId),
+  ],
+);
+
+export const behaviorEvents = pgTable(
+  "behavior_events",
+  {
+    id: serial("id").primaryKey(),
+    site: varchar("site", { length: 10 }).notNull(),
+    userId: integer("user_id").references(() => users.id),
+    event: varchar("event", { length: 80 }).notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("behavior_events_site_idx").on(table.site),
+    index("behavior_events_user_idx").on(table.userId),
+    index("behavior_events_event_idx").on(table.event),
+    index("behavior_events_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const aiCallLogs = pgTable(
+  "ai_call_logs",
+  {
+    id: serial("id").primaryKey(),
+    site: varchar("site", { length: 10 }).notNull(),
+    userId: integer("user_id").references(() => users.id),
+    route: varchar("route", { length: 120 }).notNull(),
+    mode: varchar("mode", { length: 20 }).notNull(),
+    fallbackReason: varchar("fallback_reason", { length: 80 }).default("").notNull(),
+    latencyMs: integer("latency_ms").default(0).notNull(),
+    promptTokens: integer("prompt_tokens").default(0).notNull(),
+    completionTokens: integer("completion_tokens").default(0).notNull(),
+    costCents: integer("cost_cents").default(0).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("ai_call_logs_site_idx").on(table.site),
+    index("ai_call_logs_user_idx").on(table.userId),
+    index("ai_call_logs_route_idx").on(table.route),
+    index("ai_call_logs_mode_idx").on(table.mode),
+    index("ai_call_logs_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const quotas = pgTable(
+  "quotas",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .references(() => users.id)
+      .notNull(),
+    site: varchar("site", { length: 10 }).notNull(),
+    aiCreditsRemaining: integer("ai_credits_remaining").default(10).notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("quotas_user_site_idx").on(table.userId, table.site),
+    index("quotas_user_idx").on(table.userId),
+  ],
+);
+
+export const quotaLedger = pgTable(
+  "quota_ledger",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .references(() => users.id)
+      .notNull(),
+    site: varchar("site", { length: 10 }).notNull(),
+    delta: integer("delta").notNull(),
+    reason: varchar("reason", { length: 80 }).notNull(),
+    balanceAfter: integer("balance_after").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("quota_ledger_user_idx").on(table.userId),
+    index("quota_ledger_site_idx").on(table.site),
+  ],
+);
+
+export const paymentOrders = pgTable(
+  "payment_orders",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .references(() => users.id)
+      .notNull(),
+    site: varchar("site", { length: 10 }).notNull(),
+    provider: varchar("provider", { length: 30 }).default("manual").notNull(),
+    status: varchar("status", { length: 30 }).default("pending").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    currency: varchar("currency", { length: 10 }).default("CNY").notNull(),
+    credits: integer("credits").default(0).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    paidAt: timestamp("paid_at", { mode: "date" }),
+  },
+  (table) => [
+    index("payment_orders_user_idx").on(table.userId),
+    index("payment_orders_site_idx").on(table.site),
+    index("payment_orders_status_idx").on(table.status),
   ],
 );
 
@@ -569,6 +837,14 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   consents: many(userConsents),
   deletionRequests: many(accountDeletionRequests, { relationName: "deletionRequester" }),
   handledDeletionRequests: many(accountDeletionRequests, { relationName: "deletionHandler" }),
+  solutions: many(solutions),
+  solutionFeedbacks: many(solutionFeedbacks),
+  solutionExports: many(solutionExports),
+  compassFavorites: many(compassFavorites),
+  behaviorEvents: many(behaviorEvents),
+  quotas: many(quotas),
+  quotaLedger: many(quotaLedger),
+  paymentOrders: many(paymentOrders),
   city: one(cities, { fields: [users.cityId], references: [cities.id] }),
   authRequest: one(authRequests, { fields: [users.id], references: [authRequests.userId] }),
 }));
@@ -634,6 +910,56 @@ export const searchDocumentsRelations = relations(searchDocuments, ({ one }) => 
   space: one(knowledgeBases, { fields: [searchDocuments.spaceSlug], references: [knowledgeBases.slug] }),
 }));
 
+export const contentRecordsRelations = relations(contentRecords, ({ one, many }) => ({
+  owner: one(users, { fields: [contentRecords.ownerId], references: [users.id] }),
+  versions: many(contentVersions),
+}));
+
+export const contentVersionsRelations = relations(contentVersions, ({ one }) => ({
+  content: one(contentRecords, { fields: [contentVersions.contentRecordId], references: [contentRecords.id] }),
+  editor: one(users, { fields: [contentVersions.editorId], references: [users.id] }),
+}));
+
+export const solutionsRelations = relations(solutions, ({ one, many }) => ({
+  user: one(users, { fields: [solutions.userId], references: [users.id] }),
+  feedbacks: many(solutionFeedbacks),
+  exports: many(solutionExports),
+}));
+
+export const solutionFeedbacksRelations = relations(solutionFeedbacks, ({ one }) => ({
+  solution: one(solutions, { fields: [solutionFeedbacks.solutionId], references: [solutions.id] }),
+  user: one(users, { fields: [solutionFeedbacks.userId], references: [users.id] }),
+}));
+
+export const solutionExportsRelations = relations(solutionExports, ({ one }) => ({
+  solution: one(solutions, { fields: [solutionExports.solutionId], references: [solutions.id] }),
+  user: one(users, { fields: [solutionExports.userId], references: [users.id] }),
+}));
+
+export const compassFavoritesRelations = relations(compassFavorites, ({ one }) => ({
+  user: one(users, { fields: [compassFavorites.userId], references: [users.id] }),
+}));
+
+export const behaviorEventsRelations = relations(behaviorEvents, ({ one }) => ({
+  user: one(users, { fields: [behaviorEvents.userId], references: [users.id] }),
+}));
+
+export const aiCallLogsRelations = relations(aiCallLogs, ({ one }) => ({
+  user: one(users, { fields: [aiCallLogs.userId], references: [users.id] }),
+}));
+
+export const quotasRelations = relations(quotas, ({ one }) => ({
+  user: one(users, { fields: [quotas.userId], references: [users.id] }),
+}));
+
+export const quotaLedgerRelations = relations(quotaLedger, ({ one }) => ({
+  user: one(users, { fields: [quotaLedger.userId], references: [users.id] }),
+}));
+
+export const paymentOrdersRelations = relations(paymentOrders, ({ one }) => ({
+  user: one(users, { fields: [paymentOrders.userId], references: [users.id] }),
+}));
+
 export const reportsRelations = relations(reports, ({ one }) => ({
   reporter: one(users, { fields: [reports.reporterId], references: [users.id] }),
 }));
@@ -678,4 +1004,12 @@ export const accountDeletionRequestsRelations = relations(accountDeletionRequest
     references: [users.id],
     relationName: "deletionHandler",
   }),
+}));
+
+export const applicationRequestsRelations = relations(applicationRequests, ({ one }) => ({
+  reviewer: one(users, { fields: [applicationRequests.reviewerId], references: [users.id] }),
+}));
+
+export const inviteCodesRelations = relations(inviteCodes, ({ one }) => ({
+  creator: one(users, { fields: [inviteCodes.createdBy], references: [users.id] }),
 }));

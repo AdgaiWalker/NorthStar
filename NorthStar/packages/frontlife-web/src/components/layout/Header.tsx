@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
-import { Bell, PenLine } from 'lucide-react';
+import { Bell, PenLine, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
 import { useUIStore } from '@/store/useUIStore';
@@ -22,6 +22,7 @@ export default function Header() {
   const setNotifications = useUIStore((s) => s.setNotifications);
   const markNotificationRead = useUIStore((s) => s.markNotificationRead);
   const resetNotifications = useUIStore((s) => s.resetNotifications);
+  const setShowSearch = useUIStore((s) => s.setShowSearch);
   const [open, setOpen] = useState(false);
   const [notificationError, setNotificationError] = useState('');
 
@@ -86,6 +87,13 @@ export default function Header() {
 
       {/* Right */}
       <div className="flex items-center gap-2.5">
+        <button
+          onClick={() => setShowSearch(true)}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-ink-muted hover:bg-bg-subtle hover:text-sage"
+          aria-label="搜索"
+        >
+          <Search size={17} />
+        </button>
         {token && canPost && (
           <button
             onClick={() => navigate('/?write=1')}

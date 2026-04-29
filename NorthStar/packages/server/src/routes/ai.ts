@@ -1,6 +1,10 @@
 import { checkSensitiveWords } from "@ns/shared";
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { searchContentFromDb } from "../data/postgres";
+import { resolveAuthUser } from "../middleware/auth";
+import { requireSiteContext } from "../middleware/site";
+import { generateGatewayText } from "../modules/ai-gateway/service";
 
 interface SearchBody {
   query?: string;
@@ -9,32 +13,6 @@ interface SearchBody {
 interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
-}
-
-interface ChatCompletionRequest {
-  model?: string;
-  messages?: ChatMessage[];
-  tools?: unknown[];
-  tool_choice?: unknown;
-  temperature?: number;
-  max_tokens?: number;
-  stream?: boolean;
-  goal?: string;
-}
-
-interface ChatCompletionResponse {
-  choices?: Array<{
-    message?: {
-      content?: string;
-      tool_calls?: Array<{
-        type?: string;
-        function?: {
-          name?: string;
-          arguments?: string;
-        };
-      }>;
-    };
-  }>;
 }
 
 export const aiRoute = new Hono();
@@ -63,7 +41,11 @@ aiRoute.post("/api/ai/search", async (c) => {
   const contextArticles = localContext?.articles.slice(0, 5) ?? [];
   const fallback = buildSearchFallback(query, contextArticles.map((article) => article.title));
 
-  const answer = await callTextAI({
+  const answer = await generateGatewayText({
+    site: normalizeRuntimeSite(requireSiteContext(c)),
+    actor: resolveAuthUser(c),
+    guestKey: readGuestKey(c),
+    route: "campus.ai_search",
     messages: [
       {
         role: "system",
@@ -83,10 +65,11 @@ aiRoute.post("/api/ai/search", async (c) => {
     ],
     fallback,
     temperature: 0.4,
+    quotaCost: 1,
   });
 
-  const outputSensitive = checkSensitiveWords(answer);
-  const safeAnswer = outputSensitive.hit ? fallback : answer;
+  const outputSensitive = checkSensitiveWords(answer.text);
+  const safeAnswer = outputSensitive.hit ? fallback : answer.text;
   const chunks = splitChunks(safeAnswer);
   const encoder = new TextEncoder();
 
@@ -131,7 +114,11 @@ aiRoute.post("/api/ai/write", async (c) => {
   }
 
   const fallback = buildDraftFallback(topic, body.spaceTitle);
-  const raw = await callTextAI({
+  const raw = await generateGatewayText({
+    site: normalizeRuntimeSite(requireSiteContext(c)),
+    actor: resolveAuthUser(c),
+    guestKey: readGuestKey(c),
+    route: "campus.ai_write",
     messages: [
       {
         role: "system",
@@ -145,9 +132,10 @@ aiRoute.post("/api/ai/write", async (c) => {
     ],
     fallback: JSON.stringify(fallback.draft),
     temperature: 0.5,
+    quotaCost: 1,
   });
 
-  const draft = parseDraft(raw) ?? fallback.draft;
+  const draft = parseDraft(raw.text) ?? fallback.draft;
 
   return c.json({
     reply: "我先给你整理了一版文章草稿。发布前请确认真实时间、地点、价格和联系人。",
@@ -155,112 +143,6 @@ aiRoute.post("/api/ai/write", async (c) => {
     draft,
   });
 });
-
-aiRoute.post("/api/ai/tools", async (c) => {
-  let body: ChatCompletionRequest = {};
-
-  try {
-    body = await c.req.json<ChatCompletionRequest>();
-  } catch {
-    body = {};
-  }
-
-  const functionName = getFunctionName(body);
-  const prompt = body.messages?.map((message) => message.content).join("\n") ?? "";
-  const goal = body.goal?.trim() || extractQuotedText(prompt) || "提高效率";
-
-  if (body.messages?.length) {
-    if (!hasAIConfig()) {
-      return c.json({ error: "AI config missing", fallbackReason: "missing_key" }, 503);
-    }
-
-    try {
-      const response = await callChatCompletion(body, null);
-      return c.json(response);
-    } catch {
-      return c.json({ error: "AI request failed", fallbackReason: "network_error" }, 502);
-    }
-  }
-
-  return c.json({
-    mode: "demo",
-    fallbackReason: hasAIConfig() ? "" : "missing_key",
-    title: `${goal} 的 AI 工具方案`,
-    aiAdvice: "先明确任务输入和交付格式，再选择一个主工具和一个校验工具。",
-    toolCalls: [
-      {
-        name: "recommend_tools",
-        arguments: {
-          goal,
-          domains: ["writing", "productivity", "coding"],
-        },
-      },
-    ],
-  });
-});
-
-async function callTextAI(input: {
-  messages: ChatMessage[];
-  fallback: string;
-  temperature?: number;
-}) {
-  if (!hasAIConfig()) return input.fallback;
-
-  try {
-    const response = await callChatCompletion(
-      {
-        messages: input.messages,
-        temperature: input.temperature ?? 0.4,
-        max_tokens: 1000,
-      },
-      null,
-    );
-    const text = response.choices?.[0]?.message?.content?.trim();
-    return text || input.fallback;
-  } catch {
-    return input.fallback;
-  }
-}
-
-async function callChatCompletion(body: ChatCompletionRequest, fallback: ChatCompletionResponse | null) {
-  if (!hasAIConfig()) {
-    if (fallback) return fallback;
-    throw new Error("AI config missing");
-  }
-
-  try {
-    const response = await fetch(`${getAIBaseURL()}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.AI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        ...body,
-        model: body.model || process.env.AI_MODEL || "glm-4-flash",
-        stream: false,
-      }),
-    });
-
-    if (!response.ok) {
-      if (fallback) return fallback;
-      throw new Error(`AI request failed: ${response.status}`);
-    }
-
-    return (await response.json()) as ChatCompletionResponse;
-  } catch {
-    if (fallback) return fallback;
-    throw new Error("AI request failed");
-  }
-}
-
-function getAIBaseURL() {
-  return (process.env.AI_BASE_URL || "https://open.bigmodel.cn/api/paas/v4").replace(/\/$/, "");
-}
-
-function hasAIConfig() {
-  return Boolean(process.env.AI_API_KEY);
-}
 
 function buildSearchFallback(query: string, titles: string[]) {
   const contextLine = titles.length
@@ -281,42 +163,6 @@ function buildDraftFallback(topic: string, spaceTitle?: string) {
       title,
       content: `# ${title}\n\n## 先确认范围\n这篇文章整理“${topic}”相关信息，发布前请补充真实时间、地点、价格或联系人。\n\n## 核心信息\n- 适用空间：${spaceTitle ?? "当前空间"}\n- 适合读者：正在查找该问题的同学\n- 更新建议：如果信息有时效性，请写明确认日期\n\n## 待补充\n请把你知道的准确信息补到这里，再发布。`,
     },
-  };
-}
-
-function buildToolFallback(goal: string, functionName?: string): ChatCompletionResponse {
-  const argumentsText =
-    functionName?.includes("search")
-      ? JSON.stringify({
-          summary: `已分析“${goal}”。`,
-          recommendation: "优先选择低学习成本、能直接产出结果的工具组合。",
-          suggestedTools: ["ChatGPT", "Claude", "Perplexity"],
-          suggestedArticles: ["AI 工具入门指南"],
-        })
-      : JSON.stringify({
-          title: `${goal} 的 AI 工具方案`,
-          aiAdvice: `### 建议方案\n\n1. 明确目标“${goal}”的输入和输出。\n2. 选择一个主工具完成初稿。\n3. 使用另一个工具交叉检查。`,
-        });
-
-  return {
-    choices: [
-      {
-        message: {
-          tool_calls: functionName
-            ? [
-                {
-                  type: "function",
-                  function: {
-                    name: functionName,
-                    arguments: argumentsText,
-                  },
-                },
-              ]
-            : undefined,
-          content: functionName ? undefined : argumentsText,
-        },
-      },
-    ],
   };
 }
 
@@ -350,11 +196,10 @@ function splitChunks(answer: string) {
   return answer.match(/.{1,16}/g) ?? [answer];
 }
 
-function getFunctionName(body: ChatCompletionRequest) {
-  const toolChoice = body.tool_choice as { function?: { name?: string } } | undefined;
-  return toolChoice?.function?.name ?? (body.tools?.[0] as { function?: { name?: string } } | undefined)?.function?.name;
+function normalizeRuntimeSite(site: string) {
+  return site === "com" ? "com" : "cn";
 }
 
-function extractQuotedText(text: string) {
-  return text.match(/"([^"]+)"/)?.[1];
+function readGuestKey(c: Context) {
+  return c.req.header("x-forwarded-for") ?? c.req.header("cf-connecting-ip") ?? "guest";
 }

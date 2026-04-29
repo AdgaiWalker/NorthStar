@@ -7,7 +7,7 @@
  *   - [[标题#锚点]]            => 文档链接带锚点
  *   - [[tool:ID]]             => 工具链接
  *   - [[tool:ID|别名]]         => 工具链接
- *   - [[solution:ID]]         => 方案链接（本地存储，暂不可路由）
+ *   - [[solution:ID]]         => 方案链接
  *   - [[solution:ID|别名]]
  */
 
@@ -96,26 +96,19 @@ export const parseWikiLinks = (text: string): WikiLinkSegment[] => {
  */
 export const hasWikiLinks = (text: string): boolean => WIKILINK_RE.test(text);
 
-// --------------------------
-// 预处理：将 [[...]] 转换为标准 Markdown 链接
-// --------------------------
-import { MOCK_ARTICLES, MOCK_TOOLS } from '@/constants';
-
 const resolveDocHref = (title: string): string | null => {
-  const art = MOCK_ARTICLES.find((a) => a.title === title);
-  return art ? `/article/${art.id}` : null;
+  return title ? `/article/${encodeURIComponent(title)}` : null;
 };
 
 const resolveToolHref = (id: string): string | null => {
-  const t = MOCK_TOOLS.find((x) => x.id === id);
-  return t ? `/tool/${t.id}` : null;
+  return id ? `/tool/${encodeURIComponent(id)}` : null;
 };
 
 /**
  * 将 Markdown 文本中的 [[...]] 转换为标准链接，供 react-markdown 解析。
  * - 文档链接：[[Title]] => [Title](/article/xxx)
  * - 工具链接：[[tool:ID|alias]] => [alias](/tool/xxx)
- * - 方案链接：暂不支持跳转，保留文本
+ * - 方案链接：[[solution:ID|alias]] => [alias](/solution/ID)
  */
 export const preprocessWikiLinks = (md: string): string => {
   return md.replace(/\[\[([^\]]+)\]\]/g, (_, inner: string) => {
@@ -139,9 +132,8 @@ export const preprocessWikiLinks = (md: string): string => {
     }
 
     if (parsed.kind === 'solution') {
-      // 方案本地存储，暂不支持路由
       const label = parsed.alias || parsed.id;
-      return `\`未找到：${label}\``;
+      return parsed.id ? `[${label}](/solution/${encodeURIComponent(parsed.id)})` : `\`未找到：${label}\``;
     }
 
     return `[[${inner}]]`;

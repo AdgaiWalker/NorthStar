@@ -9,7 +9,7 @@ import type {
   SiteContext,
 } from "@ns/shared";
 import { db } from "../../db/client";
-import { articles, auditLogs, moderationTasks, posts, siteConfigs, users } from "../../db/schema";
+import { articles, auditLogs, contentRecords, contentVersions, moderationTasks, posts, siteConfigs, users } from "../../db/schema";
 import type { CreateAuditLogInput } from "./types";
 
 export async function getAdminSummary(site: SiteContext): Promise<AdminSummary> {
@@ -236,4 +236,54 @@ function toAdminUserRecord(row: typeof users.$inferSelect): AdminUserRecord {
 function toAdminUserRole(value: string): AdminUserRecord["role"] {
   if (value === "editor" || value === "reviewer" || value === "operator" || value === "admin") return value;
   return "user";
+}
+
+export async function getContentQualityReport(site: SiteContext) {
+  if (!db) {
+    return { campus: { articlesByStatus: {}, articlesByKb: {}, avgHelpfulCount: 0 }, compass: { contentByType: {}, contentByStatus: {}, avgVersionCount: 0 } };
+  }
+
+  const campusSite = site === "all" || site === "cn";
+
+  const campusArticlesByStatus = campusSite
+    ? await db.select({ status: articles.status, count: sql<number>`count(*)::int` }).from(articles).groupBy(articles.status)
+    : [];
+
+  const campusArticlesByKb = campusSite
+    ? await db.select({ kbId: articles.kbId, count: sql<number>`count(*)::int` }).from(articles).groupBy(articles.kbId)
+    : [];
+
+  const campusAvgHelpful = campusSite
+    ? (await db.select({ avg: sql<number>`coalesce(avg(${articles.helpfulCount}), 0)` }).from(articles))[0]?.avg ?? 0
+    : 0;
+
+  const compassSite = site === "all" || site === "com";
+  const compassWhere = site === "all" ? sql`true` : eq(contentRecords.site, "com");
+
+  const compassContentByType = compassSite
+    ? await db.select({ contentType: contentRecords.contentType, count: sql<number>`count(*)::int` }).from(contentRecords).where(compassWhere).groupBy(contentRecords.contentType)
+    : [];
+
+  const compassContentByStatus = compassSite
+    ? await db.select({ status: contentRecords.status, count: sql<number>`count(*)::int` }).from(contentRecords).where(compassWhere).groupBy(contentRecords.status)
+    : [];
+
+  const compassAvgVersions = compassSite
+    ? (await db.select({ avg: sql<number>`coalesce(avg(version_count), 0)` }).from(
+        db.select({ contentRecordId: contentVersions.contentRecordId, version_count: sql<number>`count(*)::int` }).from(contentVersions).groupBy(contentVersions.contentRecordId).as("sub")
+      ))[0]?.avg ?? 0
+    : 0;
+
+  return {
+    campus: {
+      articlesByStatus: Object.fromEntries(campusArticlesByStatus.map((r) => [r.status, r.count])),
+      articlesByKb: Object.fromEntries(campusArticlesByKb.map((r) => [String(r.kbId), r.count])),
+      avgHelpfulCount: Math.round(Number(campusAvgHelpful) * 100) / 100,
+    },
+    compass: {
+      contentByType: Object.fromEntries(compassContentByType.map((r) => [r.contentType, r.count])),
+      contentByStatus: Object.fromEntries(compassContentByStatus.map((r) => [r.status, r.count])),
+      avgVersionCount: Math.round(Number(compassAvgVersions) * 100) / 100,
+    },
+  };
 }

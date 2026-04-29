@@ -1,17 +1,19 @@
 import React, { useMemo, useState } from 'react';
 import { Trash2, Share2, Sparkles, X, Copy, Check, MessageCircle, MessageSquare } from 'lucide-react';
-import { MOCK_TOOLS } from '@/constants';
+import type { Tool } from '@/types';
 import { SITE_URL } from '@/constants/ui';
 import { useShare } from '@/hooks/useShare';
 
 interface FloatingDockProps {
   selectedToolIds: Set<string>;
+  tools: Tool[];
   onClearSelection: () => void;
   onGenerate: () => void;
 }
 
 export const FloatingDock: React.FC<FloatingDockProps> = ({
   selectedToolIds,
+  tools,
   onClearSelection,
   onGenerate,
 }) => {
@@ -21,7 +23,7 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
   const toolIds = useMemo(() => Array.from(selectedToolIds), [selectedToolIds]);
 
   const handleShareTextCopy = () => {
-    const selectedTools = MOCK_TOOLS.filter(t => selectedToolIds.has(t.id));
+    const selectedTools = tools.filter(t => selectedToolIds.has(t.id));
     const text = `我在盘根 AI 指南针发现了这些好用的工具：\n${selectedTools
       .map(t => `- ${t.name}: ${t.description}`)
       .join('\n')}\n快来看看：${SITE_URL}`;
@@ -40,7 +42,7 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
         <div className="flex items-center pl-2 gap-3">
           <div className="flex -space-x-3">
             {toolIds.slice(0, 4).map(id => {
-              const tool = MOCK_TOOLS.find(t => t.id === id);
+              const tool = tools.find(t => t.id === id);
               if (!tool) return null;
               return (
                 <img
@@ -157,7 +159,7 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
           <div className="flex items-center gap-3">
             <div className="flex -space-x-2">
               {toolIds.slice(0, 3).map(id => {
-                const tool = MOCK_TOOLS.find(t => t.id === id);
+                const tool = tools.find(t => t.id === id);
                 if (!tool) return null;
                 return (
                   <img

@@ -7,6 +7,7 @@ export * from './admin-contract';
 export * from './identity-contract';
 export * from './compliance-contract';
 export * from './moderation-contract';
+export * from './platform-contract';
 export * from './campus-contract';
 export * from './analytics-contract';
 export * from './billing-contract';

@@ -1,5 +1,19 @@
 import type { AuthTokenPayload } from "../../lib/auth";
 import { assertSiteReadable } from "../../db/site-aware";
+import { db } from "../../db/client";
+import {
+  articles,
+  behaviorEvents,
+  compassFavorites,
+  favorites,
+  feedbacks,
+  posts,
+  solutionExports,
+  solutionFeedbacks,
+  solutions,
+  users,
+} from "../../db/schema";
+import { eq } from "drizzle-orm";
 import { invalidateUserTokens } from "../identity/repository";
 import { writeAuditLog } from "../platform/service";
 import {
@@ -78,6 +92,37 @@ export async function changeDeletionRequestStatus(
 
   if (status === "completed") {
     await invalidateUserTokens(Number(result.after.userId));
+
+    // 异步数据清除：删除用户关联数据，匿名化用户记录
+    if (db) {
+      const userId = Number(result.after.userId);
+
+      await db.delete(posts).where(eq(posts.authorId, userId));
+      await db.delete(articles).where(eq(articles.authorId, userId));
+      await db.delete(feedbacks).where(eq(feedbacks.userId, userId));
+      await db.delete(favorites).where(eq(favorites.userId, userId));
+      await db.delete(solutionFeedbacks).where(eq(solutionFeedbacks.userId, userId));
+      await db.delete(solutionExports).where(eq(solutionExports.userId, userId));
+      await db.delete(solutions).where(eq(solutions.userId, userId));
+      await db.delete(behaviorEvents).where(eq(behaviorEvents.userId, userId));
+      await db.delete(compassFavorites).where(eq(compassFavorites.userId, userId));
+
+      // 匿名化用户记录（保留 id，清除个人信息）
+      await db
+        .update(users)
+        .set({
+          email: null,
+          username: `deleted_${userId}`,
+          phone: null,
+          wxOpenId: null,
+          githubId: null,
+          nickname: "已注销用户",
+          avatar: null,
+          passwordHash: null,
+          disabledAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+    }
   }
 
   await writeAuditLog({

@@ -1,16 +1,18 @@
 import { create } from 'zustand';
-import { ThemeMode, Language, UserSolution, Domain, ExportFormat, StudentCertification, User } from '@/types';
-import { STORAGE_KEYS, storageGet, storageSet } from '@/utils/storage';
-import { isThemeMode, isLanguage, isStringArray, isUserSolutionArray, isExportFormat, isStudentCertification } from '@/utils/guards';
+import { ThemeMode, Language, Domain, ExportFormat, StudentCertification, User } from '@/types';
+import type { IdentitySession, IdentityUser, PlatformRole } from '@ns/shared';
+import { STORAGE_KEYS, storageGet, storageRemove, storageSet } from '@/utils/storage';
+import { isThemeMode, isLanguage, isStringArray, isExportFormat, isStudentCertification } from '@/utils/guards';
 
 // 初始化时从 localStorage 读取
 const initTheme = storageGet(STORAGE_KEYS.themeMode, 'light' as ThemeMode, isThemeMode);
 const initLang = storageGet(STORAGE_KEYS.language, 'zh' as Language, isLanguage);
 const initSelectedToolIds = storageGet(STORAGE_KEYS.selectedToolIds, [] as string[], isStringArray);
-const initUserSolutions = storageGet(STORAGE_KEYS.userSolutions, [] as UserSolution[], isUserSolutionArray);
 const initFavoriteToolIds = storageGet(STORAGE_KEYS.favoriteToolIds, [] as string[], isStringArray);
 const initDefaultExportFormat = storageGet(STORAGE_KEYS.defaultExportFormat, 'md' as ExportFormat, isExportFormat);
 const initStudentCert = storageGet(STORAGE_KEYS.studentCertification, { status: 'none' } as StudentCertification, isStudentCertification);
+const initAuthToken = storageGet(STORAGE_KEYS.identityToken, null as string | null, isNullableString);
+const initIdentityUser = storageGet(STORAGE_KEYS.identityUser, null as IdentityUser | null, isNullableIdentityUser);
 
 interface AppState {
   // 主题与语言
@@ -24,11 +26,15 @@ interface AppState {
   currentDomain: Domain;
   setCurrentDomain: (domain: Domain) => void;
 
-  // 登录状态（前端模拟）
+  // 登录状态
   isLoggedIn: boolean;
   setIsLoggedIn: (v: boolean) => void;
+  authToken: string | null;
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
+  setIdentitySession: (session: IdentitySession) => void;
+  setIdentityUser: (user: IdentityUser | null) => void;
+  logout: () => void;
 
   // 已选工具
   selectedToolIds: Set<string>;
@@ -36,15 +42,19 @@ interface AppState {
   clearSelection: () => void;
   getSelectedToolIdsArray: () => string[];
 
-  // 用户方案
-  userSolutions: UserSolution[];
-  saveSolution: (solution: UserSolution) => void;
-  deleteSolution: (id: string) => void;
-
   // 收藏
   favoriteToolIds: Set<string>;
+  favoriteArticleIds: Set<string>;
+  favoriteTopicIds: Set<string>;
   toggleFavoriteTool: (toolId: string) => void;
+  setFavoriteToolIds: (toolIds: string[]) => void;
+  setFavoriteArticleIds: (ids: string[]) => void;
+  setFavoriteTopicIds: (ids: string[]) => void;
   isToolFavorited: (toolId: string) => boolean;
+  isArticleFavorited: (id: string) => boolean;
+  isTopicFavorited: (id: string) => boolean;
+  toggleFavoriteArticle: (id: string) => void;
+  toggleFavoriteTopic: (id: string) => void;
 
   // 默认导出格式
   defaultExportFormat: ExportFormat;
@@ -53,8 +63,6 @@ interface AppState {
   // 学生认证（前端演示状态机）
   studentCertification: StudentCertification;
   submitStudentCertification: (payload: { schoolId: string; schoolName: string }) => void;
-  mockApproveStudentCertification: () => void;
-  mockRejectStudentCertification: (reason: string) => void;
   resetStudentCertification: () => void;
 
   // 存储重置检测
@@ -67,20 +75,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   themeMode: initTheme.value,
   language: initLang.value,
   currentDomain: 'creative',
-  isLoggedIn: false,
+  isLoggedIn: Boolean(initAuthToken.value && initIdentityUser.value),
+  authToken: initAuthToken.value,
   selectedToolIds: new Set(initSelectedToolIds.value),
-  userSolutions: initUserSolutions.value,
   favoriteToolIds: new Set(initFavoriteToolIds.value),
+  favoriteArticleIds: new Set<string>(),
+  favoriteTopicIds: new Set<string>(),
   defaultExportFormat: initDefaultExportFormat.value,
   studentCertification: initStudentCert.value,
   storageResetDetected:
     initTheme.resetDetected ||
     initLang.resetDetected ||
     initSelectedToolIds.resetDetected ||
-    initUserSolutions.resetDetected ||
     initFavoriteToolIds.resetDetected ||
     initDefaultExportFormat.resetDetected ||
-    initStudentCert.resetDetected,
+    initStudentCert.resetDetected ||
+    initAuthToken.resetDetected ||
+    initIdentityUser.resetDetected,
 
   // 主题
   setThemeMode: (mode) => {
@@ -103,9 +114,37 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCurrentDomain: (domain) => set({ currentDomain: domain }),
 
   // 登录
-  setIsLoggedIn: (v) => set({ isLoggedIn: v }),
-  currentUser: null, // 默认无用户，或 mock 一个 superadmin
+  setIsLoggedIn: (v) => {
+    if (!v) {
+      get().logout();
+      return;
+    }
+    set({ isLoggedIn: true });
+  },
+  currentUser: initIdentityUser.value ? toCompassUser(initIdentityUser.value) : null,
   setCurrentUser: (user) => set({ currentUser: user }),
+  setIdentitySession: (session) => {
+    set({
+      isLoggedIn: true,
+      authToken: session.token,
+      currentUser: toCompassUser(session.user),
+    });
+    storageSet(STORAGE_KEYS.identityToken, session.token);
+    storageSet(STORAGE_KEYS.identityUser, session.user);
+  },
+  setIdentityUser: (user) => {
+    set({ currentUser: user ? toCompassUser(user) : null, isLoggedIn: Boolean(user && get().authToken) });
+    if (user) {
+      storageSet(STORAGE_KEYS.identityUser, user);
+    } else {
+      storageRemove(STORAGE_KEYS.identityUser);
+    }
+  },
+  logout: () => {
+    set({ isLoggedIn: false, authToken: null, currentUser: null });
+    storageRemove(STORAGE_KEYS.identityToken);
+    storageRemove(STORAGE_KEYS.identityUser);
+  },
 
   // 工具选择
   toggleToolSelection: (id) => {
@@ -125,18 +164,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   getSelectedToolIdsArray: () => Array.from(get().selectedToolIds),
 
-  // 方案
-  saveSolution: (solution) => {
-    const next = [solution, ...get().userSolutions];
-    set({ userSolutions: next });
-    storageSet(STORAGE_KEYS.userSolutions, next);
-  },
-  deleteSolution: (id) => {
-    const next = get().userSolutions.filter((s) => s.id !== id);
-    set({ userSolutions: next });
-    storageSet(STORAGE_KEYS.userSolutions, next);
-  },
-
   // 收藏
   toggleFavoriteTool: (toolId) => {
     const prev = get().favoriteToolIds;
@@ -149,7 +176,28 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ favoriteToolIds: next });
     storageSet(STORAGE_KEYS.favoriteToolIds, Array.from(next));
   },
+  setFavoriteToolIds: (toolIds) => {
+    const next = new Set(toolIds);
+    set({ favoriteToolIds: next });
+    storageSet(STORAGE_KEYS.favoriteToolIds, Array.from(next));
+  },
   isToolFavorited: (toolId) => get().favoriteToolIds.has(toolId),
+  setFavoriteArticleIds: (ids) => set({ favoriteArticleIds: new Set(ids) }),
+  setFavoriteTopicIds: (ids) => set({ favoriteTopicIds: new Set(ids) }),
+  isArticleFavorited: (id) => get().favoriteArticleIds.has(id),
+  isTopicFavorited: (id) => get().favoriteTopicIds.has(id),
+  toggleFavoriteArticle: (id) => {
+    const prev = get().favoriteArticleIds;
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    set({ favoriteArticleIds: next });
+  },
+  toggleFavoriteTopic: (id) => {
+    const prev = get().favoriteTopicIds;
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    set({ favoriteTopicIds: next });
+  },
 
   // 默认导出格式
   setDefaultExportFormat: (fmt) => {
@@ -168,28 +216,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ studentCertification: cert });
     storageSet(STORAGE_KEYS.studentCertification, cert);
   },
-  mockApproveStudentCertification: () => {
-    const prev = get().studentCertification;
-    const cert: StudentCertification = {
-      ...prev,
-      status: 'verified',
-      reviewedAt: new Date().toISOString(),
-      rejectReason: undefined,
-    };
-    set({ studentCertification: cert });
-    storageSet(STORAGE_KEYS.studentCertification, cert);
-  },
-  mockRejectStudentCertification: (reason) => {
-    const prev = get().studentCertification;
-    const cert: StudentCertification = {
-      ...prev,
-      status: 'rejected',
-      reviewedAt: new Date().toISOString(),
-      rejectReason: reason,
-    };
-    set({ studentCertification: cert });
-    storageSet(STORAGE_KEYS.studentCertification, cert);
-  },
   resetStudentCertification: () => {
     const cert: StudentCertification = { status: 'none' };
     set({ studentCertification: cert });
@@ -199,3 +225,52 @@ export const useAppStore = create<AppState>((set, get) => ({
   // 存储重置提示
   dismissStorageResetNotice: () => set({ storageResetDetected: false }),
 }));
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
+}
+
+function isNullableIdentityUser(value: unknown): value is IdentityUser | null {
+  if (value === null) return true;
+  if (!value || typeof value !== 'object') return false;
+  const user = value as Partial<IdentityUser>;
+  return (
+    typeof user.id === 'string' &&
+    typeof user.username === 'string' &&
+    typeof user.email === 'string' &&
+    typeof user.name === 'string' &&
+    typeof user.emailVerified === 'boolean' &&
+    (user.site === 'cn' || user.site === 'com') &&
+    isPlatformRole(user.role)
+  );
+}
+
+function isPlatformRole(value: unknown): value is PlatformRole {
+  return (
+    value === 'visitor' ||
+    value === 'user' ||
+    value === 'editor' ||
+    value === 'reviewer' ||
+    value === 'operator' ||
+    value === 'admin'
+  );
+}
+
+function toCompassUser(user: IdentityUser): User {
+  return {
+    id: user.id,
+    name: user.name || user.username,
+    email: user.email,
+    avatar: '',
+    role: mapRole(user.role),
+    isPro: user.role !== 'user',
+  };
+}
+
+function mapRole(role: PlatformRole): User['role'] {
+  if (role === 'admin') return 'admin';
+  if (role === 'editor') return 'editor';
+  if (role === 'reviewer') return 'reviewer';
+  if (role === 'operator') return 'admin';
+  return 'user';
+}

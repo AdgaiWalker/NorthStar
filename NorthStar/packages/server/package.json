@@ -9,7 +9,8 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/scripts/seed.ts",
     "search:refresh": "tsx src/scripts/refresh-search-documents.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "clean:analytics": "tsx src/scripts/cleanup-analytics.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.0",

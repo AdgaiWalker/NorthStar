@@ -3,9 +3,25 @@ import { AISearchResultV2, AISolutionResult, FallbackReason } from '@ns/shared';
 import { buildFallbackResult } from './aiFallback';
 import { API_ENDPOINTS } from '@ns/shared';
 import { safeParseJsonObject, ZhipuChatResponse, normalizeStringArray, isRecord } from '@ns/shared';
+import { STORAGE_KEYS } from '@/utils/storage';
 
 const ZHIPU_MODEL = 'glm-4-flash';
 const EMIT_SEARCH_RESULT_TOOL_NAME = 'emit_search_result_v2';
+
+function aiHeaders() {
+  let token: string | null = null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.identityToken);
+    token = raw ? (JSON.parse(raw) as string) : null;
+  } catch {
+    token = null;
+  }
+  return {
+    'Content-Type': 'application/json',
+    'x-pangen-site': 'com',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 const resolveFallbackReason = async (response: Response): Promise<FallbackReason> => {
   const payload = (await response.json().catch(() => null)) as { error?: string; fallbackReason?: string } | null;
@@ -77,9 +93,7 @@ ${articleContext}
  
     const response = await fetch(API_ENDPOINTS.AI_CHAT, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: aiHeaders(),
       body: JSON.stringify({
         model: ZHIPU_MODEL,
         messages: [
@@ -150,6 +164,7 @@ export const buildFallbackSolution = (
   tools: Tool[]
 ): AISolutionResult => {
   const toolNames = tools.map(t => t.name).join('、');
+  const hasTools = tools.length > 0;
 
   const intro =
     reason === 'quota_exhausted'
@@ -164,18 +179,19 @@ export const buildFallbackSolution = (
   return {
     mode: 'demo',
     fallbackReason: reason,
-    title: `方案: ${toolNames}`,
+    title: hasTools ? `方案: ${toolNames}` : `目标方案草稿: ${goal || '待明确目标'}`,
     aiAdvice: `### 演示模式
 
 ${intro}
 
-#### 已选工具
-${tools.map(t => `- **${t.name}**: ${t.description}`).join('\n')}
+#### 工具状态
+${hasTools ? tools.map(t => `- **${t.name}**: ${t.description}`).join('\n') : '- 暂未选择具体工具，先按目标拆解主工具和校验工具。'}
 
 #### 建议步骤
-1. 熟悉每个工具的基本操作
-2. 根据目标“${goal || '探索工具组合'}”设计工作流
-3. 尝试将工具组合使用
+1. 明确目标“${goal || '待明确目标'}”的最终交付物和验收标准
+2. 先选择一个主工具完成核心产出，再选择一个校验工具检查质量
+3. 小范围试做一次，记录耗时、效果和卡点
+4. 根据试做结果调整工具组合，再进入正式执行
 
 ${outro}`,
   };
@@ -186,7 +202,9 @@ export const generateSolutionWithAI = async (
   selectedTools: Tool[]
 ): Promise<AISolutionResult> => {
   try {
-    const toolContext = selectedTools.map(t => `- ${t.name}: ${t.description}`).join('\n');
+    const toolContext = selectedTools.length
+      ? selectedTools.map(t => `- ${t.name}: ${t.description}`).join('\n')
+      : '用户暂未选择工具。请先根据目标推荐主工具、辅助工具和校验工具。';
     const effectiveGoal = goal.trim() || '探索这些工具的组合潜力';
 
     const userPrompt = `用户目标: "${effectiveGoal}"
@@ -224,9 +242,7 @@ ${toolContext}
 
     const response = await fetch(API_ENDPOINTS.AI_CHAT, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: aiHeaders(),
       body: JSON.stringify({
         model: ZHIPU_MODEL,
         messages: [

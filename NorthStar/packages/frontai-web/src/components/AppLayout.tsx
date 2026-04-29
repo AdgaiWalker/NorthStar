@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Sun, BookOpen, Globe, User, Menu, X, ChevronDown, LogOut, Shield, Check } from 'lucide-react';
+import { Layout, Sun, BookOpen, Globe, User, Menu, X, ChevronDown, LogOut, Shield, Check, ExternalLink } from 'lucide-react';
 import { APP_NAME, ICP_LICENSE } from '@/constants';
 import { Language, Domain } from '@/types';
 import { DOMAIN_CONFIG, DOMAIN_LIST } from '../constants/domains';
@@ -13,7 +13,7 @@ export const AppHeader: React.FC = () => {
     themeMode, toggleTheme,
     language, setLanguage,
     currentDomain, setCurrentDomain,
-    isLoggedIn, setIsLoggedIn,
+    isLoggedIn, currentUser, logout,
   } = useAppStore();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -34,7 +34,7 @@ export const AppHeader: React.FC = () => {
   const currentDomainLabel = DOMAIN_CONFIG[currentDomain].label;
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
+    logout();
     navigate('/');
     setMobileMenuOpen(false);
   };
@@ -144,8 +144,8 @@ export const AppHeader: React.FC = () => {
                 {/* User Dropdown */}
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right z-50 py-2">
                    <div className="px-4 py-3 border-b border-slate-50 mb-1 bg-slate-50/50">
-                     <p className="text-sm font-bold text-slate-800">My User</p>
-                     <p className="text-xs text-slate-400 truncate">user@pangen.ai</p>
+                     <p className="text-sm font-bold text-slate-800">{currentUser?.name ?? '盘根用户'}</p>
+                     <p className="text-xs text-slate-400 truncate">{currentUser?.email || '邮箱待绑定'}</p>
                    </div>
                    <button onClick={() => navigate('/me/profile')} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-3">
                      <User size={16} /> 个人中心
@@ -191,8 +191,8 @@ export const AppHeader: React.FC = () => {
              <div className="flex items-center gap-3 px-4 py-4 bg-slate-50 rounded-xl mb-2" onClick={() => { navigate('/me/profile'); setMobileMenuOpen(false); }}>
                 <img src="https://picsum.photos/100/100?random=user" alt="User" className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
                 <div className="flex-1">
-                   <div className="font-bold text-slate-800">My User</div>
-                   <div className="text-xs text-slate-500">user@pangen.ai</div>
+                   <div className="font-bold text-slate-800">{currentUser?.name ?? '盘根用户'}</div>
+                   <div className="text-xs text-slate-500">{currentUser?.email || '邮箱待绑定'}</div>
                 </div>
                 <User size={18} className="text-slate-400" />
              </div>
@@ -248,12 +248,33 @@ export const AppHeader: React.FC = () => {
 };
 
 export const Footer: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <footer className="bg-white border-t border-slate-100 py-12 mt-auto">
       <div className="max-w-7xl mx-auto px-4 text-center">
-        <p className="text-slate-500 text-sm mb-2">
+        <p className="text-slate-500 text-sm mb-4">
           &copy; {new Date().getFullYear()} {APP_NAME}. 保留所有权利。
         </p>
+        <div className="flex flex-wrap justify-center items-center gap-4 text-xs text-slate-400 mb-4">
+          <button onClick={() => navigate('/legal/terms')} className="hover:text-slate-600 transition-colors">
+            用户协议
+          </button>
+          <span>•</span>
+          <button onClick={() => navigate('/legal/privacy')} className="hover:text-slate-600 transition-colors">
+            隐私政策
+          </button>
+          <span>•</span>
+          <a
+            href="https://xyzidea.cn"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-slate-600 transition-colors flex items-center gap-1"
+          >
+            校园站
+            <ExternalLink size={12} />
+          </a>
+        </div>
         <div className="text-slate-400 text-xs flex flex-col sm:flex-row justify-center items-center gap-2">
           <span>{ICP_LICENSE}</span>
           <span className="hidden sm:inline">•</span>

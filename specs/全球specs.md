@@ -1,12 +1,14 @@
 # 实现规格（Implementation Specs）— 仅全球站适用
 
 > ⚠️ **适用范围**：本文档仅适用于**全球站**（frontai-web）。
-> 校园站（frontlife-web）的产品模型和实现规格见 `specs/PRD-盘根校园-v8.md`。
+> 校园站（frontlife-web）的产品模型和实现规格见 `specs/PRD-盘根校园-v9.md`。
 > 本文档中涉及校园站的内容已过时，请勿参考。
+>
+> **2026-04-25 一致性裁定**：本文保留早期实现设想。若下文出现 `cn-auth.ts`、手机号/SMS 主注册、后端待建、旧 `/api/auth/*` 路由等描述，以 `specs/架构设计.md` 的统一平台架构为准：后端位于 `NorthStar/packages/server/`，新接口走 `/api/identity/*`、`/api/platform/*`、`/api/campus/*`、`/api/compass/*` 等命名空间；不做 SMS 主注册。
 
 > 全球站前端：`NorthStar/packages/frontai-web/src/`
 > 共享包：`NorthStar/packages/shared/src/`
-> 后端代码路径：`NorthStar/packages/server/`（待建）
+> 后端代码路径：`NorthStar/packages/server/`
 
 ---
 

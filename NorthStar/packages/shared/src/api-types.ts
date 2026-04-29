@@ -42,6 +42,7 @@ export interface ArticleDetail extends ArticleSummary {
   author: {
     id: string;
     name: string;
+    helpedCount?: number;
   };
   space: {
     id: string;

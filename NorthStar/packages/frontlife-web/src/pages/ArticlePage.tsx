@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
-import { AlertTriangle, Bookmark, CheckCircle, FileText, Flag, Pencil } from 'lucide-react';
+import { AlertTriangle, Bookmark, CheckCircle, ExternalLink, FileText, Flag, LoaderCircle, Pencil, ShieldCheck, X } from 'lucide-react';
 import { ErrorState, LoadingState } from '@/components/LoadingState';
 import { api, type ArticleDetail, type ArticleSummary } from '@/services/api';
 import CodeBlock from '@/components/CodeBlock';
@@ -31,6 +31,12 @@ export default function ArticlePage() {
   const [previousArticleId, setPreviousArticleId] = useState<string | null>(null);
   const [nextArticleId, setNextArticleId] = useState<string | null>(null);
   const [spaceArticles, setSpaceArticles] = useState<ArticleSummary[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editSummary, setEditSummary] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState('');
   const headings = article ? extractHeadings(article.content) : [];
 
   useEffect(() => {
@@ -130,6 +136,62 @@ export default function ArticlePage() {
     }
   };
 
+  const resolveChanged = async () => {
+    if (!token || !article) return;
+    setActionError('');
+    try {
+      await api.resolveArticleChanged(article.id);
+      setArticle({ ...article, changedCount: 0, changeNotes: [] });
+      setMessage('已确认内容更新，变化标记已解除');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '解除变化标记失败');
+    }
+  };
+
+  const startEdit = () => {
+    if (!article) return;
+    setIsEditing(true);
+    setEditTitle(article.title);
+    setEditContent(article.content);
+    setEditSummary(article.summary || '');
+    setEditError('');
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setEditTitle('');
+    setEditContent('');
+    setEditSummary('');
+    setEditError('');
+  };
+
+  const submitEdit = async () => {
+    if (!token || !article) return;
+    if (!editTitle.trim() || !editContent.trim()) {
+      setEditError('标题和内容不能为空');
+      return;
+    }
+    setEditError('');
+    setEditSubmitting(true);
+    try {
+      const result = await api.updateArticle(article.id, {
+        title: editTitle.trim(),
+        content: editContent.trim(),
+        summary: editSummary.trim() || undefined,
+      });
+      setArticle(result.article);
+      cancelEdit();
+      setMessage('文章已更新');
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : '更新失败，请稍后重试');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const userId = useUserStore((state) => state.userId);
+  const isAuthor = article && userId && article.author.id === String(userId);
+
   return (
     <div className="mx-auto max-w-content-max overflow-x-hidden px-4 py-6 sm:px-5 sm:py-8">
       {loading && <LoadingState label="正在加载文章..." />}
@@ -173,6 +235,24 @@ export default function ArticlePage() {
               <FileText size={20} />
             </div>
             <div className="flex flex-wrap items-center justify-end gap-1">
+              {isAuthor && (
+                <button
+                  onClick={isEditing ? cancelEdit : startEdit}
+                  className="rounded-lg px-2 py-1 text-xs text-ink-faint transition-colors hover:bg-bg-subtle hover:text-sage"
+                >
+                  {isEditing ? (
+                    <>
+                      <X size={14} className="mr-1 inline" />
+                      取消
+                    </>
+                  ) : (
+                    <>
+                      <Pencil size={14} className="mr-1 inline" />
+                      编辑
+                    </>
+                  )}
+                </button>
+              )}
               <button
                 onClick={() => {
                   if (!token) return navigate('/login');
@@ -193,17 +273,84 @@ export default function ArticlePage() {
             </div>
           </div>
 
-          <h1 className="break-words font-display text-[28px] font-bold leading-tight text-ink sm:text-[30px]">{article.title}</h1>
-          <div className="mt-3 flex flex-wrap gap-3 text-xs text-ink-faint">
-            <span>{article.author.name}</span>
+          {isEditing ? (
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-ink-secondary">标题</label>
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-bg-subtle px-3 py-2 text-sm outline-none focus:border-sage"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-ink-secondary">摘要</label>
+                <input
+                  value={editSummary}
+                  onChange={(e) => setEditSummary(e.target.value)}
+                  placeholder="文章摘要（可选）"
+                  className="w-full rounded-lg border border-border bg-bg-subtle px-3 py-2 text-sm outline-none focus:border-sage"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-ink-secondary">内容（支持 Markdown）</label>
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  rows={15}
+                  className="w-full resize-none rounded-lg border border-border bg-bg-subtle px-3 py-2 text-sm font-mono outline-none focus:border-sage"
+                />
+              </div>
+              {editError && <div className="text-sm text-rose-custom">{editError}</div>}
+              <div className="flex gap-2">
+                <button
+                  onClick={submitEdit}
+                  disabled={editSubmitting}
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-sage px-4 text-sm font-medium text-white disabled:bg-ink-faint"
+                >
+                  {editSubmitting && <LoaderCircle size={15} className="mr-1.5 animate-spin" />}
+                  保存更改
+                </button>
+                <button
+                  onClick={cancelEdit}
+                  disabled={editSubmitting}
+                  className="inline-flex h-10 items-center justify-center rounded-lg border border-border px-4 text-sm font-medium text-ink-secondary hover:bg-bg-subtle"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h1 className="break-words font-display text-[28px] font-bold leading-tight text-ink sm:text-[30px]">{article.title}</h1>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-ink-faint">
+            <span className="font-medium text-ink-secondary">{article.author.name}</span>
+            {article.author.helpedCount != null && article.author.helpedCount > 0 && (
+              <span className="flex items-center gap-1 text-sage">
+                <ShieldCheck size={12} />
+                累计帮助 {article.author.helpedCount} 人
+              </span>
+            )}
             <span>{article.helpfulCount} 人确认</span>
             {article.confirmedAt && <span>确认于 {new Date(article.confirmedAt).toLocaleDateString()}</span>}
           </div>
 
           {article.changedCount > 0 && (
             <div className="mt-5 rounded-xl border border-amber-light bg-amber-light p-4 text-sm leading-6 text-amber-custom">
-              <AlertTriangle size={15} className="mr-1 inline" />
-              {article.changedCount} 人反馈可能有变化
+              <div className="flex items-center justify-between">
+                <span>
+                  <AlertTriangle size={15} className="mr-1 inline" />
+                  {article.changedCount} 人反馈可能有变化
+                </span>
+                {isAuthor && (
+                  <button
+                    onClick={resolveChanged}
+                    className="rounded-lg bg-amber-custom px-3 py-1 text-xs font-medium text-white transition-colors hover:opacity-90"
+                  >
+                    已更新，解除标记
+                  </button>
+                )}
+              </div>
               {article.changeNotes[0] && <div className="mt-1 text-xs">{article.changeNotes[0].note}</div>}
             </div>
           )}
@@ -306,7 +453,10 @@ export default function ArticlePage() {
             {message && <div className="mt-3 text-sm text-sage">{message}</div>}
             {actionError && <div className="mt-3 text-sm text-rose-custom">{actionError}</div>}
           </div>
+            </>
+          )}
 
+          {!isEditing && (
           <nav className="mt-8 flex flex-col justify-between gap-3 border-t border-border-light pt-5 sm:flex-row">
             {previousArticleId ? (
               <Link to={`/article/${previousArticleId}`} className="rounded-xl border border-border-light px-4 py-3 text-sm text-ink-secondary transition-colors hover:border-sage hover:text-sage">
@@ -321,6 +471,21 @@ export default function ArticlePage() {
               </Link>
             )}
           </nav>
+          )}
+
+          {!isEditing && (
+          <div className="mt-6 rounded-xl border border-border-light bg-bg-subtle px-4 py-3 text-center">
+            <a
+              href="https://xyzidea.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-ink-faint transition-colors hover:text-sage"
+            >
+              AI 还能做什么？看看全球站
+              <ExternalLink size={10} />
+            </a>
+          </div>
+          )}
         </article>
 
           <aside className="sticky top-[72px] hidden max-h-[calc(100vh-88px)] overflow-y-auto rounded-2xl border border-border-light bg-surface p-4 lg:block">

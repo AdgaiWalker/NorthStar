@@ -3,6 +3,7 @@ import type {
   ArticleDraftResponse,
   ArticleSummary,
   AccountDeletionRequestRecord,
+  CampusCapabilityResponse,
   CreateCampusSpaceRequest,
   CreateArticleInput,
   CreatePostInput,
@@ -20,7 +21,6 @@ import type {
   SearchResponse,
   SpaceSummary,
 } from '@ns/shared';
-import { mockApi } from './mockApi';
 import { handleExpiredSession, SESSION_EXPIRED_MESSAGE } from './authSession';
 
 export type {
@@ -70,7 +70,6 @@ interface ApiEnvelope<T> {
 }
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? '';
-const useMock = import.meta.env.VITE_USE_MOCK === 'true';
 const FRONTLIFE_SITE = 'cn';
 
 function toReadableApiMessage(message: string, status?: number) {
@@ -159,8 +158,7 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
 
 export const api = {
   listSpaces() {
-    if (useMock) return mockApi.listSpaces();
-    return request<{ spaces: SpaceSummary[] }>('/api/spaces');
+    return request<{ spaces: SpaceSummary[] }>('/api/campus/spaces');
   },
 
   createSpace(input: CreateCampusSpaceRequest) {
@@ -172,30 +170,34 @@ export const api = {
   },
 
   getSpace(id: string) {
-    if (useMock) return mockApi.getSpace(id);
-    return request<{ space: SpaceSummary; articles: ArticleSummary[] }>(`/api/spaces/${id}`);
+    return request<{ space: SpaceSummary; articles: ArticleSummary[] }>(`/api/campus/spaces/${id}`);
   },
 
   getArticle(id: string) {
-    if (useMock) return mockApi.getArticle(id);
     return request<{
       article: ArticleDetail;
       previousArticleId: string | null;
       nextArticleId: string | null;
-    }>(`/api/articles/${id}`);
+    }>(`/api/campus/articles/${id}`);
   },
 
   createArticle(input: CreateArticleInput) {
-    if (useMock) return mockApi.createArticle(input);
-    return request<{ article: ArticleDetail }>('/api/articles', {
+    return request<{ article: ArticleDetail }>('/api/campus/articles', {
       method: 'POST',
       authIntent: 'write',
       body: JSON.stringify(input),
     });
   },
 
+  updateArticle(articleId: string, input: { title?: string; content?: string; summary?: string }) {
+    return request<{ article: ArticleDetail }>(`/api/campus/articles/${articleId}`, {
+      method: 'PATCH',
+      authIntent: 'write',
+      body: JSON.stringify(input),
+    });
+  },
+
   generateArticleDraft(input: { topic: string; spaceTitle?: string }) {
-    if (useMock) return mockApi.generateArticleDraft(input);
     return request<ArticleDraftResponse>('/api/ai/write', {
       method: 'POST',
       authIntent: 'write',
@@ -204,13 +206,11 @@ export const api = {
   },
 
   getSpacePosts(spaceId: string) {
-    if (useMock) return mockApi.getSpacePosts(spaceId);
-    return request<{ posts: PostRecord[] }>(`/api/spaces/${spaceId}/posts`);
+    return request<{ posts: PostRecord[] }>(`/api/campus/spaces/${spaceId}/posts`);
   },
 
   createPost(input: CreatePostInput) {
-    if (useMock) return mockApi.createPost(input);
-    return request<{ post: PostRecord }>('/api/posts', {
+    return request<{ post: PostRecord }>('/api/campus/posts', {
       method: 'POST',
       authIntent: 'write',
       body: JSON.stringify(input),
@@ -218,36 +218,40 @@ export const api = {
   },
 
   replyToPost(postId: string, content: string) {
-    if (useMock) return mockApi.replyToPost(postId, content);
-    return request<{ reply: PostReplyRecord }>(`/api/posts/${postId}/replies`, {
+    return request<{ reply: PostReplyRecord }>(`/api/campus/posts/${postId}/replies`, {
       method: 'POST',
       authIntent: 'write',
       body: JSON.stringify({ content }),
     });
   },
 
+  updatePost(postId: string, input: { title?: string; content?: string }) {
+    return request<{ post: PostRecord }>(`/api/campus/posts/${postId}`, {
+      method: 'PATCH',
+      authIntent: 'write',
+      body: JSON.stringify(input),
+    });
+  },
+
   markPostSolved(postId: string) {
-    if (useMock) return mockApi.markPostSolved(postId);
-    return request<{ post: PostRecord }>(`/api/posts/${postId}/solve`, {
+    return request<{ post: PostRecord }>(`/api/campus/posts/${postId}/solve`, {
       method: 'POST',
       authIntent: 'write',
     });
   },
 
   markArticleHelpful(articleId: string) {
-    if (useMock) return mockApi.markArticleHelpful(articleId);
     return request<{
       articleId: string;
       helpfulCount: number;
       confirmedAt: string;
-    }>(`/api/articles/${articleId}/helpful`, {
+    }>(`/api/campus/articles/${articleId}/helpful`, {
       method: 'POST',
       authIntent: 'write',
     });
   },
 
   markArticleChanged(articleId: string, note: string) {
-    if (useMock) return mockApi.markArticleChanged(articleId, note);
     return request<{
       articleId: string;
       changedCount: number;
@@ -257,15 +261,21 @@ export const api = {
         note: string;
         createdAt: string;
       };
-    }>(`/api/articles/${articleId}/changed`, {
+    }>(`/api/campus/articles/${articleId}/changed`, {
       method: 'POST',
       authIntent: 'write',
       body: JSON.stringify({ note }),
     });
   },
 
+  resolveArticleChanged(articleId: string) {
+    return request<{ articleId: string; resolved: boolean }>(
+      `/api/campus/articles/${articleId}/resolve-changed`,
+      { method: 'POST', authIntent: 'write' },
+    );
+  },
+
   reportContent(input: { targetType: 'article' | 'post'; targetId: string; reason: string }) {
-    if (useMock) return mockApi.reportContent(input);
     return request<ApiEnvelope<ModerationTaskRecord>>('/api/moderation/tasks', {
       method: 'POST',
       authIntent: 'write',
@@ -281,28 +291,21 @@ export const api = {
   },
 
   getFeed(page: number, pageSize: number) {
-    if (useMock) return mockApi.getFeed(page, pageSize);
-    return request<FeedResponse>(`/api/feed?page=${page}&pageSize=${pageSize}`);
+    return request<FeedResponse>(`/api/campus/feed?page=${page}&pageSize=${pageSize}`);
   },
 
   recordSearchLog(input: { query: string; resultCount: number; usedAi: boolean }) {
-    if (useMock) return mockApi.recordSearchLog(input);
-    return request('/api/search/logs', {
+    return request('/api/campus/search/logs', {
       method: 'POST',
       body: JSON.stringify(input),
     });
   },
 
   search(query: string) {
-    if (useMock) return mockApi.search(query);
-    return request<SearchResponse>(`/api/search?q=${encodeURIComponent(query)}`);
+    return request<SearchResponse>(`/api/campus/search?q=${encodeURIComponent(query)}`);
   },
 
   async searchAiStream(query: string, onDelta: (delta: string) => void) {
-    if (useMock) {
-      return mockApi.searchAiStream(query, onDelta);
-    }
-
     let response: Response;
 
     try {
@@ -354,8 +357,7 @@ export const api = {
     }
   },
 
-  register(input: { username: string; email: string; password: string; consentVersion?: string }) {
-    if (useMock) return mockApi.register(input);
+  register(input: { username: string; email?: string; password: string; consentVersion?: string }) {
     return request<ApiEnvelope<IdentitySession>>('/api/identity/register', {
       method: 'POST',
       body: JSON.stringify({ ...input, site: FRONTLIFE_SITE }),
@@ -363,20 +365,31 @@ export const api = {
   },
 
   login(input: { account: string; password: string }) {
-    if (useMock) return mockApi.login(input);
     return request<ApiEnvelope<IdentitySession>>('/api/identity/login', {
       method: 'POST',
       body: JSON.stringify({ ...input, site: FRONTLIFE_SITE }),
     }).then(unwrapEnvelope);
   },
 
+  requestPasswordReset(input: { account: string }) {
+    return request<ApiEnvelope<{ message: string }>>('/api/identity/password-reset/request', {
+      method: 'POST',
+      body: JSON.stringify({ ...input, site: FRONTLIFE_SITE }),
+    }).then(unwrapEnvelope);
+  },
+
+  confirmPasswordReset(input: { token: string; newPassword: string }) {
+    return request<ApiEnvelope<{ token: string }>>('/api/identity/password-reset/confirm', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }).then(unwrapEnvelope);
+  },
+
   getIdentityMe() {
-    if (useMock) return mockApi.getIdentityMe();
     return request<ApiEnvelope<IdentityMeResponse>>('/api/identity/me').then(unwrapEnvelope);
   },
 
   listLegalDocuments(type?: 'terms' | 'privacy') {
-    if (useMock) return mockApi.listLegalDocuments(type);
     const query = type ? `?type=${type}` : '';
     return request<ApiEnvelope<{ items: LegalDocumentRecord[] }>>(`/api/compliance/legal-documents${query}`).then(
       unwrapEnvelope,
@@ -384,12 +397,10 @@ export const api = {
   },
 
   exportUserData() {
-    if (useMock) return mockApi.exportUserData();
     return request<ApiEnvelope<DataExportResponse>>('/api/compliance/data-export').then(unwrapEnvelope);
   },
 
   requestAccountDeletion(input: { reason?: string }) {
-    if (useMock) return mockApi.requestAccountDeletion(input);
     return request<ApiEnvelope<AccountDeletionRequestRecord>>('/api/compliance/account-deletions', {
       method: 'POST',
       authIntent: 'write',
@@ -398,30 +409,43 @@ export const api = {
   },
 
   getPermissions() {
-    if (useMock) return mockApi.getPermissions();
-    return request<PermissionResponse>('/api/me/permissions');
+    return request<ApiEnvelope<CampusCapabilityResponse>>('/api/platform/capabilities?site=campus')
+      .then(unwrapEnvelope)
+      .then((capabilities) => ({
+        canPost: capabilities.canPost,
+        canWrite: capabilities.canWriteArticle,
+        canCreateSpace: capabilities.canCreateSpace,
+      }));
   },
 
   getNotifications() {
-    if (useMock) return mockApi.getNotifications();
-    return request<{ notifications: NotificationRecord[] }>('/api/notifications');
+    return request<ApiEnvelope<{ notifications: NotificationRecord[] }>>('/api/notification/inbox').then(unwrapEnvelope);
   },
 
   markNotificationRead(id: string) {
-    if (useMock) return mockApi.markNotificationRead(id);
-    return request<{ notification: NotificationRecord }>(`/api/notifications/${id}/read`, {
+    return request<ApiEnvelope<{ notification: NotificationRecord }>>(`/api/notification/${id}/read`, {
       method: 'POST',
       authIntent: 'write',
-    });
+    }).then(unwrapEnvelope);
   },
 
   getProfile() {
-    if (useMock) return mockApi.getProfile();
-    return request<ProfileResponse>('/api/me/profile');
+    return request<ProfileResponse>('/api/campus/me/profile');
+  },
+
+  applyCertification(input: { schoolId: string; schoolName: string }) {
+    return request<{ certification: { status: 'pending'; submittedAt: string } }>('/api/campus/certification/applications', {
+      method: 'POST',
+      authIntent: 'write',
+      body: JSON.stringify(input),
+    });
+  },
+
+  getCertificationStatus() {
+    return request<{ certification: { status: 'none' | 'pending' | 'verified' | 'rejected'; schoolName?: string; submittedAt?: string; reviewedAt?: string; rejectReason?: string } | null }>('/api/campus/me/certification');
   },
 
   favorite(input: { targetType: 'article' | 'space'; targetId: string }) {
-    if (useMock) return mockApi.favorite(input);
     return request<{
       favorite: {
         id: string;
@@ -430,10 +454,25 @@ export const api = {
         title: string;
         createdAt: string;
       };
-    }>('/api/favorites', {
+    }>('/api/campus/favorites', {
       method: 'POST',
       authIntent: 'write',
       body: JSON.stringify(input),
     });
+  },
+
+  claimSpace(spaceId: string, reason: string) {
+    return request<ApiEnvelope<ModerationTaskRecord>>('/api/moderation/tasks', {
+      method: 'POST',
+      authIntent: 'write',
+      body: JSON.stringify({
+        site: 'cn',
+        type: 'space_claim',
+        targetType: 'space',
+        targetId: spaceId,
+        title: '空间认领申请',
+        reason,
+      }),
+    }).then((payload) => ({ task: payload.data }));
   },
 };

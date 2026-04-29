@@ -1,5 +1,8 @@
 import type { AuthTokenPayload } from "../../lib/auth";
+import { createArticleChangedNotificationInDb } from "../../data/postgres";
+import { approveSpaceClaimTask } from "../campus/repository";
 import { assertSiteReadable } from "../../db/site-aware";
+import { applyApplicationReview } from "../identity/service";
 import { writeAuditLog } from "../platform/service";
 import {
   createModerationTask,
@@ -60,6 +63,29 @@ export async function changeModerationTaskStatus(
     before: { ...result.before },
     after: { ...result.after },
   });
+
+  if (result.after.type === "space_claim" && body.status === "resolved") {
+    const claimUpdate = await approveSpaceClaimTask(result.after);
+    if (claimUpdate) {
+      await writeAuditLog({
+        actorId: toNumberOrNull(actor.sub),
+        site,
+        targetType: "space",
+        targetId: claimUpdate.after.slug,
+        action: "campus.space_claim_approved",
+        before: { ...claimUpdate.before },
+        after: { ...claimUpdate.after },
+      });
+    }
+  }
+
+  if (result.after.type === "changed_feedback" && body.status === "resolved") {
+    await createArticleChangedNotificationInDb(result.after.targetId, result.after.reason ?? "内容可能需要重新确认");
+  }
+
+  if (result.after.type === "application_review" && (body.status === "resolved" || body.status === "dismissed")) {
+    await applyApplicationReview(result.after.targetId, body.status === "resolved", actor);
+  }
 
   return { task: result.after };
 }

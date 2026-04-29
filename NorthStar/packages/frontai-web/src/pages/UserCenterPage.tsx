@@ -1,22 +1,24 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   BookOpen,
   Calendar,
   CheckSquare,
+  ChevronRight,
   Clock,
   Copy,
   Download,
   GraduationCap,
+  Github,
   Heart,
   Layout,
   Lock,
   Moon,
   Plus,
   RefreshCw,
-  Search,
   Share2,
+  ShieldCheck,
   Sparkles,
   Sun,
   Trash2,
@@ -28,16 +30,15 @@ import {
   FileText,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { UserSolution, ExportFormat, Language } from '@/types';
-import { MOCK_TOOLS } from '@/constants';
+import type { PaymentOrderRecord, QuotaLedgerRecord, QuotaRecord, SolutionRecord } from '@ns/shared';
+import type { UserSolution, ExportFormat, Language, Tool, Article } from '@/types';
 import { useAppStore } from '@/store/useAppStore';
-import { exportSolutionToFile } from '@/utils/export';
-import { getGuestQuotaState, DAILY_GUEST_QUOTA_LIMITS } from '@/utils/quota';
 import { t } from '../i18n';
+import { billingApi, compassApi, identityApi } from '@/services/api';
 
 type UserCenterTab = 'profile' | 'solutions' | 'favorites' | 'settings' | 'credits' | 'certification';
 
-// 内置学校列表（V1 演示用）
+// 认证学校白名单
 const SCHOOLS = [
   { id: 'heihe', name: '黑河学院' },
 ];
@@ -50,23 +51,48 @@ export const UserCenterPage: React.FC = () => {
     setThemeMode,
     language,
     setLanguage,
-    userSolutions,
-    deleteSolution,
     favoriteToolIds,
-    toggleFavoriteTool,
+    setFavoriteToolIds,
     toggleToolSelection,
     defaultExportFormat,
     setDefaultExportFormat,
     isLoggedIn,
+    currentUser,
     studentCertification,
     submitStudentCertification,
-    mockApproveStudentCertification,
-    mockRejectStudentCertification,
     resetStudentCertification,
   } = useAppStore();
 
   const tab = (tabParam as UserCenterTab) || 'profile';
   const isEyeCare = themeMode === 'eye-care';
+  const [solutionState, setSolutionState] = useState<{
+    key: string;
+    solutions: UserSolution[];
+    tools: Tool[];
+    articles: Article[];
+    error: string;
+  }>({
+    key: '',
+    solutions: [],
+    tools: [],
+    articles: [],
+    error: '',
+  });
+  const [billingState, setBillingState] = useState<{
+    key: string;
+    quota: QuotaRecord | null;
+    ledger: QuotaLedgerRecord[];
+    orders: PaymentOrderRecord[];
+    error: string;
+    creating: boolean;
+  }>({
+    key: '',
+    quota: null,
+    ledger: [],
+    orders: [],
+    error: '',
+    creating: false,
+  });
 
   // 方案详情抽屉
   const [viewSolution, setViewSolution] = useState<UserSolution | null>(null);
@@ -76,6 +102,10 @@ export const UserCenterPage: React.FC = () => {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [githubOAuthConfigured, setGithubOAuthConfigured] = useState(false);
+  const [githubOAuthLoading, setGithubOAuthLoading] = useState(true);
+  const [githubOAuthError, setGithubOAuthError] = useState('');
+  const [favoriteArticleIds, setFavoriteArticleIds] = useState<Set<string>>(new Set());
 
   const resetMenus = () => {
     setShowShareMenu(false);
@@ -93,22 +123,190 @@ export const UserCenterPage: React.FC = () => {
     setViewSolution(null);
   };
 
-  const handleDeleteConfirm = () => {
-    if (!solutionToDelete) return;
-    deleteSolution(solutionToDelete);
-    if (viewSolution?.id === solutionToDelete) {
-      closeSolution();
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    let cancelled = false;
+
+    Promise.all([compassApi.listSolutions(), compassApi.listTools(), compassApi.listFavorites(), compassApi.listArticles()])
+      .then(([solutionResult, toolResult, favoriteResult, articleResult]) => {
+        if (cancelled) return;
+        setFavoriteToolIds(favoriteResult.items.filter((item) => item.targetType === 'tool').map((item) => item.targetId));
+        setFavoriteArticleIds(new Set(favoriteResult.items.filter((item) => item.targetType === 'article').map((item) => item.targetId)));
+        setSolutionState({
+          key: 'loaded',
+          solutions: solutionResult.items.map(toUserSolution),
+          tools: toolResult.items,
+          articles: articleResult.items,
+          error: '',
+        });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setSolutionState({
+          key: 'loaded',
+          solutions: [],
+          tools: [],
+          articles: [],
+          error: error instanceof Error ? error.message : '方案资产加载失败，请稍后重试。',
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, setFavoriteToolIds]);
+
+  useEffect(() => {
+    if (!isLoggedIn || tab !== 'credits') return;
+    let cancelled = false;
+
+    Promise.all([billingApi.getQuota(), billingApi.listOrders()])
+      .then(([quotaResult, orderResult]) => {
+        if (cancelled) return;
+        setBillingState({
+          key: 'loaded',
+          quota: quotaResult.quota,
+          ledger: quotaResult.ledger,
+          orders: orderResult.items,
+          error: '',
+          creating: false,
+        });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setBillingState({
+          key: 'loaded',
+          quota: null,
+          ledger: [],
+          orders: [],
+          error: error instanceof Error ? error.message : '额度信息加载失败，请稍后重试。',
+          creating: false,
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, tab]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    identityApi
+      .getGitHubOAuthStatus()
+      .then((result) => {
+        if (!cancelled) setGithubOAuthConfigured(result.configured);
+      })
+      .catch(() => {
+        if (!cancelled) setGithubOAuthConfigured(false);
+      })
+      .finally(() => {
+        if (!cancelled) setGithubOAuthLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const createQuotaOrder = async () => {
+    setBillingState((current) => ({ ...current, creating: true, error: '' }));
+    try {
+      const order = await billingApi.createManualOrder({ credits: 20, amountCents: 9900, currency: 'CNY' });
+      setBillingState((current) => ({
+        ...current,
+        orders: [order, ...current.orders],
+        creating: false,
+      }));
+    } catch (error) {
+      setBillingState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : '订单创建失败，请稍后重试。',
+        creating: false,
+      }));
     }
-    setSolutionToDelete(null);
   };
 
-  const handleExportSolution = (sol: UserSolution, format: 'md' | 'txt' | 'csv') => {
-    exportSolutionToFile(sol, format, MOCK_TOOLS);
+  const startGitHubBind = async () => {
+    setGithubOAuthError('');
+    setGithubOAuthLoading(true);
+    try {
+      const result = await identityApi.startGitHubOAuth();
+      window.location.href = result.authorizeUrl;
+    } catch (error) {
+      setGithubOAuthError(error instanceof Error ? error.message : 'GitHub OAuth 启动失败，请稍后重试。');
+      setGithubOAuthLoading(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!solutionToDelete) return;
+    try {
+      await compassApi.deleteSolution(solutionToDelete);
+      setSolutionState((current) => ({
+        ...current,
+        solutions: current.solutions.filter((solution) => solution.id !== solutionToDelete),
+      }));
+      if (viewSolution?.id === solutionToDelete) {
+        closeSolution();
+      }
+    } catch (error) {
+      setSolutionState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : '方案删除失败，请稍后重试。',
+      }));
+    } finally {
+      setSolutionToDelete(null);
+    }
+  };
+
+  const handleExportSolution = async (sol: UserSolution, format: 'md' | 'txt' | 'csv') => {
+    try {
+      const content = await compassApi.exportSolution(sol.id, format);
+      downloadTextFile(`${sol.title}.${format}`, content);
+    } catch (error) {
+      setSolutionState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : '方案导出失败，请稍后重试。',
+      }));
+    }
+  };
+
+  const handleRemoveFavorite = async (toolId: string) => {
+    try {
+      await compassApi.removeFavorite({ targetType: 'tool', targetId: toolId });
+      setFavoriteToolIds(Array.from(favoriteToolIds).filter((id) => id !== toolId));
+    } catch (error) {
+      setSolutionState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : '取消收藏失败，请稍后重试。',
+      }));
+    }
+  };
+
+  const handleRemoveArticleFavorite = async (articleId: string) => {
+    try {
+      await compassApi.removeFavorite({ targetType: 'article', targetId: articleId });
+      setFavoriteArticleIds((prev) => {
+        const next = new Set(prev);
+        next.delete(articleId);
+        return next;
+      });
+    } catch (error) {
+      setSolutionState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : '取消收藏失败，请稍后重试。',
+      }));
+    }
   };
 
   const navigateTab = (t: UserCenterTab) => {
     navigate(t === 'profile' ? '/me' : `/me/${t}`);
   };
+  const solutions = solutionState.solutions;
+  const tools = solutionState.tools;
+  const articles = solutionState.articles;
+  const solutionLoading = isLoggedIn && solutionState.key !== 'loaded';
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 animate-in fade-in">
@@ -124,11 +322,11 @@ export const UserCenterPage: React.FC = () => {
           >
             <div className="flex items-center gap-3 px-2 mb-6">
               <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden">
-                <img src="https://picsum.photos/100/100?random=user" alt="User" />
+                <img src="https://picsum.photos/100/100?random=user" alt={currentUser?.name || '用户'} />
               </div>
               <div>
-                <div className="font-bold text-sm">My User</div>
-                <div className="text-xs text-slate-400">Pro Member</div>
+                <div className="font-bold text-sm">{currentUser?.name || '未登录'}</div>
+                <div className="text-xs text-slate-400">{currentUser?.isPro ? 'Pro 用户' : '普通用户'}</div>
               </div>
             </div>
 
@@ -202,7 +400,27 @@ export const UserCenterPage: React.FC = () => {
           {tab === 'solutions' && (
             <div>
               <h2 className="text-2xl font-bold mb-6">我的 AI 方案</h2>
-              {userSolutions.length === 0 ? (
+              {!isLoggedIn ? (
+                <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-2xl">
+                  <Lock className="mx-auto mb-2 opacity-50" size={32} />
+                  <p>登录后才能查看已保存方案</p>
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="mt-4 text-blue-600 font-bold text-sm hover:underline"
+                  >
+                    去登录
+                  </button>
+                </div>
+              ) : solutionLoading ? (
+                <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-2xl">
+                  <Sparkles className="mx-auto mb-2 animate-pulse opacity-50" size={32} />
+                  <p>正在加载方案资产...</p>
+                </div>
+              ) : solutionState.error ? (
+                <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-5 text-sm leading-6 text-rose-700">
+                  {solutionState.error}
+                </div>
+              ) : solutions.length === 0 ? (
                 <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-2xl">
                   <Sparkles className="mx-auto mb-2 opacity-50" size={32} />
                   <p>还没有生成过方案</p>
@@ -215,7 +433,7 @@ export const UserCenterPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {userSolutions.map((sol) => (
+                  {solutions.map((sol) => (
                     <div
                       key={sol.id}
                       onClick={() => openSolution(sol)}
@@ -255,7 +473,7 @@ export const UserCenterPage: React.FC = () => {
                       </p>
                       <div className="flex items-center gap-2">
                         {sol.toolIds.map((tid) => {
-                          const t = MOCK_TOOLS.find((mt) => mt.id === tid);
+                          const t = tools.find((mt) => mt.id === tid);
                           if (!t) return null;
                           return (
                             <img
@@ -294,8 +512,8 @@ export const UserCenterPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <div className="font-bold text-lg">My User</div>
-                  <div className="text-slate-500">user@pangen.ai</div>
+                  <div className="font-bold text-lg">{currentUser?.name || '未命名用户'}</div>
+                  <div className="text-slate-500">{currentUser?.email || '未绑定邮箱'}</div>
                 </div>
               </div>
               <div className="space-y-4 max-w-md">
@@ -305,7 +523,7 @@ export const UserCenterPage: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    defaultValue="My User"
+                    defaultValue={currentUser?.name || '未命名用户'}
                     className="w-full p-2 bg-slate-50 rounded-lg border-none"
                   />
                 </div>
@@ -315,7 +533,7 @@ export const UserCenterPage: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    defaultValue="user@pangen.ai"
+                    defaultValue={currentUser?.email || '未绑定邮箱'}
                     disabled
                     className="w-full p-2 bg-slate-50 rounded-lg border-none opacity-50 cursor-not-allowed"
                   />
@@ -407,6 +625,76 @@ export const UserCenterPage: React.FC = () => {
                   </div>
                   <p className="text-xs text-slate-400 mt-2">“我的方案”快捷导出将使用此格式</p>
                 </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Github size={16} /> GitHub 账号
+                  </h3>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="text-sm font-bold text-slate-900">绑定 GitHub</div>
+                        <div className="mt-1 text-xs leading-5 text-slate-500">
+                          使用已登录的全球站账号发起绑定，后续可直接通过 GitHub OAuth 登录。
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => void startGitHubBind()}
+                        disabled={!isLoggedIn || githubOAuthLoading || !githubOAuthConfigured}
+                        className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
+                          !isLoggedIn || githubOAuthLoading || !githubOAuthConfigured
+                            ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                            : 'bg-slate-900 text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        <Github size={16} />
+                        {githubOAuthLoading ? '检查中' : githubOAuthConfigured ? '绑定 GitHub' : '尚未配置'}
+                      </button>
+                    </div>
+                    {githubOAuthError && <div className="mt-3 text-xs text-rose-700">{githubOAuthError}</div>}
+                  </div>
+                </div>
+                {/* 账号与数据 */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <ShieldCheck size={16} /> 账号与数据
+                  </h3>
+                  <div className="rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                    <button
+                      onClick={() => navigate('/legal/terms')}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 text-sm hover:bg-slate-50 transition-colors"
+                    >
+                      <FileText size={18} className="text-slate-400" />
+                      <span className="flex-1 text-left text-slate-700">用户协议</span>
+                      <ChevronRight size={16} className="text-slate-300" />
+                    </button>
+                    <button
+                      onClick={() => navigate('/legal/privacy')}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 text-sm hover:bg-slate-50 transition-colors"
+                    >
+                      <ShieldCheck size={18} className="text-slate-400" />
+                      <span className="flex-1 text-left text-slate-700">隐私政策</span>
+                      <ChevronRight size={16} className="text-slate-300" />
+                    </button>
+                    <button
+                      disabled
+                      className="w-full flex items-center gap-3 px-4 py-3.5 text-sm opacity-50 cursor-not-allowed"
+                      title="即将上线"
+                    >
+                      <Download size={18} className="text-slate-400" />
+                      <span className="flex-1 text-left text-slate-700">导出我的数据</span>
+                      <span className="text-xs text-slate-400">即将上线</span>
+                    </button>
+                    <button
+                      disabled
+                      className="w-full flex items-center gap-3 px-4 py-3.5 text-sm opacity-50 cursor-not-allowed"
+                      title="即将上线"
+                    >
+                      <Trash2 size={18} className="text-slate-400" />
+                      <span className="flex-1 text-left text-slate-700">申请注销账号</span>
+                      <span className="text-xs text-slate-400">即将上线</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -417,84 +705,92 @@ export const UserCenterPage: React.FC = () => {
               <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
                 <CreditCard size={24} /> 我的额度
               </h2>
-              {(() => {
-                const quota = getGuestQuotaState();
-                const resetDate = new Date(quota.resetAt);
-                const resetTimeStr = `${resetDate.getMonth() + 1}月${resetDate.getDate()}日 00:00`;
-                return (
-                  <div className="space-y-4">
-                    {/* AI 搜索 */}
-                    <div className={`p-6 rounded-2xl ${isEyeCare ? 'bg-white border border-stone-200' : 'bg-white shadow-sm'}`}>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Search size={20} /></div>
-                          <div>
-                            <h3 className="font-bold">AI 搜索</h3>
-                            <p className="text-xs text-slate-500">每日免费次数</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {quota.aiSearchRemaining} <span className="text-sm text-slate-400">/ {DAILY_GUEST_QUOTA_LIMITS.aiSearch}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(quota.aiSearchRemaining / DAILY_GUEST_QUOTA_LIMITS.aiSearch) * 100}%` }} />
-                      </div>
-                    </div>
-                    {/* AI 方案 */}
-                    <div className={`p-6 rounded-2xl ${isEyeCare ? 'bg-white border border-stone-200' : 'bg-white shadow-sm'}`}>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-purple-100 text-purple-600 rounded-lg"><Sparkles size={20} /></div>
-                          <div>
-                            <h3 className="font-bold">AI 方案生成</h3>
-                            <p className="text-xs text-slate-500">每日免费次数</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-purple-600">
-                            {quota.aiSolutionRemaining} <span className="text-sm text-slate-400">/ {DAILY_GUEST_QUOTA_LIMITS.aiSolution}</span>
-                          </div>
+              {!isLoggedIn ? (
+                <div className="rounded-2xl bg-slate-50 px-4 py-12 text-center text-slate-500">
+                  <Lock className="mx-auto mb-2 opacity-50" size={32} />
+                  登录后才能查看账号额度。
+                </div>
+              ) : billingState.key !== 'loaded' ? (
+                <div className="rounded-2xl bg-slate-50 px-4 py-12 text-center text-slate-500">
+                  <Clock className="mx-auto mb-2 animate-pulse opacity-50" size={32} />
+                  正在加载额度信息...
+                </div>
+              ) : billingState.error ? (
+                <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-5 text-sm leading-6 text-rose-700">
+                  {billingState.error}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className={`p-6 rounded-2xl ${isEyeCare ? 'bg-white border border-stone-200' : 'bg-white shadow-sm'}`}>
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Sparkles size={20} /></div>
+                        <div>
+                          <h3 className="font-bold">AI 统一额度</h3>
+                          <p className="text-xs text-slate-500">搜索、方案生成和导出前的 AI 能力统一扣减</p>
                         </div>
                       </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${(quota.aiSolutionRemaining / DAILY_GUEST_QUOTA_LIMITS.aiSolution) * 100}%` }} />
+                      <div className="text-3xl font-bold text-blue-600">
+                        {billingState.quota?.aiCreditsRemaining ?? 0}
+                        <span className="ml-1 text-sm font-medium text-slate-400">点</span>
                       </div>
                     </div>
-                    {/* 重置时间 */}
-                    <div className={`p-4 rounded-xl flex items-center gap-3 ${isEyeCare ? 'bg-amber-50 border border-amber-100' : 'bg-amber-50'}`}>
-                      <Clock size={18} className="text-amber-600" />
-                      <div className="text-sm">
-                        <span className="text-slate-600">下次重置时间：</span>
-                        <span className="font-bold text-amber-700">{resetTimeStr}</span>
-                      </div>
-                    </div>
-                    {/* 说明 */}
-                    <div className="text-sm text-slate-500 space-y-1 p-4 bg-slate-50 rounded-xl">
-                      <p>• 仅在 AI 模式成功返回结果时才会扣减额度</p>
-                      <p>• 失败、超时或回退均不扣次</p>
-                      <p>• 额度用尽后自动切换为 Demo 演示模式（不扣次）</p>
-                    </div>
-                    {/* 行动按钮 */}
-                    <div className="flex gap-3 pt-2">
-                      <button
-                        onClick={() => navigate('/')}
-                        className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Search size={18} /> 去 AI 搜索
-                      </button>
+                    <div className="mt-5 flex flex-wrap gap-3">
                       <button
                         onClick={() => navigate('/solution/new')}
-                        className="flex-1 py-3 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-700"
                       >
                         <Sparkles size={18} /> 生成方案
                       </button>
+                      <button
+                        onClick={() => void createQuotaOrder()}
+                        disabled={billingState.creating}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        <CreditCard size={18} /> {billingState.creating ? '正在创建订单' : '创建 20 点手动订单'}
+                      </button>
                     </div>
                   </div>
-                );
-              })()}
+
+                  <div className={`p-5 rounded-2xl ${isEyeCare ? 'bg-white border border-stone-200' : 'bg-white shadow-sm'}`}>
+                    <h3 className="mb-3 font-bold">额度流水</h3>
+                    {billingState.ledger.length === 0 ? (
+                      <div className="text-sm text-slate-500">暂无额度变化记录。</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {billingState.ledger.slice(0, 6).map((item) => (
+                          <div key={item.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
+                            <span className={item.delta >= 0 ? 'font-bold text-emerald-600' : 'font-bold text-rose-600'}>
+                              {item.delta >= 0 ? '+' : ''}{item.delta} 点
+                            </span>
+                            <span className="text-slate-500">{item.reason}</span>
+                            <span className="text-xs text-slate-400">{new Date(item.createdAt).toLocaleString('zh-CN')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={`p-5 rounded-2xl ${isEyeCare ? 'bg-white border border-stone-200' : 'bg-white shadow-sm'}`}>
+                    <h3 className="mb-3 font-bold">手动订单</h3>
+                    {billingState.orders.length === 0 ? (
+                      <div className="text-sm text-slate-500">暂无订单。创建后由后台确认支付并发放额度。</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {billingState.orders.slice(0, 6).map((order) => (
+                          <div key={order.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
+                            <span className="font-medium">订单 {order.id}</span>
+                            <span className="text-slate-500">{order.credits} 点 · {(order.amountCents / 100).toFixed(2)} {order.currency}</span>
+                            <span className={order.status === 'paid' ? 'font-bold text-emerald-600' : 'font-bold text-amber-600'}>
+                              {order.status === 'paid' ? '已确认' : '待确认'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -549,24 +845,6 @@ export const UserCenterPage: React.FC = () => {
                     <p className="text-sm text-slate-500 mb-2">您的认证申请正在审核，请耐心等待</p>
                     <p className="text-sm text-slate-400">学校：{studentCertification.schoolName}</p>
                   </div>
-                  {/* 演示用操作 */}
-                  <div className="mt-8 pt-6 border-t border-slate-100">
-                    <p className="text-xs text-slate-400 mb-3 text-center">演示用操作（仅开发阶段可见）</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => mockApproveStudentCertification()}
-                        className="flex-1 py-2 bg-green-100 text-green-700 text-sm font-bold rounded-lg hover:bg-green-200"
-                      >
-                        模拟通过
-                      </button>
-                      <button
-                        onClick={() => mockRejectStudentCertification('学生证照片不清晰')}
-                        className="flex-1 py-2 bg-red-100 text-red-700 text-sm font-bold rounded-lg hover:bg-red-200"
-                      >
-                        模拟驳回
-                      </button>
-                    </div>
-                  </div>
                 </div>
               ) : studentCertification.status === 'rejected' ? (
                 // 已驳回
@@ -601,15 +879,6 @@ export const UserCenterPage: React.FC = () => {
                       返回首页
                     </button>
                   </div>
-                  {/* 演示用重置 */}
-                  <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-                    <button
-                      onClick={() => resetStudentCertification()}
-                      className="text-xs text-slate-400 hover:text-slate-600"
-                    >
-                      演示用：重置认证状态
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
@@ -618,61 +887,129 @@ export const UserCenterPage: React.FC = () => {
           {tab === 'favorites' && (
             <div>
               <h2 className="text-2xl font-bold mb-6">我的收藏</h2>
-              {favoriteToolIds.size === 0 ? (
-                <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-2xl">
-                  <Heart className="mx-auto mb-2 opacity-50" size={32} />
-                  <p>还没有收藏任何工具</p>
-                  <button
-                    onClick={() => navigate('/')}
-                    className="mt-4 text-blue-600 font-bold text-sm hover:underline"
-                  >
-                    去首页逛逛
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {Array.from(favoriteToolIds).map((toolId) => {
-                    const tool = MOCK_TOOLS.find((t) => t.id === toolId);
-                    if (!tool) return null;
-                    return (
-                      <div
-                        key={toolId}
-                        className={`p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:border-blue-400 transition-all ${
-                          isEyeCare
-                            ? 'bg-white border border-stone-200'
-                            : 'bg-white border border-slate-100 shadow-sm'
-                        }`}
-                        onClick={() => navigate(`/tool/${toolId}`)}
-                      >
-                        <img
-                          src={tool.imageUrl}
-                          alt={tool.name}
-                          className="w-14 h-14 rounded-lg object-cover bg-slate-100"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-sm truncate">{tool.name}</h3>
-                          <p className="text-xs text-slate-500 line-clamp-1">
-                            {tool.description}
-                          </p>
-                          <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-slate-100 text-slate-500 rounded">
-                            {tool.domain}
-                          </span>
+
+              {/* 收藏的工具 */}
+              <div className="mb-8">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <Zap size={18} className="text-slate-400" /> 收藏的工具
+                </h3>
+                {favoriteToolIds.size === 0 ? (
+                  <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-2xl">
+                    <Heart className="mx-auto mb-2 opacity-50" size={28} />
+                    <p className="text-sm">还没有收藏任何工具</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {Array.from(favoriteToolIds).map((toolId) => {
+                      const tool = tools.find((t) => t.id === toolId);
+                      if (!tool) return null;
+                      return (
+                        <div
+                          key={toolId}
+                          className={`p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:border-blue-400 transition-all ${
+                            isEyeCare
+                              ? 'bg-white border border-stone-200'
+                              : 'bg-white border border-slate-100 shadow-sm'
+                          }`}
+                          onClick={() => navigate(`/tool/${toolId}`)}
+                        >
+                          <img
+                            src={tool.imageUrl}
+                            alt={tool.name}
+                            className="w-14 h-14 rounded-lg object-cover bg-slate-100"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-sm truncate">{tool.name}</h3>
+                            <p className="text-xs text-slate-500 line-clamp-1">
+                              {tool.description}
+                            </p>
+                            <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-slate-100 text-slate-500 rounded">
+                              {tool.domain}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleToolSelection(toolId);
+                              }}
+                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="加入方案"
+                            >
+                              <Plus size={16} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleRemoveFavorite(toolId);
+                              }}
+                              className="p-2 text-pink-500 hover:text-pink-600 hover:bg-pink-50 rounded-lg transition-colors"
+                              title="取消收藏"
+                            >
+                              <Heart size={16} className="fill-pink-500" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 收藏的文章 */}
+              <div>
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <BookOpen size={18} className="text-slate-400" /> 收藏的文章
+                </h3>
+                {favoriteArticleIds.size === 0 ? (
+                  <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-2xl">
+                    <BookOpen className="mx-auto mb-2 opacity-50" size={28} />
+                    <p className="text-sm">还没有收藏任何文章</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {Array.from(favoriteArticleIds).map((articleId) => {
+                      const article = articles.find((a) => a.id === articleId);
+                      if (!article) return null;
+                      return (
+                        <div
+                          key={articleId}
+                          className={`p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:border-blue-400 transition-all ${
+                            isEyeCare
+                              ? 'bg-white border border-stone-200'
+                              : 'bg-white border border-slate-100 shadow-sm'
+                          }`}
+                          onClick={() => navigate(`/article/${articleId}`)}
+                        >
+                          <div className="w-14 h-14 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0">
+                            {article.imageUrl ? (
+                              <img
+                                src={article.imageUrl}
+                                alt={article.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <BookOpen size={24} className="text-slate-400" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-sm truncate">{article.title}</h3>
+                            <p className="text-xs text-slate-500 line-clamp-1">
+                              {article.summary}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-500 rounded">
+                                {article.domain}
+                              </span>
+                              <span className="text-xs text-slate-400">{article.readTime}</span>
+                            </div>
+                          </div>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              toggleToolSelection(toolId);
-                            }}
-                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="加入方案"
-                          >
-                            <Plus size={16} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleFavoriteTool(toolId);
+                              void handleRemoveArticleFavorite(articleId);
                             }}
                             className="p-2 text-pink-500 hover:text-pink-600 hover:bg-pink-50 rounded-lg transition-colors"
                             title="取消收藏"
@@ -680,9 +1017,21 @@ export const UserCenterPage: React.FC = () => {
                             <Heart size={16} className="fill-pink-500" />
                           </button>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 全部为空时的引导 */}
+              {favoriteToolIds.size === 0 && favoriteArticleIds.size === 0 && (
+                <div className="text-center py-4">
+                  <button
+                    onClick={() => navigate('/')}
+                    className="text-blue-600 font-bold text-sm hover:underline"
+                  >
+                    去首页逛逛
+                  </button>
                 </div>
               )}
             </div>
@@ -787,7 +1136,7 @@ export const UserCenterPage: React.FC = () => {
                 </h3>
                 <div className="flex flex-wrap gap-3">
                   {viewSolution.toolIds.map((tid) => {
-                    const tool = MOCK_TOOLS.find((t) => t.id === tid);
+                    const tool = tools.find((t) => t.id === tid);
                     return tool ? (
                       <div
                         key={tid}
@@ -808,6 +1157,11 @@ export const UserCenterPage: React.FC = () => {
                       </div>
                     ) : null;
                   })}
+                  {viewSolution.toolIds.length === 0 && (
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
+                      该方案未绑定具体工具
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -920,3 +1274,26 @@ export const UserCenterPage: React.FC = () => {
     </div>
   );
 };
+
+function toUserSolution(record: SolutionRecord): UserSolution {
+  return {
+    id: record.id,
+    title: record.title,
+    targetGoal: record.targetGoal,
+    toolIds: record.toolIds,
+    aiAdvice: record.content,
+    createdAt: new Date(record.createdAt).toLocaleDateString('zh-CN'),
+  };
+}
+
+function downloadTextFile(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename.replace(/[\\/:*?"<>|]+/g, '-');
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}

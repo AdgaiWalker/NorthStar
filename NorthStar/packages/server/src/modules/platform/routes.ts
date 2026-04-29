@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { SiteAccessError } from "../../db/site-aware";
 import { fail, ok } from "../../lib/http";
-import { authMiddleware, requireAuthUser } from "../../middleware/auth";
+import { authMiddleware, requireAuthUser, resolveAuthUser } from "../../middleware/auth";
 import { requireSiteContext } from "../../middleware/site";
 import {
   changeAdminUserRole,
@@ -12,11 +12,32 @@ import {
   readAdminSummary,
   readAdminUsers,
   readAuditLogs,
+  readContentQualityReport,
+  readFeatureFlags,
+  readPlatformCapabilities,
   readSiteConfigs,
 } from "./service";
 import type { UpdateAdminUserRoleRequest, UpdateSiteConfigRequest } from "./types";
 
 export const platformRoute = new Hono();
+
+platformRoute.get("/api/platform/capabilities", async (c) => {
+  const site = c.req.query("site");
+  if (site !== "campus" && site !== "compass") {
+    return fail(c, 400, "VALIDATION_ERROR", "能力站点参数必须是 campus 或 compass");
+  }
+
+  return ok(c, await readPlatformCapabilities(site, resolveAuthUser(c)));
+});
+
+platformRoute.get("/api/platform/feature-flags", async (c) => {
+  const site = c.req.query("site");
+  if (site !== "campus" && site !== "compass") {
+    return fail(c, 400, "VALIDATION_ERROR", "Feature flag 站点参数必须是 campus 或 compass");
+  }
+
+  return ok(c, await readFeatureFlags(site!));
+});
 
 platformRoute.use("/api/admin/*", authMiddleware);
 
@@ -94,6 +115,15 @@ platformRoute.get("/api/admin/content", async (c) => {
   try {
     const content = await readAdminContent(requireSiteContext(c), requireAuthUser(c));
     return ok(c, { items: content });
+  } catch (error) {
+    return handleKnownError(c, error);
+  }
+});
+
+platformRoute.get("/api/admin/content-quality", async (c) => {
+  try {
+    const report = await readContentQualityReport(requireSiteContext(c), requireAuthUser(c));
+    return ok(c, report);
   } catch (error) {
     return handleKnownError(c, error);
   }

@@ -2,7 +2,6 @@ export const STORAGE_KEYS = {
   themeMode: 'pangen.themeMode',
   language: 'pangen.language',
   selectedToolIds: 'pangen.selectedToolIds',
-  userSolutions: 'pangen.userSolutions',
   analyticsEvents: 'pangen.analyticsEvents',
 
   // 游客额度（本地存储）
@@ -14,13 +13,12 @@ export const STORAGE_KEYS = {
   favoriteToolIds: 'pangen.favoriteToolIds',
   defaultExportFormat: 'pangen.export.defaultFormat',
 
+  // 统一账号
+  identityToken: 'pangen.identity.token',
+  identityUser: 'pangen.identity.user',
+
   // 学生认证
   studentCertification: 'pangen.user.studentCertification',
-
-  // 内容管理（本地 mock）
-  contentItems: 'pangen.content.items',
-  contentAssets: 'pangen.content.assets',
-  contentFolders: 'pangen.content.folders',
 } as const;
 
 export interface StorageReadResult<T> {

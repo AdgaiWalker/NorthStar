@@ -14,10 +14,11 @@ export interface IdentityUser {
 
 export interface RegisterRequest {
   username: string;
-  email: string;
+  email?: string;
   password: string;
   site: Exclude<SiteContext, 'all'>;
   consentVersion?: string;
+  inviteCode?: string;
 }
 
 export interface LoginRequest {
@@ -60,4 +61,56 @@ export interface PasswordResetConfirmRequest {
 
 export interface PasswordResetConfirmResponse {
   message: string;
+}
+
+export type ApplicationRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ApplicationRequestInput {
+  name: string;
+  email: string;
+  useCase: string;
+  site: Exclude<SiteContext, 'all'>;
+}
+
+export interface ApplicationRequestRecord {
+  id: string;
+  site: Exclude<SiteContext, 'all'>;
+  name: string;
+  email: string;
+  useCase: string;
+  status: ApplicationRequestStatus;
+  createdAt: string;
+  reviewedAt?: string;
+}
+
+export interface CreateInviteCodeRequest {
+  code?: string;
+  site: Exclude<SiteContext, 'all'>;
+  maxUses?: number;
+  expiresAt?: string;
+}
+
+export interface InviteCodeRecord {
+  id: string;
+  site: Exclude<SiteContext, 'all'>;
+  code: string;
+  maxUses: number;
+  usedCount: number;
+  expiresAt?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface GitHubOAuthStatusResponse {
+  configured: boolean;
+  site: Exclude<SiteContext, 'all'>;
+  callbackUrl?: string;
+}
+
+export interface GitHubOAuthStartRequest {
+  site: Exclude<SiteContext, 'all'>;
+}
+
+export interface GitHubOAuthStartResponse {
+  authorizeUrl: string;
 }

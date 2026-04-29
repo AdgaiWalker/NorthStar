@@ -1,98 +1,132 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckSquare, Loader2, Share2, Sparkles, AlertTriangle } from 'lucide-react';
-import { UserSolution } from '@/types';
-import { MOCK_TOOLS } from '@/constants';
+import { ArrowLeft, CheckSquare, Loader2, Plus, Share2, Sparkles, AlertTriangle } from 'lucide-react';
+import type { CompassCapabilityResponse } from '@ns/shared';
+import type { Tool } from '@/types';
 import { useAppStore } from '@/store/useAppStore';
 import { useShare } from '@/hooks/useShare';
 import { SITE_URL } from '../constants/ui';
-import { generateSolutionWithAI, buildFallbackSolution } from '@/services/AIService';
-import { DAILY_GUEST_QUOTA_LIMITS, consumeGuestQuota, getGuestQuotaState } from '@/utils/quota';
+import { generateSolutionWithAI } from '@/services/AIService';
+import { compassApi, platformApi } from '@/services/api';
 
 export const SolutionNewPage: React.FC = () => {
   const navigate = useNavigate();
   const {
     themeMode,
+    authToken,
     getSelectedToolIdsArray,
-    saveSolution,
+    toggleToolSelection,
     clearSelection,
   } = useAppStore();
 
   const toolIds = getSelectedToolIdsArray();
-  const selectedTools = MOCK_TOOLS.filter((t) => toolIds.includes(t.id));
-
+  const [tools, setTools] = useState<Tool[]>([]);
+  const [toolLoadError, setToolLoadError] = useState('');
+  const [capabilities, setCapabilities] = useState<CompassCapabilityResponse | null>(null);
+  const selectedTools = tools.filter((t) => toolIds.includes(t.id));
   const [goal, setGoal] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    compassApi
+      .listTools()
+      .then((result) => {
+        if (!cancelled) setTools(result.items);
+      })
+      .catch((error) => {
+        if (!cancelled) setToolLoadError(error instanceof Error ? error.message : '工具列表加载失败，请稍后重试。');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    platformApi
+      .getCompassCapabilities()
+      .then((result) => {
+        if (!cancelled) setCapabilities(result);
+      })
+      .catch(() => {
+        if (!cancelled) setCapabilities(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken]);
+
+  const suggestedTools = useMemo(() => {
+    const normalizedGoal = goal.trim().toLowerCase();
+    const remainingTools = tools.filter((tool) => !toolIds.includes(tool.id));
+    if (!normalizedGoal) return remainingTools.slice(0, 3);
+
+    return remainingTools
+      .map((tool) => {
+        const text = `${tool.name} ${tool.description} ${tool.domain} ${tool.tags.join(' ')}`.toLowerCase();
+        const score = normalizedGoal
+          .split(/\s+/)
+          .filter(Boolean)
+          .reduce((total, word) => total + (text.includes(word) ? 1 : 0), 0);
+        return { tool, score };
+      })
+      .sort((a, b) => b.score - a.score || (b.tool.rating ?? 0) - (a.tool.rating ?? 0))
+      .map((item) => item.tool)
+      .slice(0, 3);
+  }, [goal, toolIds, tools]);
+
   const [isGenerating, setIsGenerating] = useState(false);
   const { copied, copyText } = useShare();
-
-  // 游客额度：用于展示与拦截
-  const [quotaState, setQuotaState] = useState(() => getGuestQuotaState());
 
   const isEyeCare = themeMode === 'eye-care';
 
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [statusType, setStatusType] = useState<'info' | 'error' | ''>('');
 
-  // 如果没有选中工具，引导用户返回首页
-  if (toolIds.length === 0) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-12 text-center">
-        <div className="text-slate-400 mb-4">
-          <Sparkles size={48} className="mx-auto opacity-50" />
-        </div>
-        <h2 className="text-xl font-bold mb-2">请先选择工具</h2>
-        <p className="text-slate-500 mb-6">返回首页，选择你感兴趣的 AI 工具，然后生成方案。</p>
-        <button
-          onClick={() => navigate('/')}
-          className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
-        >
-          去首页选工具
-        </button>
-      </div>
-    );
-  }
-
   const handleGenerate = async () => {
+    if (!authToken) {
+      setStatusMessage('请先登录后再生成并保存私有方案。');
+      setStatusType('error');
+      return;
+    }
+    if (capabilities && !capabilities.canGenerateSolution) {
+      setStatusMessage(capabilities.lockedReason || '当前账号暂未开放方案生成。');
+      setStatusType('error');
+      return;
+    }
+    if (capabilities && !capabilities.canSaveSolution) {
+      setStatusMessage(capabilities.lockedReason || '当前账号暂未开放方案保存。');
+      setStatusType('error');
+      return;
+    }
+
     setIsGenerating(true);
     setStatusMessage('');
     setStatusType('');
 
     try {
       const effectiveGoal = goal.trim() || '探索这些工具的组合潜力';
-      const quota = getGuestQuotaState();
-
-      // 额度耗尽：直接使用演示模式结果，不中断流程
-      const finalResult =
-        quota.aiSolutionRemaining <= 0
-          ? buildFallbackSolution('quota_exhausted', effectiveGoal, selectedTools)
-          : await generateSolutionWithAI(effectiveGoal, selectedTools);
-
-      if (finalResult.mode === 'ai') {
-        consumeGuestQuota('aiSolution', 1);
-      }
-      setQuotaState(getGuestQuotaState());
+      const finalResult = await generateSolutionWithAI(effectiveGoal, selectedTools);
 
       if (finalResult.mode === 'demo') {
         setStatusMessage(
           finalResult.fallbackReason === 'quota_exhausted'
-            ? '演示模式：今日 AI 方案额度已用完，已为你提供不消耗次数的方案草稿。明日 00:00 自动恢复。'
+            ? '演示模式：AI 额度已用完，已提供不消耗额度的基础方案草稿。'
             : '演示模式：AI 服务不可用，已提供基础方案草稿。'
         );
         setStatusType('info');
       }
 
-      const newSolution: UserSolution = {
-        id: Date.now().toString(),
+      const savedSolution = await compassApi.createSolution({
         title: finalResult.title,
         targetGoal: effectiveGoal,
-        toolIds: toolIds,
-        aiAdvice: finalResult.aiAdvice,
-        createdAt: new Date().toLocaleDateString(),
-      };
-
-      saveSolution(newSolution);
+        toolIds,
+        content: finalResult.aiAdvice,
+      });
       clearSelection();
-      navigate('/me/solutions');
+      navigate(`/solution/${savedSolution.id}`);
     } catch (error) {
       console.error('AI 方案生成失败:', error);
       setStatusMessage('AI 请求失败。请检查网络或稍后重试，本次未保存任何方案。');
@@ -103,9 +137,9 @@ export const SolutionNewPage: React.FC = () => {
   };
 
   const handleShare = () => {
-    const textToShare = `【盘根 AI 方案生成】\n已选工具：${selectedTools
-      .map((t) => t.name)
-      .join(' + ')}\n目标：${goal || '探索工具组合潜力'}\n\n快来体验：${SITE_URL}`;
+    const textToShare = `【盘根 AI 方案生成】\n已选工具：${
+      selectedTools.length ? selectedTools.map((t) => t.name).join(' + ') : '暂未选择，先从目标开始'
+    }\n目标：${goal || '探索工具组合潜力'}\n\n快来体验：${SITE_URL}`;
     copyText(textToShare);
   };
 
@@ -153,7 +187,7 @@ export const SolutionNewPage: React.FC = () => {
 
         <div className="mb-4 flex justify-end">
           <div className={`text-xs ${isEyeCare ? 'text-stone-600' : 'text-slate-500'}`}>
-            今日额度：AI 搜索 {quotaState.aiSearchRemaining}/{DAILY_GUEST_QUOTA_LIMITS.aiSearch} · 方案 {quotaState.aiSolutionRemaining}/{DAILY_GUEST_QUOTA_LIMITS.aiSolution}
+            当前方案额度：{capabilities?.solutionRemaining ?? '读取中'}
           </div>
         </div>
 
@@ -170,34 +204,47 @@ export const SolutionNewPage: React.FC = () => {
           </div>
         )}
 
-        {quotaState.aiSolutionRemaining <= 0 && (
+        {toolLoadError && (
+          <div className="mb-6 flex items-start gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-rose-800">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+            <div className="text-sm font-medium leading-relaxed">{toolLoadError}</div>
+          </div>
+        )}
+
+        {capabilities && capabilities.solutionRemaining <= 0 && (
           <div className="mb-6 flex items-start gap-2 rounded-xl bg-amber-50 text-amber-800 px-4 py-3 border border-amber-100">
             <AlertTriangle size={18} className="shrink-0 mt-0.5" />
             <div className="text-sm font-medium">
-              今日 AI 方案额度已用完。请明日 00:00 后重试（额度会重置）。
+              当前 AI 方案额度已用完。可在“我的额度”创建手动订单，后台确认后发放额度。
             </div>
           </div>
         )}
 
         <div className="mb-6">
           <label className="block text-sm font-bold text-slate-500 mb-2 uppercase tracking-wider">
-            已选工具
+            工具上下文
           </label>
-          <div className="flex flex-wrap gap-2">
-            {selectedTools.map((t) => (
-              <div
-                key={t.id}
-                className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg text-sm text-slate-700"
-              >
-                <img
-                  src={t.imageUrl}
-                  className="w-5 h-5 rounded-full object-cover"
-                  alt=""
-                />
-                {t.name}
-              </div>
-            ))}
-          </div>
+          {selectedTools.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {selectedTools.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg text-sm text-slate-700"
+                >
+                  <img
+                    src={t.imageUrl}
+                    className="w-5 h-5 rounded-full object-cover"
+                    alt=""
+                  />
+                  {t.name}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+              可以不选工具直接生成方案。系统会先按目标拆解主工具、辅助工具和校验工具。
+            </div>
+          )}
         </div>
 
         <div className="mb-8">
@@ -207,10 +254,32 @@ export const SolutionNewPage: React.FC = () => {
           <textarea
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
-            placeholder="例如：我想结合这两个工具制作一个自动化营销视频..."
+            placeholder="例如：我想做一个可以持续更新的小红书选题和图文生产流程..."
             className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]"
           />
         </div>
+
+        {suggestedTools.length > 0 && (
+          <div className="mb-8 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-3 text-sm font-bold text-slate-700">可加入方案的候选工具</div>
+            <div className="space-y-2">
+              {suggestedTools.map((tool) => (
+                <button
+                  key={tool.id}
+                  onClick={() => toggleToolSelection(tool.id)}
+                  className="flex w-full items-center gap-3 rounded-xl bg-white px-3 py-2 text-left transition-colors hover:bg-blue-50"
+                >
+                  <img src={tool.imageUrl} className="h-9 w-9 rounded-lg object-cover" alt={tool.name} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold text-slate-800">{tool.name}</span>
+                    <span className="line-clamp-1 text-xs text-slate-500">{tool.description}</span>
+                  </span>
+                  <Plus size={16} className="text-blue-600" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <button
           onClick={handleGenerate}

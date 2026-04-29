@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, BookOpen, CheckCircle, Flag, LoaderCircle, MessageCircle, Sparkles } from 'lucide-react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, BookOpen, CheckCircle, Flag, HandMetal, LoaderCircle, MessageCircle, Pencil, Sparkles, X } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingState } from '@/components/LoadingState';
 import { api, type ArticleSummary, type PostRecord, type SpaceSummary } from '@/services/api';
 import { useUserStore } from '@/store/useUserStore';
@@ -8,8 +8,10 @@ import { useUserStore } from '@/store/useUserStore';
 export default function SpacePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const permissions = useUserStore((state) => state.permissions);
   const userName = useUserStore((state) => state.userName);
+  const userId = useUserStore((state) => state.userId);
   const token = useUserStore((state) => state.token);
   const [space, setSpace] = useState<SpaceSummary | null>(null);
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
@@ -38,6 +40,13 @@ export default function SpacePage() {
   const [postSubmitting, setPostSubmitting] = useState(false);
   const [postError, setPostError] = useState('');
   const [replyError, setReplyError] = useState('');
+  const [claimDialogOpen, setClaimDialogOpen] = useState(false);
+  const [claimReason, setClaimReason] = useState('');
+  const [claimSubmitting, setClaimSubmitting] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editPostContent, setEditPostContent] = useState('');
+  const [editPostSubmitting, setEditPostSubmitting] = useState(false);
+  const [editPostError, setEditPostError] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -63,6 +72,12 @@ export default function SpacePage() {
       cancelled = true;
     };
   }, [id, reloadKey]);
+
+  useEffect(() => {
+    if (searchParams.get('posted') === '1') {
+      setMessage('帖子已发布，已回到对应空间。');
+    }
+  }, [searchParams]);
 
   const parentArticles = articles.filter((article) => !article.parentId);
   const childArticles = articles.filter((article) => article.parentId);
@@ -144,6 +159,29 @@ export default function SpacePage() {
     }
   };
 
+  const submitClaim = async () => {
+    if (!token || !id) return navigate('/login');
+    if (!claimReason.trim()) {
+      setActionError('请说明认领理由。');
+      return;
+    }
+    setMessage('');
+    setActionError('');
+    setClaimSubmitting(true);
+    try {
+      await api.claimSpace(id, claimReason.trim());
+      setClaimDialogOpen(false);
+      setClaimReason('');
+      setMessage('认领申请已提交，请等待审核。');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '认领申请提交失败，请稍后重试。');
+    } finally {
+      setClaimSubmitting(false);
+    }
+  };
+
+  const isSpaceInactive = space ? new Date(space.recentActiveAt) < new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) : false;
+
   const generateDraft = async () => {
     if (!token) return navigate('/login');
     if (!space || !writingTopic.trim()) return;
@@ -197,6 +235,41 @@ export default function SpacePage() {
     }
   };
 
+  const startEditPost = (post: PostRecord) => {
+    setEditingPostId(post.id);
+    setEditPostContent(post.content);
+    setEditPostError('');
+  };
+
+  const cancelEditPost = () => {
+    setEditingPostId(null);
+    setEditPostContent('');
+    setEditPostError('');
+  };
+
+  const submitEditPost = async () => {
+    if (!token || !editingPostId) return;
+    if (!editPostContent.trim()) {
+      setEditPostError('内容不能为空');
+      return;
+    }
+    setEditPostError('');
+    setEditPostSubmitting(true);
+    try {
+      const result = await api.updatePost(editingPostId, {
+        content: editPostContent.trim(),
+      });
+      setPosts((current) => current.map((post) => (post.id === editingPostId ? result.post : post)));
+      if (activePost?.id === editingPostId) setActivePost(result.post);
+      cancelEditPost();
+      setMessage('帖子已更新');
+    } catch (err) {
+      setEditPostError(err instanceof Error ? err.message : '更新失败，请稍后重试');
+    } finally {
+      setEditPostSubmitting(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-content-max overflow-x-hidden px-4 py-6 sm:px-5 sm:py-8">
       {loading && <LoadingState label="正在加载空间..." />}
@@ -238,12 +311,26 @@ export default function SpacePage() {
             <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-sage-light text-sage">
               <BookOpen size={20} />
             </div>
-            <h1 className="break-words font-display text-[28px] font-bold leading-tight text-ink">{space.title}</h1>
-            <p className="mt-2 text-sm leading-7 text-ink-muted">{space.description}</p>
-            <div className="mt-4 flex flex-wrap gap-3 text-xs text-ink-faint">
-              <span>{space.articleCount} 篇文章</span>
-              <span>{space.helpfulCount} 人确认</span>
-              <span>{space.maintainer.name} 维护</span>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <h1 className="break-words font-display text-[28px] font-bold leading-tight text-ink">{space.title}</h1>
+                <p className="mt-2 text-sm leading-7 text-ink-muted">{space.description}</p>
+                <div className="mt-4 flex flex-wrap gap-3 text-xs text-ink-faint">
+                  <span>{space.articleCount} 篇文章</span>
+                  <span>{space.helpfulCount} 人确认</span>
+                  <span>{space.maintainer.name} 维护</span>
+                  {isSpaceInactive && <span className="text-amber-600">较久未更新</span>}
+                </div>
+              </div>
+              {isSpaceInactive && token && (
+                <button
+                  onClick={() => setClaimDialogOpen(true)}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-sage bg-sage-light px-3 py-2 text-sm font-medium text-sage transition-colors hover:bg-sage hover:text-white"
+                >
+                  <HandMetal size={14} />
+                  申请认领
+                </button>
+              )}
             </div>
           </header>
 
@@ -425,45 +512,88 @@ export default function SpacePage() {
               )}
               {visiblePosts.map((post) => (
                 <div key={post.id} className="rounded-2xl border border-border-light bg-surface p-4">
-                  <div className="mb-2 flex items-center justify-between gap-2 text-xs text-ink-muted">
-                    <span className="flex items-center gap-2">
-                      <MessageCircle size={14} className="text-sage" />
-                      {post.author.name}
-                    </span>
-                    <button onClick={() => (token ? setReportPostId(post.id) : navigate('/login'))} className="text-ink-faint hover:text-rose-custom">
-                      <Flag size={13} className="mr-1 inline" />
-                      举报
-                    </button>
-                  </div>
-                  <button onClick={() => setActivePost(post)} className="block w-full break-words text-left text-[15px] leading-7 text-ink">
-                    {post.content}
-                  </button>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
-                    {post.tags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-bg-subtle px-2 py-0.5">
-                        #{tag === 'help' ? '求助' : tag === 'secondhand' ? '二手' : tag === 'event' ? '活动' : tag === 'discussion' ? '讨论' : '分享'}
-                      </span>
-                    ))}
-                    <span>{post.replyCount} 条回复</span>
-                    {post.solved && <span className="text-sage">已解决</span>}
-                    {token && post.tags.includes('help') && !post.solved && (
-                      <button onClick={() => solvePost(post)} className="text-sage">
-                        标记解决了
-                      </button>
-                    )}
-                  </div>
-                  {reportPostId === post.id && (
-                    <div className="mt-3 rounded-xl border border-border-light bg-bg-subtle p-3">
-                      <input
-                        value={reportReason}
-                        onChange={(event) => setReportReason(event.target.value)}
-                        placeholder="请说明举报原因"
-                        className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm outline-none focus:border-sage"
+                  {editingPostId === post.id ? (
+                    <div className="space-y-3">
+                      <textarea
+                        value={editPostContent}
+                        onChange={(e) => setEditPostContent(e.target.value)}
+                        placeholder="帖子内容"
+                        rows={4}
+                        className="w-full resize-none rounded-lg border border-border bg-bg-subtle px-3 py-2 text-sm outline-none focus:border-sage"
                       />
-                      <button onClick={() => submitPostReport(post.id)} className="mt-2 rounded-lg bg-sage px-3 py-1.5 text-xs font-medium text-white">
-                        提交举报
-                      </button>
+                      {editPostError && <div className="text-sm text-rose-custom">{editPostError}</div>}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={submitEditPost}
+                          disabled={editPostSubmitting}
+                          className="inline-flex h-9 items-center justify-center rounded-lg bg-sage px-4 text-sm font-medium text-white disabled:bg-ink-faint"
+                        >
+                          {editPostSubmitting && <LoaderCircle size={15} className="mr-1.5 animate-spin" />}
+                          保存
+                        </button>
+                        <button
+                          onClick={cancelEditPost}
+                          disabled={editPostSubmitting}
+                          className="inline-flex h-9 items-center justify-center rounded-lg border border-border px-4 text-sm font-medium text-ink-secondary hover:bg-bg-subtle"
+                        >
+                          取消
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    <>
+                      <div className="mb-2 flex items-center justify-between gap-2 text-xs text-ink-muted">
+                        <span className="flex items-center gap-2">
+                          <MessageCircle size={14} className="text-sage" />
+                          {post.author.name}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {post.author.id === userId && (
+                            <button
+                              onClick={() => startEditPost(post)}
+                              className="text-ink-faint hover:text-sage"
+                              title="编辑"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          )}
+                          <button onClick={() => (token ? setReportPostId(post.id) : navigate('/login'))} className="text-ink-faint hover:text-rose-custom">
+                            <Flag size={13} className="mr-1 inline" />
+                            举报
+                          </button>
+                        </div>
+                      </div>
+                      <button onClick={() => setActivePost(post)} className="block w-full break-words text-left text-[15px] leading-7 text-ink">
+                        {post.content}
+                      </button>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
+                        {post.tags.map((tag) => (
+                          <span key={tag} className="rounded-full bg-bg-subtle px-2 py-0.5">
+                            #{tag === 'help' ? '求助' : tag === 'secondhand' ? '二手' : tag === 'event' ? '活动' : tag === 'discussion' ? '讨论' : '分享'}
+                          </span>
+                        ))}
+                        <span>{post.replyCount} 条回复</span>
+                        {post.solved && <span className="text-sage">已解决</span>}
+                        {token && post.tags.includes('help') && !post.solved && (
+                          <button onClick={() => solvePost(post)} className="text-sage">
+                            标记解决了
+                          </button>
+                        )}
+                      </div>
+                      {reportPostId === post.id && (
+                        <div className="mt-3 rounded-xl border border-border-light bg-bg-subtle p-3">
+                          <input
+                            value={reportReason}
+                            onChange={(event) => setReportReason(event.target.value)}
+                            placeholder="请说明举报原因"
+                            className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm outline-none focus:border-sage"
+                          />
+                          <button onClick={() => submitPostReport(post.id)} className="mt-2 rounded-lg bg-sage px-3 py-1.5 text-xs font-medium text-white">
+                            提交举报
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ))}
@@ -519,6 +649,45 @@ export default function SpacePage() {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+      {claimDialogOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4" onClick={() => setClaimDialogOpen(false)}>
+          <div className="w-full max-w-[420px] rounded-2xl bg-white p-5 shadow-lg" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex items-center gap-2">
+              <HandMetal size={20} className="text-sage" />
+              <h3 className="text-lg font-semibold text-ink">申请认领空间</h3>
+            </div>
+            <p className="mb-4 text-sm text-ink-muted">
+              该空间较久未更新，你可以申请成为维护者。请说明你的认领理由和计划。
+            </p>
+            <textarea
+              value={claimReason}
+              onChange={(event) => setClaimReason(event.target.value)}
+              placeholder="说明你的认领理由，比如你是该领域的负责人、有定期更新的计划等..."
+              className="h-28 w-full resize-none rounded-xl border border-border bg-bg-subtle px-3 py-2 text-sm outline-none focus:border-sage"
+            />
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={submitClaim}
+                disabled={claimSubmitting || !claimReason.trim()}
+                className="flex-1 rounded-lg bg-sage px-4 py-2 text-sm font-medium text-white disabled:bg-ink-faint"
+              >
+                {claimSubmitting ? '提交中...' : '提交申请'}
+              </button>
+              <button
+                onClick={() => {
+                  setClaimDialogOpen(false);
+                  setClaimReason('');
+                  setActionError('');
+                }}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-ink-secondary hover:bg-bg-subtle"
+              >
+                取消
+              </button>
+            </div>
+            {actionError && <div className="mt-3 text-sm text-rose-custom">{actionError}</div>}
           </div>
         </div>
       )}

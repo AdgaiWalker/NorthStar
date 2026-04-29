@@ -39,6 +39,26 @@ export async function createModerationTask(
 ): Promise<ModerationTaskRecord | null> {
   if (!db) return null;
 
+  // 去重检查：查询是否已存在同 site + type + targetType + targetId + status=pending 的记录
+  const existing = await db
+    .select()
+    .from(moderationTasks)
+    .where(
+      and(
+        eq(moderationTasks.site, input.site),
+        eq(moderationTasks.type, input.type),
+        eq(moderationTasks.targetType, input.targetType),
+        eq(moderationTasks.targetId, input.targetId),
+        eq(moderationTasks.status, "pending"),
+      ),
+    )
+    .limit(1);
+
+  if (existing[0]) {
+    // 已存在 pending 状态的任务，直接返回
+    return toRecord(existing[0]);
+  }
+
   const [row] = await db
     .insert(moderationTasks)
     .values({

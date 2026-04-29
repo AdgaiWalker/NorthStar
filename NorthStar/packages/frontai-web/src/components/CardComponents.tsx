@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, PlayCircle, Video, FileText, Layers, Users, Circle, CheckCircle2 } from 'lucide-react';
+import { Star, PlayCircle, Video, FileText, Layers, Users, Circle, CheckCircle2, Heart } from 'lucide-react';
 import { Tool, Article, ThemeMode, Topic } from '@/types';
 
 interface ToolCardProps {
@@ -7,11 +7,13 @@ interface ToolCardProps {
   onClick: () => void;
   themeMode: ThemeMode;
   isSelected?: boolean;
+  isFavorited?: boolean;
   onToggleSelection?: (e: React.MouseEvent) => void;
+  onToggleFavorite?: (e: React.MouseEvent) => void;
 }
 
-export const ToolCard: React.FC<ToolCardProps> = ({ 
-  tool, onClick, themeMode, isSelected = false, onToggleSelection 
+export const ToolCard: React.FC<ToolCardProps> = ({
+  tool, onClick, themeMode, isSelected = false, isFavorited = false, onToggleSelection, onToggleFavorite
 }) => {
   const isEyeCare = themeMode === 'eye-care';
 
@@ -78,7 +80,17 @@ export const ToolCard: React.FC<ToolCardProps> = ({
              <Users size={12} />
              <span className="text-[10px]">{tool.usageCount}</span>
            </div>
-           {/* Removed Bookmark icon to avoid clutter with selection logic */}
+           {onToggleFavorite && (
+             <button
+               onClick={(e) => { e.stopPropagation(); onToggleFavorite(e); }}
+               className="transition-colors"
+             >
+               <Heart
+                 size={14}
+                 className={isFavorited ? 'text-rose-500 fill-rose-500' : 'hover:text-rose-400'}
+               />
+             </button>
+           )}
         </div>
       </div>
     </div>
@@ -89,9 +101,11 @@ interface ArticleCardProps {
   article: Article;
   onClick: () => void;
   themeMode: ThemeMode;
+  isFavorited?: boolean;
+  onToggleFavorite?: (e: React.MouseEvent) => void;
 }
 
-export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onClick, themeMode }) => {
+export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onClick, themeMode, isFavorited = false, onToggleFavorite }) => {
   const isEyeCare = themeMode === 'eye-care';
 
   return (
@@ -148,6 +162,17 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onClick, them
           <div className="flex items-center gap-3">
              <span>{article.stats.views} 浏览</span>
              <span>{article.stats.likes} 赞</span>
+             {onToggleFavorite && (
+               <button
+                 onClick={(e) => { e.stopPropagation(); onToggleFavorite(e); }}
+                 className="transition-colors"
+               >
+                 <Heart
+                   size={13}
+                   className={isFavorited ? "text-rose-500 fill-rose-500" : "hover:text-rose-400"}
+                 />
+               </button>
+             )}
           </div>
         </div>
       </div>

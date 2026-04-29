@@ -178,6 +178,16 @@ export async function getArticleDetailFromDb(articleSlug: string) {
   const articleRow = rows[0];
   if (!articleRow) return null;
 
+  // 查询作者累计被确认有帮助数
+  const authorStatsRow = await db
+    .select({
+      helpedCount: sql<number>`coalesce(sum(${articles.helpfulCount}), 0)`,
+    })
+    .from(articles)
+    .where(eq(articles.authorId, articleRow.authorId));
+
+  const authorHelpedCount = Number(authorStatsRow[0]?.helpedCount ?? 0);
+
   const siblings = await db
     .select({
       slug: articles.slug,
@@ -222,6 +232,7 @@ export async function getArticleDetailFromDb(articleSlug: string) {
       author: {
         id: String(articleRow.authorId),
         name: articleRow.authorName,
+        helpedCount: authorHelpedCount,
       },
       space: {
         id: articleRow.spaceSlug,
@@ -400,7 +411,6 @@ export async function createPostInDb(input: {
     .returning({ id: posts.id });
 
   if (!created) return null;
-  await createNotificationInDb(input.userId, "reply", "帖子已发布", "你的短帖已经进入空间动态。", "post", created.id);
   await recordTrustEvent(input.userId, "post_created", 10, "post", created.id);
   return getPostById(created.id, space.slug);
 }
@@ -462,6 +472,47 @@ export async function createReplyInDb(postId: string, content: string, userId: n
     starCount: reply.starCount,
     createdAt: toIso(reply.createdAt) ?? new Date().toISOString(),
   } satisfies PostReplyRecord;
+}
+
+export async function updatePostInDb(postId: string, updates: { title?: string; content?: string }, userId: number) {
+  if (!db) return null;
+
+  const numericPostId = Number(postId);
+  if (!Number.isFinite(numericPostId)) return null;
+
+  const [existing] = await db
+    .select({ authorId: posts.authorId, kbSlug: knowledgeBases.slug })
+    .from(posts)
+    .leftJoin(knowledgeBases, eq(posts.kbId, knowledgeBases.id))
+    .where(eq(posts.id, numericPostId));
+
+  if (!existing) return null;
+  if (existing.authorId !== userId) return null;
+
+  const [updated] = await db
+    .update(posts)
+    .set({
+      ...(updates.title !== undefined && { title: updates.title }),
+      ...(updates.content !== undefined && { content: updates.content }),
+      updatedAt: new Date(),
+    })
+    .where(eq(posts.id, numericPostId))
+    .returning({
+      id: posts.id,
+      title: posts.title,
+      content: posts.content,
+      tags: posts.tags,
+      solved: posts.solved,
+      favoriteCount: posts.favoriteCount,
+      replyCount: posts.replyCount,
+      createdAt: posts.createdAt,
+      updatedAt: posts.updatedAt,
+    });
+
+  if (!updated) return null;
+  await insertActivity("post", numericPostId, "update", userId);
+
+  return getPostById(updated.id, existing.kbSlug ?? "");
 }
 
 export async function markPostSolvedInDb(postId: string, userId: number) {
@@ -562,9 +613,6 @@ export async function markArticleChangedInDb(articleSlug: string, note: string, 
     });
 
   await insertActivity("article", article.id, "changed", userId);
-  if (article.authorId !== userId) {
-    await createNotificationInDb(article.authorId, "changed", "有人反馈内容有变化", note, "article", article.id);
-  }
 
   if (!feedback || !updated) return null;
 
@@ -580,7 +628,79 @@ export async function markArticleChangedInDb(articleSlug: string, note: string, 
   };
 }
 
-export async function listNotificationsFromDb(userId: number) {
+export async function updateArticleInDb(
+  articleSlug: string,
+  updates: { title?: string; content?: string; summary?: string },
+  userId: number,
+) {
+  if (!db) return null;
+
+  const article = await resolveArticleBySlug(articleSlug);
+  if (!article) return null;
+
+  const space = await db
+    .select({ ownerId: knowledgeBases.ownerId })
+    .from(knowledgeBases)
+    .where(eq(knowledgeBases.id, article.kbId))
+    .limit(1);
+
+  const isMaintainer = space[0]?.ownerId === userId;
+  if (article.authorId !== userId && !isMaintainer) return null;
+
+  const [updated] = await db
+    .update(articles)
+    .set({
+      ...(updates.title !== undefined && { title: updates.title }),
+      ...(updates.content !== undefined && { content: updates.content }),
+      ...(updates.summary !== undefined && { summary: updates.summary }),
+      updatedAt: new Date(),
+    })
+    .where(eq(articles.id, article.id))
+    .returning({
+      id: articles.id,
+      slug: articles.slug,
+      title: articles.title,
+      content: articles.content,
+      helpfulCount: articles.helpfulCount,
+      changedCount: articles.changedCount,
+      readCount: articles.readCount,
+      favoriteCount: articles.favoriteCount,
+      confirmedAt: articles.confirmedAt,
+      updatedAt: articles.updatedAt,
+    });
+
+  if (!updated) return null;
+  await insertActivity("article", article.id, "update", userId);
+
+  const detail = await getArticleDetailFromDb(updated.slug);
+  return detail?.article ?? null;
+}
+
+export async function resolveArticleChangedInDb(articleSlug: string, userId: number) {
+  if (!db) return null;
+
+  const article = await resolveArticleBySlug(articleSlug);
+  if (!article) return null;
+  if (article.authorId !== userId) return null;
+
+  const [updated] = await db
+    .update(articles)
+    .set({
+      changedCount: 0,
+      confirmedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(articles.id, article.id))
+    .returning({
+      id: articles.id,
+      changedCount: articles.changedCount,
+      confirmedAt: articles.confirmedAt,
+    });
+
+  return updated ? { articleId: articleSlug, resolved: true } : null;
+}
+
+export async function listNotificationsFromDb(userId: number, site: "cn" | "com") {
   if (!db) return null;
 
   const rows = await db
@@ -593,7 +713,7 @@ export async function listNotificationsFromDb(userId: number) {
       createdAt: notifications.createdAt,
     })
     .from(notifications)
-    .where(eq(notifications.userId, userId))
+    .where(and(eq(notifications.userId, userId), eq(notifications.site, site)))
     .orderBy(desc(notifications.createdAt));
 
   return rows.map((row) => ({
@@ -633,6 +753,22 @@ export async function createContentExpiryNotificationInDb(userId: number, articl
   return article;
 }
 
+export async function createArticleChangedNotificationInDb(articleSlug: string, note: string) {
+  const article = await resolveArticleBySlug(articleSlug);
+  if (!article) return null;
+
+  await createNotificationInDb(
+    article.authorId,
+    "changed",
+    "有人反馈内容有变化",
+    note,
+    "article",
+    article.id,
+  );
+
+  return article;
+}
+
 export async function createSpaceClaimNotificationInDb(userId: number, spaceSlug: string) {
   const space = await resolveSpaceBySlug(spaceSlug);
   if (!space) return null;
@@ -649,7 +785,7 @@ export async function createSpaceClaimNotificationInDb(userId: number, spaceSlug
   return space;
 }
 
-export async function markNotificationReadInDb(id: string, userId: number) {
+export async function markNotificationReadInDb(id: string, userId: number, site: "cn" | "com") {
   if (!db) return null;
 
   const numericId = Number(id);
@@ -658,7 +794,7 @@ export async function markNotificationReadInDb(id: string, userId: number) {
   const [updated] = await db
     .update(notifications)
     .set({ isRead: true })
-    .where(and(eq(notifications.id, numericId), eq(notifications.userId, userId)))
+    .where(and(eq(notifications.id, numericId), eq(notifications.userId, userId), eq(notifications.site, site)))
     .returning({
       id: notifications.id,
       type: notifications.type,
@@ -984,6 +1120,37 @@ export async function recordSearchLogInDb(input: {
         createdAt: toIso(record.createdAt) ?? new Date().toISOString(),
       } satisfies SearchLogRecord)
     : null;
+}
+
+export async function listExpiredArticlesFromDb(olderThanDays: number) {
+  if (!db) return null;
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - olderThanDays);
+
+  const rows = await db
+    .select({
+      id: articles.id,
+      slug: articles.slug,
+      authorId: articles.authorId,
+      title: articles.title,
+      confirmedAt: articles.confirmedAt,
+      updatedAt: articles.updatedAt,
+    })
+    .from(articles)
+    .where(
+      sql`${articles.status} = 'published' and coalesce(${articles.confirmedAt}, ${articles.updatedAt}) < ${cutoff.toISOString()}`
+    )
+    .limit(100);
+
+  return rows.map((row) => ({
+    id: String(row.id),
+    slug: row.slug,
+    authorId: row.authorId,
+    title: row.title,
+    confirmedAt: toIso(row.confirmedAt),
+    updatedAt: toIso(row.updatedAt),
+  }));
 }
 
 export async function listSearchGapsFromDb() {
@@ -1414,6 +1581,7 @@ async function resolveArticleBySlug(articleSlug: string) {
   const rows = await db
     .select({
       id: articles.id,
+      kbId: articles.kbId,
       slug: articles.slug,
       authorId: articles.authorId,
     })
@@ -1455,6 +1623,19 @@ async function resolveFavoriteSpace(spaceSlug: string) {
   return rows[0] ?? null;
 }
 
+async function resolveUserNotificationSite(userId: number) {
+  if (!db) return null;
+
+  const rows = await db
+    .select({ site: users.site })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  const site = rows[0]?.site;
+  return site === "com" ? "com" : site === "cn" ? "cn" : null;
+}
+
 async function createNotificationInDb(
   userId: number,
   type: NotificationRecord["type"],
@@ -1464,9 +1645,12 @@ async function createNotificationInDb(
   relatedId?: number,
 ) {
   if (!db) return;
+  const site = await resolveUserNotificationSite(userId);
+  if (!site) return;
 
   await db.insert(notifications).values({
     userId,
+    site,
     type,
     title,
     content,
@@ -1528,6 +1712,11 @@ async function updateTrustLevelFromEvents(userId: number) {
       .where(eq(users.id, userId));
 
     await createNotificationInDb(userId, "trust", "权限已升级", `你当前的贡献已提升到 ${nextTrustLevel}。`, "user", userId);
+
+    // 升级到 author 时发送认证邀请通知
+    if (nextTrustLevel === "author") {
+      await createAuthInviteNotificationInDb(userId);
+    }
   }
 }
 

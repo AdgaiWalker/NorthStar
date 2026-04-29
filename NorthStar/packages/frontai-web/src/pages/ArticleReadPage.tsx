@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, List } from 'lucide-react';
-import { MOCK_ARTICLES, MOCK_TOPICS } from '@/constants';
+import { AlertTriangle, ArrowLeft, List, LoaderCircle } from 'lucide-react';
+import type { Article, Topic } from '@/types';
 import { useAppStore } from '@/store/useAppStore';
-import { useContentStore } from '@/store/useContentStore';
 import { DocRenderer } from '../components/DocRenderer';
 import { extractDocToc } from '@/utils/docMarkdown';
+import { compassApi } from '@/services/api';
+
+type ArticleLoadState = {
+  key: string;
+  article: Article | null;
+  topics: Topic[];
+  topicArticles: Article[];
+  error: string;
+};
 
 export const ArticleReadPage: React.FC = () => {
   const { articleId } = useParams<{ articleId: string }>();
@@ -13,52 +21,59 @@ export const ArticleReadPage: React.FC = () => {
   const topicIdFromQuery = searchParams.get('topicId');
   const navigate = useNavigate();
   const { themeMode } = useAppStore();
-
   const [tocOpen, setTocOpen] = useState(false);
+  const [loadState, setLoadState] = useState<ArticleLoadState>({
+    key: '',
+    article: null,
+    topics: [],
+    topicArticles: [],
+    error: '',
+  });
 
-  const contentStore = useContentStore();
-  const fromStore = contentStore.getArticleById(articleId || '');
-  const mapped = fromStore
-    ? {
-        id: fromStore.id,
-        topicId: fromStore.tags.find((t) => t.startsWith('topic:'))?.slice('topic:'.length),
-        title: fromStore.title,
-        summary: fromStore.summary,
-        content: fromStore.markdown,
-        domain: fromStore.domain,
-        author: '站长',
-        authorLevel: 'certified',
-        date: new Date(fromStore.publishedAt || fromStore.updatedAt).toLocaleDateString(),
-        readTime: '3 min',
-        imageUrl: fromStore.coverImageUrl,
-        isVideo: false,
-        isFeatured: fromStore.tags.includes('featured'),
-        stats: { views: fromStore.stats?.views ?? 0, likes: fromStore.stats?.likes ?? 0, comments: 0 },
-        visibility: fromStore.visibility,
-        schoolId: fromStore.schoolId,
-      }
-    : null;
-  const article = mapped || MOCK_ARTICLES.find((a) => a.id === articleId);
+  useEffect(() => {
+    if (!articleId) return;
+    let cancelled = false;
+    const requestKey = `${articleId}:${topicIdFromQuery ?? ''}`;
+
+    Promise.all([compassApi.getArticle(articleId), compassApi.listTopics(), compassApi.listArticles()])
+      .then(([articleResult, topicResult, articleListResult]) => {
+        if (cancelled) return;
+        const effectiveTopicId = topicIdFromQuery || articleResult.topicId;
+        setLoadState({
+          key: requestKey,
+          article: articleResult,
+          topics: topicResult.items,
+          topicArticles: effectiveTopicId ? articleListResult.items.filter((item) => item.topicId === effectiveTopicId) : [],
+          error: '',
+        });
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setLoadState({
+            key: requestKey,
+            article: null,
+            topics: [],
+            topicArticles: [],
+            error: err instanceof Error ? err.message : '文章加载失败，请稍后重试。',
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [articleId, topicIdFromQuery]);
+
+  const article = loadState.article;
+  const topics = loadState.topics;
+  const topicArticles = loadState.topicArticles;
+  const error = !articleId ? '缺少文章 ID。' : loadState.error;
+  const currentKey = articleId ? `${articleId}:${topicIdFromQuery ?? ''}` : '';
+  const loading = Boolean(articleId) && loadState.key !== currentKey;
   const articleContent = article?.content || '';
   const toc = extractDocToc(articleContent);
-  if (!article) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center text-slate-400 hover:text-slate-700 mb-6 transition-colors"
-        >
-          <ArrowLeft size={18} className="mr-1" /> 返回
-        </button>
-        <div className="text-center py-20 text-slate-400">未找到文章</div>
-      </div>
-    );
-  }
-
-  // Topic 数据
-  const effectiveTopicId = topicIdFromQuery || article.topicId;
-  const topic = effectiveTopicId ? MOCK_TOPICS.find((t) => t.id === effectiveTopicId) : null;
-  const topicArticles = topic ? MOCK_ARTICLES.filter((a) => a.topicId === topic.id) : [];
+  const effectiveTopicId = topicIdFromQuery || article?.topicId;
+  const topic = effectiveTopicId ? topics.find((item) => item.id === effectiveTopicId) : null;
   const isEyeCare = themeMode === 'eye-care';
 
   const scrollToHeading = (id: string) => {
@@ -68,77 +83,95 @@ export const ArticleReadPage: React.FC = () => {
     window.history.replaceState(null, '', `#${id}`);
   };
 
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-12">
+        <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-12 text-sm text-slate-500">
+          <LoaderCircle size={18} className="animate-spin" />
+          正在加载文章...
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !article) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <button
+          onClick={() => navigate('/')}
+          className="mb-6 flex items-center text-slate-400 transition-colors hover:text-slate-700"
+        >
+          <ArrowLeft size={18} className="mr-1" /> 返回
+        </button>
+        <div className="flex items-start gap-2 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-5 text-sm leading-6 text-rose-700">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+          {error || '未找到文章。'}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-[calc(100vh-64px)]">
-      {/* Sidebar (Topic TOC) - Desktop only */}
       {topic && (
         <aside
-          className={`hidden lg:block w-72 border-r border-slate-100 p-6 sticky top-16 h-[calc(100vh-64px)] overflow-y-auto ${
+          className={`hidden h-[calc(100vh-64px)] w-72 overflow-y-auto border-r border-slate-100 p-6 lg:sticky lg:top-16 lg:block ${
             isEyeCare ? 'bg-[#F7F6F2]' : 'bg-white'
           }`}
         >
           <button
             onClick={() => navigate('/')}
-            className="mb-6 text-slate-500 hover:text-slate-800 flex items-center gap-1 text-sm"
+            className="mb-6 flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"
           >
             <ArrowLeft size={14} /> 返回首页
           </button>
           <div className="mb-6">
-            <h3 className="font-bold text-lg mb-2">{topic.title}</h3>
-            <p className="text-xs text-slate-500 line-clamp-2">{topic.description}</p>
+            <h3 className="mb-2 text-lg font-bold">{topic.title}</h3>
+            <p className="line-clamp-2 text-xs text-slate-500">{topic.description}</p>
           </div>
           <div className="space-y-1">
-            {topicArticles.map((a, idx) => (
+            {topicArticles.map((item, idx) => (
               <button
-                key={a.id}
-                onClick={() => navigate(`/article/${a.id}?topicId=${topic.id}`)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-start gap-2 ${
-                  a.id === articleId
-                    ? 'bg-blue-50 text-blue-600 font-medium'
+                key={item.id}
+                onClick={() => navigate(`/article/${item.id}?topicId=${topic.id}`)}
+                className={`flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left text-sm ${
+                  item.id === articleId
+                    ? 'bg-blue-50 font-medium text-blue-600'
                     : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
-                <span className="text-xs opacity-50 mt-0.5">{idx + 1}.</span>
-                <span className="line-clamp-2">{a.title}</span>
+                <span className="mt-0.5 text-xs opacity-50">{idx + 1}.</span>
+                <span className="line-clamp-2">{item.title}</span>
               </button>
             ))}
           </div>
         </aside>
       )}
 
-      {/* Main Content */}
-      <div className="flex-1 max-w-4xl mx-auto p-6 md:p-12">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-slate-400 mb-6">
-          <span
-            className="cursor-pointer hover:text-slate-600"
-            onClick={() => navigate('/')}
-          >
+      <div className="mx-auto max-w-4xl flex-1 p-6 md:p-12">
+        <div className="mb-6 flex items-center gap-2 text-sm text-slate-400">
+          <span className="cursor-pointer hover:text-slate-600" onClick={() => navigate('/')}>
             首页
           </span>
           <span>/</span>
           {topic ? (
             <>
-              <span className="cursor-pointer hover:text-slate-600 truncate max-w-[150px]">
-                {topic.title}
-              </span>
+              <span className="max-w-[150px] truncate">{topic.title}</span>
               <span>/</span>
             </>
           ) : (
             <span>{article.domain}</span>
           )}
-          <span className="text-slate-800 font-medium truncate max-w-[200px]">
-            {article.title}
-          </span>
+          <span className="max-w-[200px] truncate font-medium text-slate-800">{article.title}</span>
         </div>
 
         <header className="mb-8">
           <div className="flex items-start justify-between gap-4">
-            <h1 className="text-3xl md:text-4xl font-extrabold mb-4">{article.title}</h1>
+            <h1 className="mb-4 text-3xl font-extrabold md:text-4xl">{article.title}</h1>
             <button
               type="button"
               onClick={() => setTocOpen(true)}
-              className="xl:hidden shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              className="shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 xl:hidden"
             >
               <span className="inline-flex items-center gap-2">
                 <List size={16} />
@@ -147,46 +180,26 @@ export const ArticleReadPage: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex items-center gap-4 text-sm text-slate-500">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-400"></div>
-              <span>{article.author}</span>
-            </div>
+          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
+            <span>{article.author}</span>
             <span>{article.date}</span>
             <span>{article.readTime}</span>
+            {isContentStale(article.date) && (
+              <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                <AlertTriangle size={12} />
+                发布时间较早，信息可能已变化
+              </span>
+            )}
           </div>
         </header>
 
-        <article
-          className={`prose prose-lg max-w-none ${
-            isEyeCare ? 'prose-stone' : 'prose-slate'
-          }`}
-        >
+        <article className={`prose prose-lg max-w-none ${isEyeCare ? 'prose-stone' : 'prose-slate'}`}>
           <DocRenderer markdown={article.content} />
         </article>
-
-        {/* Comments Section Mock */}
-        <div className="mt-16 pt-8 border-t border-slate-100">
-          <h3 className="font-bold text-lg mb-6">评论 (2)</h3>
-          <div className="space-y-6">
-            {[1, 2].map((i) => (
-              <div key={i} className="flex gap-4">
-                <div className="w-10 h-10 rounded-full bg-slate-200 shrink-0"></div>
-                <div>
-                  <div className="font-bold text-sm text-slate-800">用户 {i}</div>
-                  <p className="text-sm text-slate-600 mt-1">
-                    这篇文章对我很有帮助，特别是关于实操的部分！
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
-      {/* Right TOC - Desktop only */}
-      <aside className="hidden xl:block w-64 p-6 sticky top-16 h-[calc(100vh-64px)]">
-        <h4 className="text-sm font-bold uppercase text-slate-400 mb-4">目录</h4>
+      <aside className="hidden h-[calc(100vh-64px)] w-64 p-6 xl:sticky xl:top-16 xl:block">
+        <h4 className="mb-4 text-sm font-bold uppercase text-slate-400">目录</h4>
         <div className="border-l border-slate-200 pl-4">
           {toc.length ? (
             <div className="space-y-2 text-sm">
@@ -208,16 +221,15 @@ export const ArticleReadPage: React.FC = () => {
         </div>
       </aside>
 
-      {/* Mobile TOC Drawer */}
       {tocOpen && (
         <div className="fixed inset-0 z-50 xl:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setTocOpen(false)} />
           <div
-            className={`absolute right-0 top-0 h-full w-[min(90vw,360px)] border-l border-slate-200 p-6 overflow-y-auto ${
+            className={`absolute right-0 top-0 h-full w-[min(90vw,360px)] overflow-y-auto border-l border-slate-200 p-6 ${
               isEyeCare ? 'bg-[#F7F6F2]' : 'bg-white'
             }`}
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4 flex items-center justify-between">
               <div className="text-sm font-bold text-slate-500">目录</div>
               <button
                 type="button"
@@ -238,7 +250,7 @@ export const ArticleReadPage: React.FC = () => {
                       setTocOpen(false);
                     }}
                     style={{ paddingLeft: Math.max(0, (item.depth - 1) * 12) }}
-                    className="block w-full text-left rounded-md px-2 py-2 text-slate-700 hover:bg-slate-100"
+                    className="block w-full rounded-md px-2 py-2 text-left text-slate-700 hover:bg-slate-100"
                   >
                     {item.text}
                   </button>
@@ -253,3 +265,11 @@ export const ArticleReadPage: React.FC = () => {
     </div>
   );
 };
+
+function isContentStale(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return false;
+  const daysSince = (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24);
+  return daysSince > 180;
+}

@@ -374,6 +374,33 @@ describe('frontlife pages', () => {
     expect(screen.getAllByText('二食堂麻辣烫实测').length).toBeGreaterThan(0);
   });
 
+  it('renders partial search results before AI reference', async () => {
+    apiMock.search.mockResolvedValueOnce({
+      articles: [],
+      posts: [
+        {
+          id: 'post-help',
+          spaceId: 'food',
+          content: '求助：打印店几点关门？',
+          tags: ['help'],
+          author: { id: 'u2', name: '李同学' },
+          helpfulCount: 0,
+          replyCount: 0,
+          createdAt: '刚刚',
+          replies: [],
+          solved: false,
+        },
+      ],
+      spaces: [],
+    });
+
+    renderRoute('/search?q=打印店');
+
+    expect(await screen.findByText('找到相关内容')).toBeInTheDocument();
+    expect(screen.getByText('求助：打印店几点关门？')).toBeInTheDocument();
+    expect(screen.getByText('由 AI 生成，仅供参考')).toBeInTheDocument();
+  });
+
   it('shows AI fallback when search has no local result', async () => {
     apiMock.search.mockResolvedValueOnce({
       articles: [],
@@ -387,6 +414,40 @@ describe('frontlife pages', () => {
     expect(await screen.findByText('由 AI 生成，仅供参考')).toBeInTheDocument();
     expect(await screen.findByText(/AI 补充回答/)).toBeInTheDocument();
     expect(apiMock.searchAiStream).toHaveBeenCalledWith('打印店在哪', expect.any(Function));
+  });
+
+  it('turns an empty search into a prefilled help post', async () => {
+    useUserStore.getState().setToken('test-token');
+    useUserStore.getState().setUser('1', '张同学');
+    useUserStore.getState().setPermissions({
+      canPost: true,
+      canWrite: false,
+      canCreateSpace: false,
+    });
+    apiMock.search.mockResolvedValueOnce({
+      articles: [],
+      posts: [],
+      spaces: [],
+    });
+
+    renderRoute('/search?q=打印店在哪');
+
+    fireEvent.click(await screen.findByRole('button', { name: '发起求助' }));
+
+    expect(await screen.findByDisplayValue('我想问：打印店在哪')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('#求助')).toBeInTheDocument();
+    apiMock.createPost.mockClear();
+    fireEvent.click(screen.getByText('发布'));
+
+    await waitFor(() => {
+      expect(apiMock.createPost).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: '我想问：打印店在哪',
+          tags: ['help'],
+        }),
+      );
+    });
+    expect(await screen.findByText('帖子已发布，已回到对应空间。')).toBeInTheDocument();
   });
 
   it('shows empty article and post states for an empty space', async () => {
@@ -620,6 +681,33 @@ describe('frontlife pages', () => {
     expect(apiMock.markNotificationRead).toHaveBeenCalledWith('notification-1');
   });
 
+  it('limits profile notifications to the most recent 12 items', async () => {
+    useUserStore.getState().setToken('test-token');
+    useUserStore.getState().setUser('1', '张同学');
+    useUserStore.getState().setPermissions({
+      canPost: true,
+      canWrite: false,
+      canCreateSpace: false,
+    });
+    apiMock.getNotifications.mockResolvedValue({
+      notifications: Array.from({ length: 13 }, (_, index) => ({
+        id: `notification-${index + 1}`,
+        type: 'reply' as const,
+        title: `通知 ${index + 1}`,
+        content: `通知内容 ${index + 1}`,
+        isRead: index !== 0,
+        createdAt: `2026-04-${String(index + 1).padStart(2, '0')}T00:00:00.000Z`,
+      })),
+    });
+
+    renderRoute('/me');
+
+    expect(await screen.findByText('共 13 条，显示最近 12 条')).toBeInTheDocument();
+    expect(screen.getByText('通知 1')).toBeInTheDocument();
+    expect(screen.getByText('通知 12')).toBeInTheDocument();
+    expect(screen.queryByText('通知 13')).not.toBeInTheDocument();
+  });
+
   it('keeps notification read state in sync when marking read from the header', async () => {
     useUserStore.getState().setToken('test-token');
     useUserStore.getState().setUser('1', '张同学');
@@ -665,16 +753,13 @@ describe('frontlife pages', () => {
     fireEvent.change(screen.getByLabelText('用户名'), {
       target: { value: 'new-user' },
     });
-    fireEvent.change(screen.getByLabelText('邮箱'), {
-      target: { value: 'new-user@example.com' },
-    });
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: '注册' }));
 
     await waitFor(() => {
       expect(apiMock.register).toHaveBeenCalledWith({
         username: 'new-user',
-        email: 'new-user@example.com',
+        email: undefined,
         password: 'password',
         consentVersion: '2026-04-24',
       });

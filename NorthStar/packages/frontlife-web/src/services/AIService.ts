@@ -12,6 +12,26 @@ export interface StreamChunk {
   done: boolean;
 }
 
+function aiHeaders() {
+  const token = getPersistedToken();
+  return {
+    'Content-Type': 'application/json',
+    'x-pangen-site': 'cn',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+function getPersistedToken() {
+  try {
+    const raw = window.localStorage.getItem('frontlife-user-storage');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { state?: { token?: string | null } };
+    return parsed.state?.token ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ===== 1. 流式对话（AI 写作等实时场景） =====
 
 export const streamChat = async (
@@ -23,7 +43,7 @@ export const streamChat = async (
 
   const res = await fetch(API_ENDPOINTS.AI_CHAT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: aiHeaders(),
     body: JSON.stringify({
       model,
       messages,
@@ -90,7 +110,7 @@ export const aiSearch = async (
 
   const res = await fetch(API_ENDPOINTS.AI_CHAT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: aiHeaders(),
     body: JSON.stringify({
       model: DEFAULT_MODEL,
       messages: [
@@ -131,7 +151,7 @@ export const aiSearch = async (
 export const generateSummary = async (content: string): Promise<string> => {
   const res = await fetch(API_ENDPOINTS.AI_CHAT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: aiHeaders(),
     body: JSON.stringify({
       model: DEFAULT_MODEL,
       messages: [
@@ -198,7 +218,7 @@ export const generateWritingReply = async (
 
   const res = await fetch(API_ENDPOINTS.AI_CHAT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: aiHeaders(),
     body: JSON.stringify({
       model: DEFAULT_MODEL,
       messages,

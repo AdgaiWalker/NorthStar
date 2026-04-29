@@ -1,9 +1,16 @@
 import type {
   EmailVerificationRequest,
   EmailVerificationResponse,
+  ApplicationRequestInput,
+  ApplicationRequestRecord,
+  CreateInviteCodeRequest,
+  GitHubOAuthStartRequest,
+  GitHubOAuthStartResponse,
+  GitHubOAuthStatusResponse,
   IdentityMeResponse,
   IdentitySession,
   IdentityUser,
+  InviteCodeRecord,
   LoginRequest,
   PasswordResetConfirmRequest,
   PasswordResetConfirmResponse,
@@ -15,9 +22,16 @@ import type {
 export type {
   EmailVerificationRequest,
   EmailVerificationResponse,
+  ApplicationRequestInput,
+  ApplicationRequestRecord,
+  CreateInviteCodeRequest,
+  GitHubOAuthStartRequest,
+  GitHubOAuthStartResponse,
+  GitHubOAuthStatusResponse,
   IdentityMeResponse,
   IdentitySession,
   IdentityUser,
+  InviteCodeRecord,
   LoginRequest,
   PasswordResetConfirmRequest,
   PasswordResetConfirmResponse,
@@ -33,10 +47,14 @@ export interface IdentityModuleStatus {
 
 export interface IdentityCreateInput {
   username: string;
-  email: string;
-  passwordHash: string;
+  email?: string;
+  passwordHash?: string;
   site: "cn" | "com";
+  githubId?: string;
+  nickname?: string;
+  avatar?: string;
+  emailVerified?: boolean;
   consentVersion?: string;
-  emailVerificationToken: string;
-  emailVerificationExpiresAt: Date;
+  emailVerificationToken?: string;
+  emailVerificationExpiresAt?: Date;
 }

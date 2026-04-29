@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, BookOpen, MessageCircle, Search, Sparkles } from 'lucide-react';
 import type { FrontlifeFeedItem } from '@ns/shared';
@@ -6,6 +6,7 @@ import { useInfiniteFeed } from '@/hooks/useInfiniteFeed';
 import { api, type SpaceSummary } from '@/services/api';
 import { useSearchStore } from '@/store/useSearchStore';
 import { useUserStore } from '@/store/useUserStore';
+import { useUIStore } from '@/store/useUIStore';
 import FeedSkeleton, { FeedSkeletonList } from '@/components/FeedSkeleton';
 import { EmptyState, ErrorState } from '@/components/LoadingState';
 
@@ -18,6 +19,7 @@ export default function HomePage() {
   const addRecentQuery = useSearchStore((state) => state.addRecentQuery);
   const canPost = useUserStore((state) => state.permissions.canPost);
   const userName = useUserStore((state) => state.userName);
+  const setShowSearch = useUIStore((state) => state.setShowSearch);
   const [query, setQuery] = useState('');
   const [writeOpen, setWriteOpen] = useState(false);
   const [postContent, setPostContent] = useState('');
@@ -26,6 +28,8 @@ export default function HomePage() {
   const [spaces, setSpaces] = useState<SpaceSummary[]>([]);
   const [spacesError, setSpacesError] = useState('');
   const [postError, setPostError] = useState('');
+  const prefillKeyRef = useRef<string | null>(null);
+  const [showGuide, setShowGuide] = useState(() => !localStorage.getItem('guide_dismissed'));
 
   const fetchData = useCallback(async (page: number) => {
     const result = await api.getFeed(page, PAGE_SIZE);
@@ -75,8 +79,22 @@ export default function HomePage() {
   }, [postContent]);
 
   useEffect(() => {
-    if (searchParams.get('write') === '1' && canPost) {
-      setWriteOpen(true);
+    if (searchParams.get('write') !== '1' || !canPost) return;
+
+    setWriteOpen(true);
+
+    const requestedTag = searchParams.get('tag');
+    if (requestedTag && ['share', 'help', 'secondhand', 'event', 'discussion'].includes(requestedTag)) {
+      setPostTag(requestedTag);
+    }
+
+    const helpQuery = searchParams.get('q')?.trim();
+    if (requestedTag === 'help' && helpQuery) {
+      const prefillKey = `help:${helpQuery}`;
+      if (prefillKeyRef.current !== prefillKey) {
+        setPostContent(`我想问：${helpQuery}`);
+        prefillKeyRef.current = prefillKey;
+      }
     }
   }, [canPost, searchParams]);
 
@@ -105,7 +123,7 @@ export default function HomePage() {
       });
       setPostContent('');
       setWriteOpen(false);
-      navigate(`/space/${result.post.spaceId}`);
+      navigate(`/space/${result.post.spaceId}?posted=1`);
     } catch (err) {
       setPostError(err instanceof Error ? err.message : '发布失败，请稍后重试。');
     }
@@ -113,6 +131,17 @@ export default function HomePage() {
 
   return (
     <div className="mx-auto max-w-content-max overflow-x-hidden px-4 pb-28 pt-6 md:px-5 md:pt-12">
+      {showGuide && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl bg-sage-light px-4 py-3 text-sm text-sage">
+          <span className="flex-1">试着搜一个你关心的问题，比如"食堂几点关门"</span>
+          <button
+            onClick={() => { setShowGuide(false); localStorage.setItem('guide_dismissed', '1'); }}
+            className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-sage hover:bg-sage/10"
+          >
+            知道了
+          </button>
+        </div>
+      )}
       <section className="mx-auto max-w-reader-max">
         <p className="text-xs font-semibold tracking-[0.22em] text-sage">PANGEN CAMPUS</p>
         <h1 className="mt-3 font-display text-[34px] font-bold leading-tight text-ink md:text-[46px]">
@@ -122,18 +151,29 @@ export default function HomePage() {
           搜索食堂、报到、选课和二手信息。先看已确认内容，没有结果再由 AI 兜底。
         </p>
 
-        <form onSubmit={submitSearch} className="mt-6 flex h-14 min-w-0 items-center gap-2 rounded-2xl border border-border-light bg-bg-subtle px-3 transition-colors focus-within:border-sage sm:gap-3 sm:px-4">
+        <div
+          onClick={() => setShowSearch(true)}
+          className="mt-6 flex h-14 min-w-0 cursor-pointer items-center gap-2 rounded-2xl border border-border-light bg-bg-subtle px-3 transition-colors hover:border-sage sm:gap-3 sm:px-4"
+        >
           <Search size={18} className="shrink-0 text-ink-faint" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onClick={() => setShowSearch(true)}
             placeholder="问点什么，或者分享点什么"
-            className="h-full min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-faint"
+            className="h-full min-w-0 flex-1 cursor-pointer bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-faint"
+            readOnly
           />
-          <button className="shrink-0 rounded-xl bg-sage px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-sage-dark sm:px-4">
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              setShowSearch(true);
+            }}
+            className="shrink-0 rounded-xl bg-sage px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-sage-dark sm:px-4"
+          >
             搜索
           </button>
-        </form>
+        </div>
 
         {canPost && (
           <div className="mt-4 rounded-2xl border border-border-light bg-surface p-4">

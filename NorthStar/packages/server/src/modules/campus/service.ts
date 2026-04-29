@@ -1,7 +1,13 @@
 import type { AuthTokenPayload } from "../../lib/auth";
 import { writeAuditLog } from "../platform/service";
-import { canCreateCampusSpace, createCampusSpace, readCampusModuleStatus } from "./repository";
-import type { CreateCampusSpaceRequest, SiteContext } from "./types";
+import {
+  canCreateCampusSpace,
+  createCampusSpace,
+  readCampusModuleStatus,
+  scanStaleCampusSpacesForClaim,
+  userExistsInCampus,
+} from "./repository";
+import type { CreateCampusSpaceRequest, SiteContext, SpaceClaimScanRequest, SpaceClaimScanResponse } from "./types";
 
 export function getCampusModuleStatus() {
   return readCampusModuleStatus();
@@ -44,6 +50,48 @@ export async function submitCampusSpace(site: SiteContext, actor: AuthTokenPaylo
   return resultOk(space);
 }
 
+export async function scanCampusSpaceClaims(
+  site: SiteContext,
+  actor: AuthTokenPayload,
+  input: SpaceClaimScanRequest,
+) {
+  if (site !== "cn" || actor.site !== "cn") return resultError("SITE_FORBIDDEN", "空间认领只能在 cn 站点执行", 403);
+  if (!canManageClaims(actor)) return resultError("SPACE_CLAIM_FORBIDDEN", "当前账号没有空间认领管理权限", 403);
+
+  const actorId = Number(actor.sub);
+  if (!Number.isInteger(actorId)) return resultError("INVALID_TOKEN", "登录状态已失效，请重新登录", 401);
+
+  const candidateUserId = input.candidateUserId ? Number(input.candidateUserId) : actorId;
+  if (!Number.isInteger(candidateUserId)) return resultError("VALIDATION_ERROR", "候选人 ID 不正确", 400);
+  if (!(await userExistsInCampus(candidateUserId))) return resultError("VALIDATION_ERROR", "候选人不存在或不属于校园站", 400);
+
+  const olderThanDays = normalizeInteger(input.olderThanDays, 90, 1, 3650);
+  const limit = normalizeInteger(input.limit, 20, 1, 100);
+  const result = await scanStaleCampusSpacesForClaim({ candidateUserId, olderThanDays, limit });
+  if (!result) return resultError("DATABASE_UNAVAILABLE", "数据库不可用，空间认领扫描失败", 503);
+
+  await writeAuditLog({
+    actorId,
+    site,
+    targetType: "space_claim",
+    targetId: "scan",
+    action: "campus.space_claim_scan",
+    before: null,
+    after: {
+      candidateUserId,
+      olderThanDays,
+      createdCount: result.items.length,
+      skippedCount: result.skippedCount,
+    },
+  });
+
+  return resultOk({
+    items: result.items,
+    createdCount: result.items.length,
+    skippedCount: result.skippedCount,
+  } satisfies SpaceClaimScanResponse);
+}
+
 function validateSpaceInput(input: CreateCampusSpaceRequest) {
   if (!input.title?.trim()) return "请填写空间名称";
   if (!input.slug?.trim()) return "请填写空间标识";
@@ -55,6 +103,15 @@ function validateSpaceInput(input: CreateCampusSpaceRequest) {
 
 function normalizeSlug(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function normalizeInteger(value: number | undefined, fallback: number, min: number, max: number) {
+  const parsed = typeof value === "number" && Number.isInteger(value) ? value : fallback;
+  return Math.min(Math.max(parsed, min), max);
+}
+
+function canManageClaims(actor: AuthTokenPayload) {
+  return actor.role === "reviewer" || actor.role === "operator" || actor.role === "admin";
 }
 
 interface Result<T> {

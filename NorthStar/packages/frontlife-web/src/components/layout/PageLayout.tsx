@@ -5,6 +5,7 @@ import { SESSION_EXPIRED_REASON } from '@/services/authSession';
 import { useUIStore } from '@/store/useUIStore';
 import Header from './Header';
 import BottomNav from './BottomNav';
+import Footer from './Footer';
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -49,11 +50,12 @@ export default function PageLayout({ children }: PageLayoutProps) {
       <main
         className={cn(
           'pt-nav-h',
-          showBottomNav && 'pb-bottom-nav-h md:pb-0'
+          showBottomNav && 'pb-24 md:pb-0'
         )}
       >
         {children}
       </main>
+      <Footer />
       {showBottomNav && <BottomNav />}
     </div>
   );

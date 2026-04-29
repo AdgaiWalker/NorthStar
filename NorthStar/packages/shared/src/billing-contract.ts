@@ -19,6 +19,23 @@ export interface PaymentOrderRecord {
   status: PaymentOrderStatus;
   amountCents: number;
   currency: string;
+  credits: number;
   createdAt: string;
   paidAt?: string;
+}
+
+export interface CreatePaymentOrderRequest {
+  credits: number;
+  amountCents: number;
+  currency?: string;
+}
+
+export interface QuotaLedgerRecord {
+  id: string;
+  userId: string;
+  site: Exclude<SiteContext, 'all'>;
+  delta: number;
+  reason: string;
+  balanceAfter: number;
+  createdAt: string;
 }

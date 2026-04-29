@@ -3,12 +3,13 @@ import { useRoutes, useLocation } from 'react-router-dom';
 import { AlertTriangle, X } from 'lucide-react';
 import { routes } from './routes';
 import { useAppStore } from './store/useAppStore';
+import { identityApi } from './services/api';
 import { AppHeader, Footer } from './components/AppLayout';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { UI_COLORS, UI_DELAY } from './constants/ui';
 
 const App: React.FC = () => {
-  const { themeMode, storageResetDetected, dismissStorageResetNotice } = useAppStore();
+  const { themeMode, storageResetDetected, dismissStorageResetNotice, authToken, setIdentityUser, logout } = useAppStore();
   const routeElement = useRoutes(routes);
   const { pathname } = useLocation();
 
@@ -26,6 +27,18 @@ const App: React.FC = () => {
     }, UI_DELAY.TOAST_AUTO_HIDE);
     return () => window.clearTimeout(t);
   }, [showNotice, dismissStorageResetNotice]);
+
+  useEffect(() => {
+    if (!authToken) {
+      setIdentityUser(null);
+      return;
+    }
+
+    identityApi
+      .me()
+      .then((result) => setIdentityUser(result.user))
+      .catch(() => logout());
+  }, [authToken, logout, setIdentityUser]);
 
   const isEyeCare = themeMode === 'eye-care';
   const bgClass = isEyeCare

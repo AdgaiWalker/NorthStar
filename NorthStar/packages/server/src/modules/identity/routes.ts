@@ -1,18 +1,26 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { fail, ok } from "../../lib/http";
-import { authMiddleware, requireAuthUser } from "../../middleware/auth";
+import { authMiddleware, requireAuthUser, resolveAuthUser } from "../../middleware/auth";
 import {
+  createAdminInviteCode,
   confirmPasswordReset,
+  finishGitHubOAuth,
+  getGitHubOAuthStatus,
   getIdentityModuleStatus,
   loginIdentity,
   readIdentityMe,
   registerIdentity,
   requestPasswordReset,
+  startGitHubOAuth,
+  submitApplicationRequest,
   verifyIdentityEmail,
 } from "./service";
 import type {
+  ApplicationRequestInput,
+  CreateInviteCodeRequest,
   EmailVerificationRequest,
+  GitHubOAuthStartRequest,
   LoginRequest,
   PasswordResetConfirmRequest,
   PasswordResetRequest,
@@ -23,9 +31,39 @@ export const identityRoute = new Hono();
 
 identityRoute.get("/api/identity/health", (c) => ok(c, getIdentityModuleStatus()));
 
+identityRoute.get("/api/identity/oauth/github/status", (c) => ok(c, getGitHubOAuthStatus()));
+
+identityRoute.post("/api/identity/oauth/github/start", async (c) => {
+  const body = await readJson<GitHubOAuthStartRequest>(c);
+  const result = await startGitHubOAuth(body, resolveAuthUser(c));
+  return sendResult(c, result);
+});
+
+identityRoute.get("/api/identity/oauth/github/callback", async (c) => {
+  const result = await finishGitHubOAuth({
+    code: c.req.query("code"),
+    state: c.req.query("state"),
+    error: c.req.query("error"),
+    errorDescription: c.req.query("error_description"),
+  });
+  return c.redirect(result.redirectUrl, 302);
+});
+
 identityRoute.post("/api/identity/register", async (c) => {
   const body = await readJson<RegisterRequest>(c);
   const result = await registerIdentity(body);
+  return sendResult(c, result, 201);
+});
+
+identityRoute.post("/api/identity/applications", async (c) => {
+  const body = await readJson<ApplicationRequestInput>(c);
+  const result = await submitApplicationRequest(body);
+  return sendResult(c, result, 201);
+});
+
+identityRoute.post("/api/identity/invites", authMiddleware, async (c) => {
+  const body = await readJson<CreateInviteCodeRequest>(c);
+  const result = await createAdminInviteCode(body, requireAuthUser(c));
   return sendResult(c, result, 201);
 });
 
